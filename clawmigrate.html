@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawMigrate - AI助手配置迁移</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(180deg, #050816 0%, #020617 100%);
+      color: #f8fafc;
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+                  radial-gradient(circle at 50% 50%, rgba(248, 113, 113, 0.05) 0%, transparent 60%);
+      z-index: -1;
+    }
+    .app-container { max-width: 1000px; margin: 0 auto; }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 48px;
+      padding: 20px 28px;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-icon {
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+      font-size: 24px;
+    }
+    .brand-text { display: flex; flex-direction: column; }
+    .brand-name {
+      font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .brand-subtitle { font-size: 12px; color: #64748b; font-weight: 500; }
+    .progress-indicator { display: flex; align-items: center; gap: 8px; }
+    .step-dots { display: flex; gap: 6px; align-items: center; }
+    .step-dot {
+      width: 10px; height: 10px; border-radius: 50%; background: #334155;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .step-dot.completed { background: #10b981; transform: scale(1.2); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15); }
+    .step-dot.active { background: #3b82f6; transform: scale(1.4); box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15); }
+    .step-label {
+      font-size: 13px; font-weight: 600; color: #94a3b8;
+      padding: 6px 12px; background: rgba(30, 41, 59, 0.8);
+      border-radius: 20px; border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .main-content {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 20px;
+      padding: 48px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      margin-bottom: 24px;
+    }
+    .step-panel {
+      display: none; animation: slideInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .step-panel.active { display: block; }
+    @keyframes slideInUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .page-header { margin-bottom: 48px; }
+    .page-title {
+      font-size: 32px; font-weight: 800; margin-bottom: 10px; letter-spacing: -1px;
+    }
+    .page-desc {
+      font-size: 15px; color: #94a3b8; max-width: 560px; line-height: 1.7;
+    }
+    .platforms-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin-bottom: 48px;
+    }
+    .platform-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 2px solid rgba(71, 85, 105, 0.4);
+      border-radius: 14px;
+      padding: 24px 22px;
+      cursor: pointer;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .platform-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #3b82f6, #10b981, #f59e0b);
+      transform: scaleX(0);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .platform-card:hover {
+      border-color: rgba(59, 130, 246, 0.5);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(59, 130, 246, 0.1) inset;
+    }
+    .platform-card.selected {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.08);
+      box-shadow: 0 12px 32px rgba(59, 130, 246, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.3) inset;
+    }
+    .platform-card.selected::before { transform: scaleX(1); }
+    .platform-card-inner {
+      display: flex; align-items: flex-start; gap: 18px;
+    }
+    .platform-card-icon {
+      width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+      font-size: 24px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
+      border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 12px; flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    .platform-card-content { flex: 1; min-width: 0; }
+    .platform-card-name { font-size: 18px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .platform-card-desc { font-size: 13px; color: #94a3b8; margin-bottom: 16px; line-height: 1.5; }
+    .platform-card-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 4px 10px; border-radius: 6px;
+      background: rgba(30, 41, 59, 0.8); color: #64748b;
+      border: 1px solid rgba(71, 85, 105, 0.6);
+    }
+    .platform-card-badge.supported {
+      background: rgba(16, 185, 129, 0.1); color: #34d399; border-color: rgba(16, 185, 129, 0.3);
+    }
+    .prompt-box {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      border-radius: 14px; overflow: hidden; margin-bottom: 36px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+    .prompt-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px 24px;
+      background: rgba(30, 41, 59, 0.8);
+      border-bottom: 1px solid rgba(71, 85, 105, 0.4);
+    }
+    .prompt-title { font-size: 14px; font-weight: 600; color: #cbd5e1; display: flex; align-items: center; gap: 10px; }
+    .copy-btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px;
+      font-size: 13px; font-weight: 600; color: #0f172a;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: all 0.25s ease; box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+    }
+    .copy-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4); }
+    .copy-btn.copied {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+    }
+    .prompt-body {
+      padding: 26px 24px;
+      font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+      font-size: 13px; line-height: 1.8; color: #e2e8f0;
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 380px; overflow-y: auto;
+    }
+    .prompt-body::-webkit-scrollbar { width: 6px; }
+    .prompt-body::-webkit-scrollbar-track { background: transparent; }
+    .prompt-body::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.6); border-radius: 3px; }
+    .input-section { margin-bottom: 32px; }
+    .input-label {
+      font-size: 14px; font-weight: 600; color: #cbd5e1;
+      margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .input-textarea {
+      width: 100%; min-height: 180px; padding: 18px 20px;
+      font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+      font-size: 13px; line-height: 1.6;
+      background: rgba(15, 23, 42, 0.9); color: #e2e8f0;
+      border: 2px solid rgba(71, 85, 105, 0.5); border-radius: 12px;
+      resize: vertical; transition: all 0.25s ease;
+    }
+    .input-textarea:focus {
+      outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+    }
+    .input-textarea.error {
+      border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+    }
+    .alert-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 28px; display: none;
+      align-items: flex-start; gap: 12px;
+    }
+    .alert-box.active { display: flex; }
+    .alert-icon { font-size: 20px; flex-shrink: 0; }
+    .alert-content { flex: 1; }
+    .alert-title { font-size: 14px; font-weight: 700; color: #fca5a5; margin-bottom: 4px; }
+    .alert-message { font-size: 13px; color: #fecaca; line-height: 1.6; }
+    .success-banner {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 12px; padding: 16px 20px; margin-bottom: 28px; display: flex; align-items: center; gap: 12px;
+    }
+    .success-icon { font-size: 22px; flex-shrink: 0; }
+    .success-text { font-size: 14px; color: #a7f3d0; line-height: 1.6; }
+    .category-section {
+      margin-bottom: 36px; padding-bottom: 20px;
+    }
+    .category-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px; padding-bottom: 12px;
+      border-bottom: 1px solid rgba(71, 85, 105, 0.4);
+    }
+    .category-title-group {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .category-icon {
+      width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 8px; font-size: 18px;
+    }
+    .category-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+    .category-count {
+      font-size: 12px; font-weight: 600; color: #64748b;
+      background: rgba(30, 41, 59, 0.9); padding: 4px 10px; border-radius: 20px;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+    }
+    .toggle-all {
+      font-size: 12px; font-weight: 600; color: #38bdf8;
+      cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+      background: none; border: none; transition: color 0.2s ease;
+    }
+    .toggle-all:hover { color: #7dd3fc; }
+    .items-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .item-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid rgba(71, 85, 105, 0.4);
+      border-radius: 10px; padding: 14px 16px; cursor: pointer;
+      transition: all 0.25s ease; display: flex; align-items: flex-start; gap: 12px;
+    }
+    .item-card:hover {
+      border-color: rgba(59, 130, 246, 0.4); transform: translateY(-2px);
+      background: rgba(30, 41, 59, 0.7);
+    }
+    .item-card.selected { border-color: #3b82f6; background: rgba(59, 130, 246, 0.08); }
+    .item-checkbox {
+      width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6;
+      margin-top: 2px; flex-shrink: 0;
+    }
+    .item-content { flex: 1; min-width: 0; }
+    .item-name {
+      font-size: 14px; font-weight: 600; margin-bottom: 4px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .item-desc {
+      font-size: 12px; color: #64748b; line-height: 1.5;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mapping-container {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 14px; overflow: hidden; margin-top: 32px;
+    }
+    .mapping-header {
+      padding: 18px 24px; background: rgba(30, 41, 59, 0.85);
+      border-bottom: 1px solid rgba(71, 85, 105, 0.4);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .mapping-content { padding: 24px; }
+    .mapping-row {
+      display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center;
+      padding: 12px 16px;
+      background: rgba(30, 41, 59, 0.8); border-radius: 10px; margin-bottom: 10px;
+    }
+    .mapping-row:last-child { margin-bottom: 0; }
+    .mapping-field {
+      font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+      font-size: 13px; padding: 8px 14px;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 8px; border: 1px solid rgba(71, 85, 105, 0.4); color: #cbd5e1;
+    }
+    .mapping-arrow { font-size: 20px; color: #38bdf8; font-weight: 700; }
+    .sensitive-section {
+      background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 12px; padding: 20px; margin-top: 24px;
+    }
+    .sensitive-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .sensitive-title { font-size: 15px; font-weight: 700; color: #fecaca; }
+    .sensitive-list {
+      list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;
+    }
+    .sensitive-item {
+      font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+      font-size: 12px; padding: 8px 12px; background: rgba(15, 23, 42, 0.9);
+      border-radius: 6px; border: 1px solid rgba(248, 113, 113, 0.25); color: #fecaca;
+    }
+    .btn-group {
+      display: flex; gap: 14px; justify-content: flex-end;
+      margin-top: 40px; padding-top: 32px; border-top: 1px solid rgba(71, 85, 105, 0.4);
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 26px; font-size: 14px; font-weight: 600;
+      border-radius: 10px; cursor: pointer; transition: all 0.25s ease; border: none; letter-spacing: 0.2px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(59, 130, 246, 0.45); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-secondary {
+      background: rgba(30, 41, 59, 0.9); color: #cbd5e1; border: 1px solid rgba(71, 85, 105, 0.6);
+    }
+    .btn-secondary:hover { background: rgba(51, 65, 85, 0.9); border-color: rgba(100, 116, 139, 0.8); transform: translateY(-1px); }
+    .final-screen { text-align: center; padding: 40px 20px; }
+    .final-icon { font-size: 80px; margin-bottom: 28px; animation: float 3s ease-in-out infinite; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    .final-title { font-size: 34px; font-weight: 800; margin-bottom: 12px; letter-spacing: -1px; }
+    .final-desc {
+      color: #94a3b8; font-size: 16px; line-height: 1.8; margin-bottom: 36px; max-width: 520px; margin-left: auto; margin-right: auto;
+    }
+    footer { text-align: center; padding: 28px; color: #475569; font-size: 13px; }
+    .footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 8px; }
+    .footer-links a { color: #64748b; text-decoration: none; font-weight: 500; transition: color 0.2s ease; }
+    .footer-links a:hover { color: #38bdf8; }
+    .footer-version { font-size: 12px; font-family: 'JetBrains Mono', monospace; opacity: 0.7; }
+    @media (max-width: 768px) {
+      body { padding: 16px; }
+      header { flex-direction: column; gap: 16px; padding: 16px; text-align: center; }
+      .main-content { padding: 28px 20px; }
+      .page-title { font-size: 26px; }
+      .platforms-grid { grid-template-columns: 1fr; gap: 14px; }
+      .platform-card { padding: 18px 16px; }
+      .mapping-row { grid-template-columns: 1fr; gap: 8px; }
+      .mapping-arrow { transform: rotate(90deg); text-align: center; }
+      .btn-group { flex-direction: column; }
+      .btn { width: 100%; padding: 14px 24px; }
+      .final-title { font-size: 28px; }
+      .items-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <div class="brand">
+        <div class="brand-icon">◇</div>
+        <div class="brand-text">
+          <div class="brand-name">ClawMigrate</div>
+          <div class="brand-subtitle">AI助手配置一键迁移</div>
+        </div>
+      </div>
+      <div class="progress-indicator">
+        <div class="step-dots">
+          <div class="step-dot completed" data-step="1"></div>
+          <div class="step-dot" data-step="2"></div>
+          <div class="step-dot" data-step="3"></div>
+          <div class="step-dot" data-step="4"></div>
+          <div class="step-dot" data-step="5"></div>
+        </div>
+        <div class="step-label" id="stepLabel">步骤 1/5</div>
+      </div>
+    </header>
+    <main class="main-content">
+      <div class="step-panel active" id="step1">
+        <div class="page-header">
+          <h1 class="page-title">选择源平台</h1>
+          <p class="page-desc">从以下 AI 助手中选择要导出配置的平台，系统将为您生成导出提示词。</p>
+        </div>
+        <div class="platforms-grid" id="sourcePlatformGrid"></div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btnStep1Next" disabled>继续下一步</button>
+        </div>
+      </div>
+      <div class="step-panel" id="step2">
+        <div class="page-header">
+          <h1 class="page-title">复制导出提示词</h1>
+          <p class="page-desc">请将以下提示词复制到源平台的对话中执行，执行后将返回的完整内容粘贴到下一步。</p>
+        </div>
+        <div class="prompt-box">
+          <div class="prompt-header">
+            <span class="prompt-title">📋 导出提示词</span>
+            <button class="copy-btn" id="copyExportPrompt">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              复制
+            </button>
+          </div>
+          <div class="prompt-body" id="exportPromptContent"></div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary" id="btnStep2Back">返回上一步</button>
+          <button class="btn btn-primary" id="btnStep2Next">已执行，继续</button>
+        </div>
+      </div>
+      <div class="step-panel" id="step3">
+        <div class="page-header">
+          <h1 class="page-title">粘贴并解析配置</h1>
+          <p class="page-desc">将源平台返回的完整内容粘贴到下方，系统将自动解析 JSON 并显示可迁移的内容项。</p>
+        </div>
+        <div class="input-section">
+          <label class="input-label">📝 源平台返回内容</label>
+          <textarea class="input-textarea" id="sourceTextarea" placeholder="请粘贴完整返回内容"></textarea>
+        </div>
+        <div class="alert-box" id="parseError">
+          <span class="alert-icon">⚠️</span>
+          <div class="alert-content">
+            <div class="alert-title">解析失败</div>
+            <div class="alert-message" id="errorMessage"></div>
+          </div>
+        </div>
+        <div id="parseResult" style="display: none;">
+          <div class="category-section" id="skillsSection" style="display: none;">
+            <div class="category-header">
+              <div class="category-title-group">
+                <div class="category-icon">⚡</div>
+                <div class="category-title">Skills</div>
+                <div class="category-count" id="skillsCount">0</div>
+              </div>
+              <button class="toggle-all" id="toggleAllSkills">全选/反选</button>
+            </div>
+            <div class="items-grid" id="skillsList"></div>
+          </div>
+          <div class="category-section" id="automationsSection" style="display: none;">
+            <div class="category-header">
+              <div class="category-title-group">
+                <div class="category-icon">⏰</div>
+                <div class="category-title">定时任务</div>
+                <div class="category-count" id="automationsCount">0</div>
+              </div>
+              <button class="toggle-all" id="toggleAllAutomations">全选/反选</button>
+            </div>
+            <div class="items-grid" id="automationsList"></div>
+          </div>
+          <div class="category-section" id="mcpSection" style="display: none;">
+            <div class="category-header">
+              <div class="category-title-group">
+                <div class="category-icon">🔗</div>
+                <div class="category-title">MCP 连接</div>
+                <div class="category-count" id="mcpCount">0</div>
+              </div>
+              <button class="toggle-all" id="toggleAllMcp">全选/反选</button>
+            </div>
+            <div class="items-grid" id="mcpList"></div>
+          </div>
+          <div class="category-section" id="memorySection" style="display: none;">
+            <div class="category-header">
+              <div class="category-title-group">
+                <div class="category-icon">🧠</div>
+                <div class="category-title">用户记忆</div>
+              </div>
+            </div>
+            <div class="item-card" id="memoryCard">
+              <input type="checkbox" class="item-checkbox" id="memoryCheckbox">
+              <div class="item-content">
+                <div class="item-name">用户记忆数据</div>
+                <div class="item-desc">包含上下文、偏好设置、关键项目信息等</div>
+              </div>
+            </div>
+          </div>
+          <div class="category-section" id="settingsSection" style="display: none;">
+            <div class="category-header">
+              <div class="category-title-group">
+                <div class="category-icon">⚙️</div>
+                <div class="category-title">系统设置</div>
+              </div>
+            </div>
+            <div class="item-card" id="settingsCard">
+              <input type="checkbox" class="item-checkbox" id="settingsCheckbox">
+              <div class="item-content">
+                <div class="item-name">系统配置</div>
+                <div class="item-desc">包含响应语言、工作模式、记忆文件等</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary" id="btnStep3Back">返回上一步</button>
+          <button class="btn btn-primary" id="btnStep3Next" disabled>继续下一步</button>
+        </div>
+      </div>
+      <div class="step-panel" id="step4">
+        <div class="page-header">
+          <h1 class="page-title">选择目标平台</h1>
+          <p class="page-desc">选择您要将配置迁移到的 AI 助手平台，下方可预览字段映射关系。</p>
+        </div>
+        <div class="platforms-grid" id="targetPlatformGrid"></div>
+        <div class="mapping-container" id="mappingSection" style="display: none;">
+          <div class="mapping-header">
+            <span class="category-icon">↔️</span>
+            <span class="category-title">字段映射预览</span>
+          </div>
+          <div class="mapping-content" id="mappingGrid"></div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary" id="btnStep4Back">返回上一步</button>
+          <button class="btn btn-primary" id="btnStep4Next" disabled>继续下一步</button>
+        </div>
+      </div>
+      <div class="step-panel" id="step5">
+        <div class="page-header">
+          <h1 class="page-title">生成导入提示词</h1>
+          <p class="page-desc">将以下提示词复制到目标平台的对话中执行，系统将提示您提供敏感信息并完成配置。</p>
+        </div>
+        <div class="success-banner" id="successBanner">
+          <span class="success-icon">✅</span>
+          <span class="success-text">检测到 <strong id="sensitiveCount">0</strong> 个敏感字段，已自动处理</span>
+        </div>
+        <div class="sensitive-section" id="sensitiveSection" style="display: none;">
+          <div class="sensitive-header">
+            <span class="alert-icon">⚠️</span>
+            <span class="sensitive-title">需要手动提供的敏感信息</span>
+          </div>
+          <ul class="sensitive-list" id="sensitiveList"></ul>
+        </div>
+        <div class="prompt-box">
+          <div class="prompt-header">
+            <span class="prompt-title">📋 导入提示词</span>
+            <button class="copy-btn" id="copyImportPrompt">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              复制
+            </button>
+          </div>
+          <div class="prompt-body" id="importPromptContent"></div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary" id="btnStep5Back">返回上一步</button>
+          <button class="btn btn-primary" id="btnComplete">完成迁移</button>
+        </div>
+      </div>
+      <div class="step-panel" id="final">
+        <div class="final-screen">
+          <div class="final-icon">🎉</div>
+          <h1 class="final-title">迁移准备完成！</h1>
+          <p class="final-desc">您已成功生成导入提示词，请在目标 AI 助手平台中执行该提示词，系统将引导您完成剩余配置。</p>
+          <div class="btn-group" style="justify-content: center;">
+            <button class="btn btn-primary" id="btnRestart">重新开始新迁移</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    <footer>
+      <div class="footer-links">
+        <a href="#" onclick="showHelp()">使用帮助</a>
+        <a href="#" onclick="showAbout()">关于</a>
+      </div>
+      <div class="footer-version">ClawMigrate v4</div>
+    </footer>
+  </div>
+  <script>
+    const PLATFORMS = [
+      { id: 'QClaw', label: 'QClaw', desc: '全能型 AI 助手平台', lang: 'en', icon: '◇' },
+      { id: 'WorkBuddy', label: 'WorkBuddy', desc: '智能工作伙伴', lang: 'en', icon: '◆' },
+      { id: 'OpenClaw', label: 'OpenClaw', desc: '开源 AI 助手框架', lang: 'en', icon: '◈' },
+      { id: 'Claude', label: 'Claude', desc: 'Anthropic AI 助手', lang: 'en', icon: '◎' },
+      { id: 'Kimi', label: 'Kimi', desc: '智能助手', lang: 'cn', icon: '◉' },
+    ];
+    const FIELD_MAPPING = {
+      QClaw: { automations: 'automations', skills: 'skills', mcp_connections: 'mcp_connections', user_memory: 'user_memory', system_settings: 'system_settings' },
+      WorkBuddy: { automations: 'automations', skills: 'skills', mcp_connections: 'mcp_connections', user_memory: 'user_memory', system_settings: 'system_settings' },
+      OpenClaw: { automations: 'scheduled_tasks', skills: 'tools', mcp_connections: 'mcps', user_memory: 'memory', system_settings: 'preferences' },
+      Claude: { automations: 'recurring_tasks', skills: 'capabilities', mcp_connections: 'connectors', user_memory: 'project_memory', system_settings: 'preferences' },
+      Kimi: { automations: '定时任务', skills: '技能', mcp_connections: 'MCP服务', user_memory: '用户记忆', system_settings: '偏好设置' },
+    };
+    let state = {
+      currentStep: 1, sourcePlatform: null, targetPlatform: null, exportedPrompt: '', rawSourceText: '',
+      parsedConfig: null, parseError: null,
+      selectedItems: { skills: [], automations: [], mcp_connections: [], user_memory: false, system_settings: false },
+      fieldMapping: null, sensitiveFields: [], importPrompt: '',
+    };
+    function buildExportPrompt(platform) {
+      return `请导出你的完整配置信息，包含以下内容：
+1. automations - 所有定时任务（包含 name, status, scheduleType, rrule, prompt, core_script）
+2. skills - 所有技能（包含 name, version, description, config_file, configured_account）
+3. mcp_connections - 所有 MCP 连接（包含 note, actual_mcp_via_mcporter）
+4. system_settings - 系统设置（包含 response_language, working_mode, memory_files）
+5. workspace - 工作空间信息（包含 name, path, key_files, python_env, tools）
+6. user_memory - 用户记忆（包含 context, preferences, key_project_facts）
+
+请将敏感信息（如 API token、密钥、密码等）替换为 [REDACTED]，然后以 JSON 格式输出。`;
+    }
+    function parseSourceText(text) {
+      let trimmed = text.trim();
+      let raw = trimmed;
+      try { return { ok: true, data: JSON.parse(trimmed), raw }; } catch (e) {}
+      const jsonCodeBlock = trimmed.match(/```json\s*([\s\S]*?)\s*```/i);
+      if (jsonCodeBlock) { try { return { ok: true, data: JSON.parse(jsonCodeBlock[1].trim()), raw }; } catch (e) {} }
+      const codeBlock = trimmed.match(/```\s*([\s\S]*?)\s*```/i);
+      if (codeBlock) { try { return { ok: true, data: JSON.parse(codeBlock[1].trim()), raw }; } catch (e) {} }
+      const firstBrace = trimmed.indexOf('{');
+      const lastBrace = trimmed.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
+        const jsonStr = trimmed.substring(firstBrace, lastBrace + 1);
+        try { return { ok: true, data: JSON.parse(jsonStr), raw }; } catch (e) {}
+      }
+      return { ok: false, error: '无法解析 JSON 内容，请检查格式是否正确', raw };
+    }
+    function scanSensitiveFields(data) {
+      const sensitive = [];
+      const keywords = ['token', 'secret', 'key', 'password', 'credential', 'api_key'];
+      function scan(obj, path = '') {
+        if (typeof obj === 'object' && obj !== null) {
+          for (const key of Object.keys(obj)) {
+            const newPath = path ? `${path}.${key}` : key;
+            const value = obj[key];
+            if (typeof value === 'string' && value === '[REDACTED]') { sensitive.push(newPath); }
+            const lowerKey = key.toLowerCase();
+            if (keywords.some(k => lowerKey.includes(k))) { if (!sensitive.includes(newPath)) { sensitive.push(newPath); } }
+            if (typeof value === 'object') { scan(value, newPath); }
+          }
+        }
+      }
+      scan(data);
+      if (data.redacted_fields && Array.isArray(data.redacted_fields)) {
+        for (const field of data.redacted_fields) {
+          if (typeof field === 'string' && !sensitive.includes(field)) { sensitive.push(field); }
+        }
+      }
+      return sensitive;
+    }
+    function buildImportPrompt(selectedItems, fieldMapping, sensitiveFields, targetPlatform, parsedConfig) {
+      let prompt = `请帮我配置以下内容：\n\n`;
+      if (selectedItems.skills && selectedItems.skills.length > 0) {
+        const skills = parsedConfig[FIELD_MAPPING[state.sourcePlatform].skills] || [];
+        const selectedSkills = skills.filter(s => selectedItems.skills.includes(s.name));
+        prompt += `## 1. Skills（技能）\n`;
+        for (const skill of selectedSkills) {
+          prompt += `- ${skill.name} (v${skill.version || '1.0'})\n`;
+          if (skill.description) prompt += `  - 描述: ${skill.description}\n`;
+        }
+        prompt += `\n`;
+      }
+      if (selectedItems.automations && selectedItems.automations.length > 0) {
+        const automations = parsedConfig[FIELD_MAPPING[state.sourcePlatform].automations] || [];
+        const selectedAuto = automations.filter(a => selectedItems.automations.includes(a.name));
+        prompt += `## 2. 定时任务\n`;
+        for (const auto of selectedAuto) {
+          prompt += `- ${auto.name}\n`;
+          if (auto.scheduleType) prompt += `  - 类型: ${auto.scheduleType}\n`;
+          if (auto.rrule) prompt += `  - 规则: ${auto.rrule}\n`;
+          if (auto.status) prompt += `  - 状态: ${auto.status}\n`;
+          if (auto.prompt) prompt += `  - 执行提示: ${auto.prompt.substring(0, 100)}${auto.prompt.length > 100 ? '...' : ''}\n`;
+        }
+        prompt += `\n`;
+      }
+      if (selectedItems.mcp_connections && selectedItems.mcp_connections.length > 0) {
+        prompt += `## 3. MCP 连接\n`;
+        for (const name of selectedItems.mcp_connections) { prompt += `- ${name}\n`; }
+        prompt += `\n`;
+      }
+      if (selectedItems.user_memory) { prompt += `## 4. 用户记忆\n请迁移用户记忆数据（包含上下文、偏好设置等）\n\n`; }
+      if (selectedItems.system_settings) {
+        prompt += `## 5. 系统设置\n`;
+        if (parsedConfig.system_settings) {
+          if (parsedConfig.system_settings.response_language) { prompt += `- 响应语言: ${parsedConfig.system_settings.response_language}\n`; }
+          if (parsedConfig.system_settings.working_mode) { prompt += `- 工作模式: ${parsedConfig.system_settings.working_mode}\n`; }
+        }
+        prompt += `\n`;
+      }
+      if (sensitiveFields.length > 0) {
+        prompt += `## 敏感信息（请向我索要）\n`;
+        for (const field of sensitiveFields) { prompt += `- ${field}\n`; }
+        prompt += `\n`;
+      }
+      prompt += `请按照 ${targetPlatform} 的格式自动配置以上所有内容。对于标记为 [REDACTED] 或列出的敏感字段，请在配置时向我询问具体值。`;
+      return prompt;
+    }
+    function renderPlatformGrid(gridId, selectedId, onSelect) {
+      const grid = document.getElementById(gridId);
+      grid.innerHTML = '';
+      for (const platform of PLATFORMS) {
+        const card = document.createElement('div');
+        card.className = `platform-card ${selectedId === platform.id ? 'selected' : ''}`;
+        card.dataset.platform = platform.id;
+        const isSupported = ['QClaw', 'WorkBuddy', 'OpenClaw'].includes(platform.id);
+        card.innerHTML = `
+          <div class="platform-card-inner">
+            <div class="platform-card-icon">${platform.icon}</div>
+            <div class="platform-card-content">
+              <div class="platform-card-name">${platform.label}</div>
+              <div class="platform-card-desc">${platform.desc}</div>
+              <span class="platform-card-badge ${isSupported ? 'supported' : ''}">${isSupported ? '✓ 已适配' : '待验证'}</span>
+            </div>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          onSelect(platform.id);
+          const allCards = grid.querySelectorAll('.platform-card');
+          allCards.forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+        });
+        grid.appendChild(card);
+      }
+    }
+    function renderParseResult(data) {
+      const sourceFields = FIELD_MAPPING[state.sourcePlatform];
+      const sections = ['skills', 'automations', 'mcp_connections', 'user_memory', 'system_settings'];
+      for (const section of sections) {
+        const fieldName = sourceFields[section];
+        const sectionEl = document.getElementById(`${section}Section`);
+        const listEl = document.getElementById(`${section}List`);
+        const countEl = document.getElementById(`${section}Count`);
+        if (section === 'user_memory' || section === 'system_settings') {
+          if (data[fieldName]) {
+            sectionEl.style.display = 'block';
+            const checkbox = document.getElementById(`${section}Checkbox`);
+            checkbox.checked = false;
+            checkbox.addEventListener('change', () => {
+              state.selectedItems[section] = checkbox.checked;
+              updateStep3NextButton();
+            });
+          } else { sectionEl.style.display = 'none'; }
+        } else {
+          const items = data[fieldName] || [];
+          if (items.length > 0) {
+            sectionEl.style.display = 'block';
+            countEl.textContent = items.length;
+            listEl.innerHTML = '';
+            for (const item of items) {
+              const card = document.createElement('div');
+              card.className = 'item-card';
+              card.dataset.name = item.name || item.id || JSON.stringify(item).substring(0, 30);
+              card.innerHTML = `
+                <input type="checkbox" class="item-checkbox">
+                <div class="item-content">
+                  <div class="item-name">${item.name || item.id || '未命名'}</div>
+                  <div class="item-desc">${item.description || item.note || '暂无描述'}</div>
+                </div>
+              `;
+              const checkbox = card.querySelector('.item-checkbox');
+              checkbox.addEventListener('change', () => {
+                const name = card.dataset.name;
+                if (checkbox.checked) {
+                  if (!state.selectedItems[section].includes(name)) { state.selectedItems[section].push(name); }
+                } else {
+                  state.selectedItems[section] = state.selectedItems[section].filter(n => n !== name);
+                }
+                updateStep3NextButton();
+              });
+              listEl.appendChild(card);
+            }
+            const toggleAll = document.getElementById(`toggleAll${section.charAt(0).toUpperCase() + section.slice(1)}`);
+            toggleAll.addEventListener('click', () => {
+              const checkboxes = listEl.querySelectorAll('.item-checkbox');
+              const allChecked = Array.from(checkboxes).every(c => c.checked);
+              checkboxes.forEach(c => { c.checked = !allChecked; c.dispatchEvent(new Event('change')); });
+            });
+          } else { sectionEl.style.display = 'none'; }
+        }
+      }
+    }
+    function renderFieldMapping() {
+      const sourceFields = FIELD_MAPPING[state.sourcePlatform];
+      const targetFields = FIELD_MAPPING[state.targetPlatform];
+      const grid = document.getElementById('mappingGrid');
+      grid.innerHTML = '';
+      const mappingItems = [
+        { key: 'automations', label: '定时任务' },
+        { key: 'skills', label: '技能' },
+        { key: 'mcp_connections', label: 'MCP 连接' },
+        { key: 'user_memory', label: '用户记忆' },
+        { key: 'system_settings', label: '系统设置' },
+      ];
+      for (const item of mappingItems) {
+        const row = document.createElement('div');
+        row.className = 'mapping-row';
+        row.innerHTML = `
+          <div class="mapping-field">${sourceFields[item.key]}</div>
+          <span class="mapping-arrow">→</span>
+          <div class="mapping-field">${targetFields[item.key]}</div>
+        `;
+        grid.appendChild(row);
+      }
+    }
+    function updateStepIndicator(step) {
+      const dots = document.querySelectorAll('.step-dot');
+      dots.forEach((dot, index) => {
+        if (index < step - 1) { dot.classList.add('completed'); dot.classList.remove('active'); }
+        else if (index === step - 1) { dot.classList.add('active'); dot.classList.remove('completed'); }
+        else { dot.classList.remove('active', 'completed'); }
+      });
+      document.getElementById('stepLabel').textContent = `步骤 ${step}/5`;
+    }
+    function showStep(step) {
+      const panels = document.querySelectorAll('.step-panel');
+      panels.forEach(p => p.classList.remove('active'));
+      document.getElementById(`step${step}`).classList.add('active');
+      updateStepIndicator(step);
+      state.currentStep = step;
+    }
+    function updateStep3NextButton() {
+      const hasSelection = 
+        state.selectedItems.skills.length > 0 ||
+        state.selectedItems.automations.length > 0 ||
+        state.selectedItems.mcp_connections.length > 0 ||
+        state.selectedItems.user_memory ||
+        state.selectedItems.system_settings;
+      document.getElementById('btnStep3Next').disabled = !hasSelection;
+    }
+    async function copyToClipboard(text, btn) {
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.classList.add('copied');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          已复制
+        `;
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = originalHTML;
+        }, 2000);
+      } catch (e) { console.error('复制失败:', e); }
+    }
+    function initEventListeners() {
+      renderPlatformGrid('sourcePlatformGrid', null, (platform) => { state.sourcePlatform = platform; document.getElementById('btnStep1Next').disabled = false; });
+      document.getElementById('btnStep1Next').addEventListener('click', () => { state.exportedPrompt = buildExportPrompt(state.sourcePlatform); document.getElementById('exportPromptContent').textContent = state.exportedPrompt; showStep(2); });
+      document.getElementById('btnStep2Back').addEventListener('click', () => showStep(1));
+      document.getElementById('btnStep2Next').addEventListener('click', () => showStep(3));
+      document.getElementById('copyExportPrompt').addEventListener('click', (e) => { copyToClipboard(state.exportedPrompt, e.currentTarget); });
+      document.getElementById('sourceTextarea').addEventListener('input', (e) => {
+        state.rawSourceText = e.target.value;
+        if (!state.rawSourceText.trim()) {
+          document.getElementById('parseError').classList.remove('active');
+          document.getElementById('parseResult').style.display = 'none';
+          document.getElementById('sourceTextarea').classList.remove('error');
+          document.getElementById('btnStep3Next').disabled = true;
+          return;
+        }
+        const result = parseSourceText(state.rawSourceText);
+        if (result.ok) {
+          state.parsedConfig = result.data;
+          state.parseError = null;
+          document.getElementById('parseError').classList.remove('active');
+          document.getElementById('sourceTextarea').classList.remove('error');
+          document.getElementById('parseResult').style.display = 'block';
+          state.sensitiveFields = scanSensitiveFields(result.data);
+          renderParseResult(result.data);
+          state.selectedItems = {
+            skills: [], automations: [], mcp_connections: [], user_memory: false, system_settings: false,
+          };
+          updateStep3NextButton();
+        } else {
+          state.parsedConfig = null;
+          state.parseError = result.error;
+          document.getElementById('errorMessage').textContent = result.error;
+          document.getElementById('parseError').classList.add('active');
+          document.getElementById('sourceTextarea').classList.add('error');
+          document.getElementById('parseResult').style.display = 'none';
+          document.getElementById('btnStep3Next').disabled = true;
+        }
+      });
+      document.getElementById('btnStep3Back').addEventListener('click', () => showStep(2));
+      document.getElementById('btnStep3Next').addEventListener('click', () => {
+        renderPlatformGrid('targetPlatformGrid', null, (platform) => {
+          state.targetPlatform = platform;
+          document.getElementById('btnStep4Next').disabled = false;
+          state.fieldMapping = { source: FIELD_MAPPING[state.sourcePlatform], target: FIELD_MAPPING[platform] };
+          document.getElementById('mappingSection').style.display = 'block';
+          renderFieldMapping();
+        });
+        showStep(4);
+      });
+      document.getElementById('btnStep4Back').addEventListener('click', () => showStep(3));
+      document.getElementById('btnStep4Next').addEventListener('click', () => {
+        state.importPrompt = buildImportPrompt(state.selectedItems, state.fieldMapping, state.sensitiveFields, state.targetPlatform, state.parsedConfig);
+        document.getElementById('importPromptContent').textContent = state.importPrompt;
+        document.getElementById('sensitiveCount').textContent = state.sensitiveFields.length;
+        if (state.sensitiveFields.length > 0) {
+          document.getElementById('sensitiveSection').style.display = 'block';
+          const listEl = document.getElementById('sensitiveList');
+          listEl.innerHTML = '';
+          for (const field of state.sensitiveFields) {
+            const li = document.createElement('li');
+            li.className = 'sensitive-item';
+            li.textContent = field;
+            listEl.appendChild(li);
+          }
+        } else {
+          document.getElementById('sensitiveSection').style.display = 'none';
+        }
+        showStep(5);
+      });
+      document.getElementById('btnStep5Back').addEventListener('click', () => showStep(4));
+      document.getElementById('copyImportPrompt').addEventListener('click', (e) => { copyToClipboard(state.importPrompt, e.currentTarget); });
+      document.getElementById('btnComplete').addEventListener('click', () => {
+        document.getElementById('step5').classList.remove('active');
+        document.getElementById('final').classList.add('active');
+        updateStepIndicator(6);
+      });
+      document.getElementById('btnRestart').addEventListener('click', () => {
+        state = {
+          currentStep: 1, sourcePlatform: null, targetPlatform: null, exportedPrompt: '', rawSourceText: '', parsedConfig: null, parseError: null,
+          selectedItems: { skills: [], automations: [], mcp_connections: [], user_memory: false, system_settings: false },
+          fieldMapping: null, sensitiveFields: [], importPrompt: '',
+        };
+        document.getElementById('sourceTextarea').value = '';
+        document.getElementById('parseResult').style.display = 'none';
+        document.getElementById('btnStep1Next').disabled = true;
+        renderPlatformGrid('sourcePlatformGrid', null, (platform) => { state.sourcePlatform = platform; document.getElementById('btnStep1Next').disabled = false; });
+        showStep(1);
+      });
+    }
+    function showHelp() {
+      alert(`ClawMigrate 使用说明：
+
+1. 选择源平台 - 从哪个平台导出配置
+2. 复制导出提示词 - 在源平台中执行
+3. 粘贴回复并解析 - 勾选要迁移的内容
+4. 选择目标平台 - 查看字段映射
+5. 复制导入提示词 - 在目标平台中执行完成迁移
+
+敏感信息处理：
+- 源平台会自动将敏感字段替换为 [REDACTED]
+- 本工具会扫描这些字段
+- 在导入提示词中会要求目标平台主动向您索要敏感信息`);
+    }
+    function showAbout() {
+      alert(`ClawMigrate v4.0
+AI 助手配置一键迁移工具
+
+支持平台：QClaw、WorkBuddy、OpenClaw、Claude、Kimi
+
+功能特点：
+- 5 步向导式操作
+- 智能 JSON 解析（支持代码块、纯文本、混合文本格式
+- 可视化字段映射
+- 敏感信息自动检测
+- 全客户端处理，数据不上传服务器`);
+    }
+    document.addEventListener('DOMContentLoaded', initEventListeners);
+  </script>
+</body>
+</html>
