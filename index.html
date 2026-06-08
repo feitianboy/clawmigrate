@@ -42,6 +42,12 @@
       text-align: center;
       margin-bottom: 32px;
     }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
     .logo {
       font-size: 36px;
       font-weight: 800;
@@ -49,7 +55,69 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 12px;
+    }
+    .auth-buttons {
+      display: flex;
+      gap: 12px;
+    }
+    .btn-auth {
+      padding: 8px 20px;
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 8px;
+      color: #a78bfa;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .btn-auth:hover {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: rgba(139, 92, 246, 0.5);
+    }
+    .btn-auth-register {
+      background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+      color: white;
+      border: none;
+    }
+    .btn-auth-register:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .user-name {
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+    .btn-logout {
+        padding: 8px 16px;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        color: #fca5a5;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .btn-settings {
+        padding: 8px 16px;
+        background: rgba(139, 92, 246, 0.1);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 8px;
+        color: #a78bfa;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .btn-settings:hover {
+        background: rgba(139, 92, 246, 0.2);
+      }
+    .btn-logout:hover {
+      background: rgba(239, 68, 68, 0.2);
     }
     .subtitle {
       color: #cbd5e1;
@@ -503,13 +571,28 @@
       .platform-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       }
+      .header-top {
+        flex-direction: column;
+        gap: 12px;
+      }
     }
   </style>
 </head>
 <body>
   <div id="app">
     <header>
-      <h1 class="logo">ClawMigrate</h1>
+      <div class="header-top">
+        <h1 class="logo">ClawMigrate</h1>
+        <div class="auth-buttons" id="authButtons">
+          <button class="btn-auth" onclick="showLoginModal()">登录</button>
+          <button class="btn-auth btn-auth-register" onclick="showRegisterModal()">注册</button>
+        </div>
+        <div class="user-info hidden" id="userInfo">
+          <span class="user-name" id="userName"></span>
+          <button class="btn-settings" onclick="showSettingsModal()">设置</button>
+          <button class="btn-logout" onclick="handleLogout()">退出</button>
+        </div>
+      </div>
       <p class="subtitle">AI 助手配置一键迁移工具</p>
       <div class="intro">
         <p class="intro-text">
@@ -665,6 +748,7 @@
       <div class="footer-version">ClawMigrate v2.0</div>
     </footer>
   </div>
+  <script src="auth.js"></script>
   <script>
     const PLATFORM_GROUPS = [
       {
@@ -712,9 +796,7 @@
 
     const ALL_PLATFORMS = PLATFORM_GROUPS.flatMap(g => g.platforms);
 
-    // 字段中文翻译
     const FIELD_TRANSLATIONS = {
-      // 用户记忆字段
       'context': '上下文信息',
       'preferences': '用户偏好设置',
       'history': '历史记录',
@@ -739,8 +821,6 @@
       'learning_style': '学习风格',
       'writing_style': '写作风格',
       'coding_style': '编程风格',
-      
-      // 系统设置字段
       'response_language': '回复语言',
       'working_mode': '工作模式',
       'memory_files': '记忆文件',
@@ -768,8 +848,6 @@
       'auto_update': '自动更新',
       'check_updates': '检查更新',
       'version': '版本信息',
-      
-      // 通用字段
       'name': '名称',
       'description': '描述',
       'enabled': '启用状态',
@@ -782,7 +860,6 @@
       'updated_at': '更新时间',
       'last_used': '上次使用',
       'usage_count': '使用次数',
-      'version': '版本',
       'author': '作者',
       'tags': '标签',
       'category': '分类',
@@ -820,14 +897,11 @@
       'memory': '记忆',
     };
 
-    // 获取字段中文描述
     function getFieldDescription(key) {
       const lowerKey = key.toLowerCase();
-      // 精确匹配
       if (FIELD_TRANSLATIONS[lowerKey]) {
         return FIELD_TRANSLATIONS[lowerKey];
       }
-      // 部分匹配
       for (const [eng, chn] of Object.entries(FIELD_TRANSLATIONS)) {
         if (lowerKey.includes(eng) || eng.includes(lowerKey)) {
           return chn;
@@ -836,17 +910,14 @@
       return null;
     }
 
-    // 获取技能中文描述
     function getSkillDescription(skill) {
       const name = skill.name || skill.id || '';
       const desc = skill.description || skill.desc || '';
       
-      // 如果描述本身是中文，直接使用
       if (desc && /[\u4e00-\u9fa5]/.test(desc)) {
         return desc;
       }
       
-      // 如果有英文描述，翻译成中文
       if (desc) {
         let translatedDesc = desc;
         const lowerDesc = desc.toLowerCase();
@@ -862,7 +933,6 @@
         return desc;
       }
       
-      // 如果没有描述，尝试翻译名称
       const fieldDesc = getFieldDescription(name);
       if (fieldDesc) {
         return fieldDesc;
@@ -1171,14 +1241,12 @@
       });
     }
 
-    // 辅助函数：将对象转换为可选择的列表项
     function objectToItems(obj, parentKey = '') {
       const items = [];
       if (obj && typeof obj === 'object') {
         for (const [key, value] of Object.entries(obj)) {
           const fullKey = parentKey ? `${parentKey}.${key}` : key;
           if (value && typeof value === 'object' && !Array.isArray(value)) {
-            // 递归处理嵌套对象
             items.push(...objectToItems(value, fullKey));
           } else {
             items.push({
@@ -1269,7 +1337,6 @@
       checkSelection();
     }
     
-    // 切换分类展开/收起
     function toggleCategoryExpand(categoryKey) {
       const listEl = document.getElementById(`list_${categoryKey}`);
       if (listEl) {
@@ -1277,7 +1344,6 @@
       }
     }
     
-    // 切换对象类型的选中项
     function toggleObjectItem(categoryKey, itemKey) {
       if (!state.selectedItems[categoryKey]) {
         state.selectedItems[categoryKey] = {};
@@ -1342,7 +1408,6 @@
       document.getElementById('btnStep3Next').disabled = !hasSelection;
     }
     
-    // 从对象中提取选中的项
     function getSelectedObjectFromKeys(data, selectedKeys) {
       if (!data || !selectedKeys) return null;
       
@@ -1489,6 +1554,10 @@
     });
 
     document.getElementById('btnComplete').addEventListener('click', () => {
+      // 保存迁移记录
+      if (typeof saveMigration === 'function') {
+        saveMigration(state.sourcePlatform, state.targetPlatform, state.selectedItems);
+      }
       updateStep('Complete');
     });
 
