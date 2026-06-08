@@ -18,6 +18,7 @@
       min-height: 100vh;
       padding: 24px;
       position: relative;
+      overflow-x: hidden;
     }
     body::before {
       content: '';
@@ -42,17 +43,35 @@
       margin-bottom: 32px;
     }
     .logo {
-      font-size: 28px;
+      font-size: 36px;
       font-weight: 800;
       background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
     .subtitle {
+      color: #cbd5e1;
+      font-size: 16px;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .intro {
+      max-width: 600px;
+      margin: 0 auto 24px;
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .intro-text {
       color: #94a3b8;
-      font-size: 14px;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .intro-text strong {
+      color: #cbd5e1;
     }
     .progress-bar {
       display: flex;
@@ -492,6 +511,14 @@
     <header>
       <h1 class="logo">ClawMigrate</h1>
       <p class="subtitle">AI 助手配置一键迁移工具</p>
+      <div class="intro">
+        <p class="intro-text">
+          <strong>🚀 简单三步，轻松迁移！</strong><br>
+          支持在 QClaw、Claude、Kimi、OpenClaw 等多种 AI 助手之间迁移配置，包括：<br>
+          🔧 技能/插件、⏰ 自动化任务、🔌 MCP 连接、💾 用户记忆、⚙️ 系统设置<br>
+          所有敏感信息都会自动标记，确保您的隐私安全！
+        </p>
+      </div>
       <div class="progress-bar">
         <div class="step-dot active" data-step="1"></div>
         <div class="step-dot" data-step="2"></div>
@@ -505,7 +532,7 @@
       <div class="step-panel active" id="step1">
         <div class="page-header">
           <h1 class="page-title">选择源平台</h1>
-          <p class="page-desc">从以下 AI 助手中选择要导出配置的平台，系统将为您生成导出提示词。</p>
+          <p class="page-desc">💡 选择您想要 <strong>导出配置</strong> 的 AI 助手平台，我们会自动生成导出提示词帮您获取完整的配置信息。</p>
         </div>
         <div class="platform-groups" id="sourcePlatformContainer"></div>
         <div class="btn-group">
@@ -515,7 +542,7 @@
       <div class="step-panel" id="step2">
         <div class="page-header">
           <h1 class="page-title">复制导出提示词</h1>
-          <p class="page-desc">请将以下提示词复制到源平台的对话中执行，执行后将返回的完整内容粘贴到下一步。</p>
+          <p class="page-desc">📋 点击右侧的 <strong>复制按钮</strong>，然后粘贴到刚才选择的源平台（AI 助手）的对话框中发送。系统会返回完整的配置 JSON，把那个返回的结果保存好，下一步会用到！</p>
         </div>
         <div class="selected-platform-info" id="sourcePlatformInfo">
           <span class="info-icon">📤</span>
@@ -542,7 +569,7 @@
       <div class="step-panel" id="step3">
         <div class="page-header">
           <h1 class="page-title">粘贴并解析配置</h1>
-          <p class="page-desc">将源平台返回的配置内容粘贴到下方文本框中，系统将自动解析并提取可迁移的配置项。</p>
+          <p class="page-desc">📝 把刚才在源平台执行提示词后返回的 <strong>完整结果</strong>（JSON内容）粘贴到下面的文本框中，系统会自动解析并展示所有可迁移的配置项供您选择！</p>
         </div>
         <div class="selected-platform-info">
           <span class="info-icon">📤</span>
@@ -562,7 +589,7 @@
       <div class="step-panel" id="step4">
         <div class="page-header">
           <h1 class="page-title">选择目标平台</h1>
-          <p class="page-desc">选择要迁移到的目标平台，系统将自动处理字段映射。</p>
+          <p class="page-desc">🎯 选择您想要 <strong>迁移到</strong> 的 AI 助手平台，系统会自动处理字段名称的转换和映射，确保配置能完美适配新平台！</p>
         </div>
         <div class="migration-summary">
           <div class="summary-row">
@@ -587,7 +614,7 @@
       <div class="step-panel" id="step5">
         <div class="page-header">
           <h1 class="page-title">生成导入提示词</h1>
-          <p class="page-desc">复制以下提示词到目标平台执行，完成配置迁移。</p>
+          <p class="page-desc">🎉 最后一步！点击右侧的 <strong>复制按钮</strong> 复制提示词，然后粘贴到您刚才选择的目标平台（AI 助手）的对话框中发送，即可完成配置迁移！</p>
         </div>
         <div class="prompt-box">
           <div class="prompt-header">
