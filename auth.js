@@ -1,5 +1,5 @@
 // ClawMigrate 用户认证模块
-const API_BASE = 'https://clawmigrate.onrender.com/api';
+const API_BASE = 'https://clawmigrate.vercel.app/api';
 let currentUser = null;
 let authToken = null;
 
