@@ -8,7 +8,7 @@ const svgCaptcha = require('svg-captcha');
 const db = require('./db/init-db');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const JWT_SECRET = 'clawmigrate-secret-key-2024';
 
 // 中间件
