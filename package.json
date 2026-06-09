@@ -1,9 +1,10 @@
 {
   "name": "clawmigrate",
   "version": "1.0.0",
-  "private": true,
+  "description": "ClawMigrate AI Assistant Config Migration Tool",
   "scripts": {
-    "dev": "node server/server.js",
+    "start": "node server/server.js",
+    "dev": "cd server && npm install && node server.js",
     "build": "echo 'Build completed'"
   },
   "dependencies": {
@@ -14,5 +15,8 @@
     "jsonwebtoken": "^9.0.2",
     "sqlite3": "^5.1.6",
     "svg-captcha": "^1.4.0"
-  }
+  },
+  "keywords": ["clawmigrate", "ai", "migration"],
+  "author": "ClawMigrate Team",
+  "license": "MIT"
 }
