@@ -13,7 +13,7 @@ const JWT_SECRET = 'clawmigrate-secret-key-2024';
 
 // 中间件
 const corsOptions = {
-  origin: ['https://feitianboy.github.io', 'http://localhost:3000', 'https://clawmigrate.vercel.app'],
+  origin: ['https://feitianboy.github.io', 'http://localhost:3000', 'https://clawmigrate-api.onrender.com'],
   credentials: true,
   optionsSuccessStatus: 200
 };
