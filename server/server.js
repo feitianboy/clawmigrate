@@ -12,7 +12,12 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = 'clawmigrate-secret-key-2024';
 
 // 中间件
-app.use(cors());
+const corsOptions = {
+  origin: ['https://feitianboy.github.io', 'http://localhost:3000'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../')));
