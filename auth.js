@@ -394,5 +394,9 @@ async function sendEmailCode() {
     }
 }
 
-// 初始化
-window.addEventListener('DOMContentLoaded', initAuth);
+// 初始化 - 立即执行，不等待 DOMContentLoaded
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initAuth);
+} else {
+    initAuth();
+}
