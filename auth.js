@@ -1,5 +1,5 @@
 // ClawMigrate 用户认证模块
-const API_BASE = 'https://clawmigrate-api.onrender.com/api';
+const API_BASE = '/api';
 let currentUser = null;
 let authToken = null;
 
