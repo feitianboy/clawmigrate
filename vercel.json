@@ -1,15 +1,10 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "includeFiles": "api/**"
-    }
-  },
+  "buildCommand": "npm install",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/[...path].js" },
     { "src": "/admin", "dest": "/admin/index.html" },
     { "src": "/admin/(.*)", "dest": "/admin/index.html" },
-    { "src": "/(.*)", "dest": "/$1" }
-  ],
-  "cleanUrls": true
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }
