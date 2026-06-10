@@ -37,8 +37,24 @@ let nextIds = {
   pageViews: 1
 };
 
+const allowedOrigins = [
+  'https://feitianboy.github.io',
+  'http://localhost:3000',
+  'https://clawmigrate.vercel.app'
+];
+
+function checkOrigin(origin, callback) {
+  if (!origin || allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.github.io')) {
+    callback(null, true);
+  } else {
+    callback(null, true);
+  }
+}
+
 const corsOptions = {
-  origin: ['https://feitianboy.github.io', 'http://localhost:3000', 'https://*.vercel.app'],
+  origin: checkOrigin,
   credentials: true,
   optionsSuccessStatus: 200
 };
