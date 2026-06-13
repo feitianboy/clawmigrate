@@ -1,21 +1,22 @@
 {
-  "name": "clawmigrate",
+  "name": "clawmigrate-vercel",
   "version": "1.0.0",
-  "description": "ClawMigrate AI Assistant Config Migration Tool",
+  "private": true,
   "scripts": {
-    "start": "node server/server.js",
-    "build": "npm install"
+    "dev": "vercel dev",
+    "build": "tsc",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "body-parser": "^1.20.2",
+    "@supabase/supabase-js": "^2.39.0",
+    "@vercel/node": "^3.0.0",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2",
-    "sqlite3": "^5.1.6",
-    "svg-captcha": "^1.4.0"
+    "jsonwebtoken": "^9.0.2"
   },
-  "engines": {
-    "node": ">=18.x"
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
   }
 }
