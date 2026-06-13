@@ -231,12 +231,31 @@ pre {
     display: none !important;
   }
   .mobile-menu-btn {
-    display: flex !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   /* header内容区缩小padding */
   .header-content {
     padding: 0 var(--space-4) !important;
+  }
+
+  /* 确保logo区域不占太多空间 */
+  .header-content > a:first-child {
+    flex-shrink: 0;
+  }
+
+  /* 用户区域不换行 */
+  .header-content > div:last-child {
+    flex-shrink: 0;
+    gap: var(--space-2) !important;
+  }
+
+  /* 登录按钮紧凑 */
+  .btn-primary {
+    padding: var(--space-1) var(--space-3) !important;
+    font-size: 0.8125rem !important;
   }
 
   /* 主内容区缩小padding */
