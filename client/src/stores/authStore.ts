@@ -26,6 +26,20 @@ interface AuthState {
 
 const API_BASE = '/api';
 
+// 双保险：localStorage 缓存用户信息，避免 Cookie 跨页面丢失
+function saveUserLocal(user: User) {
+  try { localStorage.setItem('clawmigrate_user', JSON.stringify(user)); } catch {}
+}
+function loadUserLocal(): User | null {
+  try {
+    const data = localStorage.getItem('clawmigrate_user');
+    return data ? JSON.parse(data) : null;
+  } catch { return null; }
+}
+function clearUserLocal() {
+  try { localStorage.removeItem('clawmigrate_user'); } catch {}
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -56,6 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
+      saveUserLocal(result.data.user);
       return true;
     } catch (error) {
       console.error('Login error:', error);
@@ -88,6 +103,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
+      saveUserLocal(result.data.user);
       return true;
     } catch (error) {
       console.error('Register error:', error);
@@ -109,6 +125,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: null,
         isAuthenticated: false,
       });
+      clearUserLocal();
     }
   },
 
@@ -123,6 +140,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const result = await response.json();
 
       if (!response.ok || !result.ok) {
+        // Cookie 验证失败，尝试 localStorage 兜底
+        const localUser = loadUserLocal();
+        if (localUser) {
+          set({
+            user: localUser,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          return true;
+        }
         set({ isAuthenticated: false, user: null, isLoading: false });
         return false;
       }
@@ -132,9 +159,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
+      saveUserLocal(result.data);
       return true;
     } catch (error) {
       console.error('Check auth error:', error);
+      // 网络错误时也尝试 localStorage 兜底
+      const localUser = loadUserLocal();
+      if (localUser) {
+        set({
+          user: localUser,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        return true;
+      }
       set({ isAuthenticated: false, user: null, isLoading: false });
       return false;
     }
