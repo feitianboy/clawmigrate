@@ -402,7 +402,7 @@ export const HistoryPage: React.FC = () => {
         <p style={styles.subtitle}>查看你所有的迁移记录</p>
       </div>
 
-      <div style={styles.statsBar}>
+      <div className="stats-bar" style={styles.statsBar}>
         <div style={styles.statCard}>
           <div style={{ ...styles.statValue, color: 'var(--color-primary)' }}>{stats.total}</div>
           <div style={styles.statLabel}>总迁移次数</div>
@@ -417,7 +417,7 @@ export const HistoryPage: React.FC = () => {
         </div>
       </div>
 
-      <div style={styles.filterBar}>
+      <div className="filter-bar" style={styles.filterBar}>
         {(['all', 'success', 'failed', 'pending'] as const).map((f) => (
           <button
             key={f}
@@ -446,8 +446,8 @@ export const HistoryPage: React.FC = () => {
         <div style={styles.recordsList}>
           {filteredRecords.map((record: HistoryRecord) => (
             <div key={record.id} style={styles.recordCard}>
-              <div style={styles.recordHeader}>
-                <div style={styles.recordPlatforms}>
+              <div className="record-header" style={styles.recordHeader}>
+                <div className="record-platforms" style={styles.recordPlatforms}>
                   <span style={styles.platformBadge}>
                     <span style={styles.platformIcon}>{platformIcons[record.source_platform] || '🤖'}</span>
                     <span style={styles.platformName}>{platformNames[record.source_platform] || record.source_platform}</span>
@@ -461,7 +461,7 @@ export const HistoryPage: React.FC = () => {
                 {getStatusBadge(record.status)}
               </div>
 
-              <div style={styles.recordMeta}>
+              <div className="record-meta" style={styles.recordMeta}>
                 <span>📅 {formatDate(record.created_at)}</span>
                 <span>⏱️ {getDuration(record.created_at, record.updated_at)}</span>
                 <span>📦 {record.items_count} 项</span>

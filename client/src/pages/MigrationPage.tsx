@@ -50,6 +50,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-secondary)',
     borderRadius: 'var(--radius-lg)',
     overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
   },
   stepDot: {
     display: 'flex',
@@ -524,7 +525,7 @@ export const MigrationPage: React.FC = () => {
   };
 
   const renderStepIndicator = () => (
-    <div style={styles.stepsIndicator}>
+    <div className="step-indicator" style={styles.stepsIndicator}>
       {stepLabels.map((step, index) => {
         const stepKey = step.key as typeof currentStep;
         const isActive = currentStep === stepKey;
@@ -560,7 +561,7 @@ export const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择你当前使用的 AI 助手平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid}>
+          <div className="platform-grid" style={styles.platformGrid}>
             {sourceAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -577,7 +578,7 @@ export const MigrationPage: React.FC = () => {
             ))}
           </div>
 
-          <div style={styles.actions}>
+          <div className="actions-bar" style={styles.actions}>
             <div />
             <button
               style={{
@@ -617,8 +618,8 @@ export const MigrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={styles.promptBox}>
-            <div style={styles.promptHeader}>
+          <div className="prompt-box" style={styles.promptBox}>
+            <div className="prompt-header" style={styles.promptHeader}>
               <span style={styles.promptLabel}>📋 导出提示词（点击复制）</span>
               <button
                 style={{
@@ -654,7 +655,7 @@ export const MigrationPage: React.FC = () => {
             </div>
           )}
 
-          <div style={styles.actions}>
+          <div className="actions-bar" style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -707,7 +708,7 @@ export const MigrationPage: React.FC = () => {
             </div>
           )}
 
-          <div style={styles.actions}>
+          <div className="actions-bar" style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -808,7 +809,7 @@ export const MigrationPage: React.FC = () => {
             </div>
           ))}
 
-          <div style={styles.actions}>
+          <div className="actions-bar" style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               重新解析
@@ -833,7 +834,7 @@ export const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择要迁移到的目标平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid}>
+          <div className="platform-grid" style={styles.platformGrid}>
             {targetAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -850,7 +851,7 @@ export const MigrationPage: React.FC = () => {
             ))}
           </div>
 
-          <div style={styles.actions}>
+          <div className="actions-bar" style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -898,8 +899,8 @@ export const MigrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={styles.promptBox}>
-            <div style={styles.promptHeader}>
+          <div className="prompt-box" style={styles.promptBox}>
+            <div className="prompt-header" style={styles.promptHeader}>
               <span style={styles.promptLabel}>📋 导入提示词（点击复制）</span>
               <button
                 style={{
@@ -929,7 +930,7 @@ export const MigrationPage: React.FC = () => {
             </ol>
           </div>
 
-          <div style={styles.actions}>
+          <div className="actions-bar" style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               返回

@@ -188,13 +188,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div style={styles.layout}>
       <header style={styles.header}>
-        <div style={styles.headerContent}>
+        <div className="header-content" style={styles.headerContent}>
           <Link to="/" style={styles.logo}>
             <div style={styles.logoIcon}>🔄</div>
             <span>ClawMigrate</span>
           </Link>
 
-          <nav style={{ ...styles.nav, '@media (maxWidth: 768px)': { display: 'none' } } as React.CSSProperties}>
+          <nav className="desktop-nav" style={styles.nav}>
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -263,6 +263,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             )}
 
             <button
+              className="mobile-menu-btn"
               style={styles.mobileMenuBtn}
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
@@ -301,11 +302,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         )}
       </header>
 
-      <main style={styles.main}>
+      <main className="main-content" style={styles.main}>
         <Outlet />
       </main>
 
-      <footer style={styles.footer}>
+      <footer className="footer" style={styles.footer}>
         <p>© 2026 ClawMigrate. AI 助手配置一键迁移工具</p>
       </footer>
     </div>
