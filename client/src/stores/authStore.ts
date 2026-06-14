@@ -7,6 +7,24 @@ interface User {
   phone?: string;
   role: 'user' | 'admin';
   avatar?: string;
+  membershipTier?: 'free' | 'pro' | 'enterprise';
+  membershipExpireAt?: string | null;
+}
+
+interface PlanInfo {
+  tier: 'free' | 'pro' | 'enterprise';
+  tierName: string;
+  expireAt: string | null;
+  isExpired: boolean;
+  usage: {
+    used: number;
+    limit: number;
+    unlimited: boolean;
+    remaining: number;
+  };
+  benefits: string[];
+  suggestedPlan?: string;
+  suggestedPlanPrice?: number;
 }
 
 interface AuthState {
@@ -14,6 +32,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  planInfo: PlanInfo | null;
   login: (username: string, password: string) => Promise<boolean>;
   register: (username: string, email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -22,29 +41,19 @@ interface AuthState {
   changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
   setUser: (user: User | null) => void;
   clearError: () => void;
+  fetchPlanInfo: () => Promise<void>;
+  isPro: () => boolean;
+  canMigrate: () => Promise<{ allowed: boolean; reason?: string }>;
 }
 
 const API_BASE = '/api';
-
-// 双保险：localStorage 缓存用户信息，避免 Cookie 跨页面丢失
-function saveUserLocal(user: User) {
-  try { localStorage.setItem('clawmigrate_user', JSON.stringify(user)); } catch {}
-}
-function loadUserLocal(): User | null {
-  try {
-    const data = localStorage.getItem('clawmigrate_user');
-    return data ? JSON.parse(data) : null;
-  } catch { return null; }
-}
-function clearUserLocal() {
-  try { localStorage.removeItem('clawmigrate_user'); } catch {}
-}
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  planInfo: null,
 
   login: async (username: string, password: string): Promise<boolean> => {
     set({ isLoading: true, error: null });
@@ -70,7 +79,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-      saveUserLocal(result.data.user);
+      // 登录成功后获取套餐信息
+      get().fetchPlanInfo();
       return true;
     } catch (error) {
       console.error('Login error:', error);
@@ -103,7 +113,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-      saveUserLocal(result.data.user);
+      // 注册成功后获取套餐信息
+      get().fetchPlanInfo();
       return true;
     } catch (error) {
       console.error('Register error:', error);
@@ -124,8 +135,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         user: null,
         isAuthenticated: false,
+        planInfo: null,
       });
-      clearUserLocal();
     }
   },
 
@@ -140,16 +151,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const result = await response.json();
 
       if (!response.ok || !result.ok) {
-        // Cookie 验证失败，尝试 localStorage 兜底
-        const localUser = loadUserLocal();
-        if (localUser) {
-          set({
-            user: localUser,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-          return true;
-        }
         set({ isAuthenticated: false, user: null, isLoading: false });
         return false;
       }
@@ -159,20 +160,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
       });
-      saveUserLocal(result.data);
+      // 检查认证后获取套餐信息
+      get().fetchPlanInfo();
       return true;
     } catch (error) {
       console.error('Check auth error:', error);
-      // 网络错误时也尝试 localStorage 兜底
-      const localUser = loadUserLocal();
-      if (localUser) {
-        set({
-          user: localUser,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        return true;
-      }
       set({ isAuthenticated: false, user: null, isLoading: false });
       return false;
     }
@@ -243,5 +235,85 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  // 获取用户套餐信息
+  fetchPlanInfo: async (): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE}/plan/me`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        set({ planInfo: result.data });
+        // 同步更新user的会员信息
+        set((state) => ({
+          user: state.user ? {
+            ...state.user,
+            membershipTier: result.data.tier,
+            membershipExpireAt: result.data.expireAt,
+          } : null,
+        }));
+      }
+    } catch (error) {
+      console.error('获取套餐信息失败:', error);
+    }
+  },
+
+  // 检查是否为Pro用户
+  isPro: (): boolean => {
+    const { user, planInfo } = get();
+    if (!user || !planInfo) return false;
+    
+    // 检查tier
+    const tier = planInfo.tier || user.membershipTier;
+    if (tier !== 'pro' && tier !== 'enterprise') return false;
+    
+    // 检查是否过期
+    if (planInfo.expireAt) {
+      return !planInfo.isExpired;
+    }
+    
+    return true;
+  },
+
+  // 检查是否可以迁移
+  canMigrate: async (): Promise<{ allowed: boolean; reason?: string }> => {
+    const { isAuthenticated, isPro } = get();
+    
+    // 未登录用户允许继续（鼓励试用）
+    if (!isAuthenticated) {
+      return { allowed: true };
+    }
+
+    // Pro/企业版直接通过
+    if (isPro()) {
+      return { allowed: true };
+    }
+
+    // 免费用户调用API检查
+    try {
+      const response = await fetch(`${API_BASE}/membership/check`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      const result = await response.json();
+
+      if (result.ok && result.data.allowed) {
+        return { allowed: true };
+      } else {
+        return {
+          allowed: false,
+          reason: result.data?.reason || '本月迁移次数已用完'
+        };
+      }
+    } catch (error) {
+      console.error('检查迁移权限失败:', error);
+      return { allowed: true }; // 网络错误时允许继续
+    }
   },
 }));

@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Zap, Shield, Clock, BookOpen, MessageSquare, Database, Settings2, Sparkles } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
+import { UsageGuard } from '../components/UsageGuard';
+import { UpgradeModal } from '../components/UpgradeModal';
 import { useState } from 'react';
 
 const styles: Record<string, React.CSSProperties> = {
@@ -263,9 +265,16 @@ const steps = [
 export const HomePage: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
+  // UsageGuard 的点击处理函数
+  const handleMigrationClick = () => {
+    // UsageGuard 组件内部会处理权限检查和升级弹窗
+    // 这里直接导航到迁移页面即可
+    window.location.href = '/migrate';
+  };
+
   return (
     <div>
-      <section className="hero-section" style={styles.hero}>
+      <section style={styles.hero}>
         <div style={styles.badge}>
           <Sparkles size={16} />
           AI 助手配置迁移工具
@@ -277,22 +286,24 @@ export const HomePage: React.FC = () => {
           无需手动复制粘贴，ClawMigrate 可以帮助你在不同 AI 助手平台之间
           安全、快速地迁移技能、自动化、记忆和设置。
         </p>
-        <div className="cta-section" style={styles.ctaSection}>
-          <Link
-            to="/migrate"
-            style={styles.primaryBtn}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.4)';
-            }}
-          >
-            开始迁移
-            <ArrowRight size={20} />
-          </Link>
+        <div style={styles.ctaSection}>
+          <UsageGuard>
+            <button
+              style={styles.primaryBtn}
+              onClick={handleMigrationClick}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.4)';
+              }}
+            >
+              开始迁移
+              <ArrowRight size={20} />
+            </button>
+          </UsageGuard>
           <button
             style={styles.secondaryBtn}
             onClick={() => setAuthModalOpen(true)}
@@ -313,7 +324,7 @@ export const HomePage: React.FC = () => {
           <h2 style={styles.sectionTitleText}>简单五步，完成迁移</h2>
           <p style={styles.sectionSubtitle}>整个过程只需要几分钟，无需任何技术背景</p>
         </div>
-        <div className="steps-grid" style={styles.stepsGrid}>
+        <div style={styles.stepsGrid}>
           {steps.map((step) => (
             <div key={step.num} style={styles.stepCard}>
               <div style={styles.stepNumber}>{step.num}</div>
@@ -345,7 +356,7 @@ export const HomePage: React.FC = () => {
           <h2 style={styles.sectionTitleText}>为什么选择 ClawMigrate</h2>
           <p style={styles.sectionSubtitle}>专为 AI 助手用户设计的功能特性</p>
         </div>
-        <div className="features-grid" style={styles.featuresGrid}>
+        <div style={styles.featuresGrid}>
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
@@ -353,9 +364,12 @@ export const HomePage: React.FC = () => {
                 <div style={styles.featureIcon}>
                   <Icon size={24} />
                 </div>
+
                 <h3 style={styles.featureTitle}>{feature.title}</h3>
                 <p style={styles.featureDesc}>{feature.desc}</p>
+
               </div>
+
             );
           })}
         </div>

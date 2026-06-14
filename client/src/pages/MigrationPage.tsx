@@ -22,7 +22,11 @@ import {
   CheckCircle,
   ArrowLeft,
   Zap,
+  Crown,
 } from 'lucide-react';
+import { UsageGuard } from '../components/UsageGuard';
+import { ItemLimitToast } from '../components/ItemLimitToast';
+import { UpgradeModal } from '../components/UpgradeModal';
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -50,7 +54,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'var(--color-bg-secondary)',
     borderRadius: 'var(--radius-lg)',
     overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
   },
   stepDot: {
     display: 'flex',
@@ -310,10 +313,6 @@ const styles: Record<string, React.CSSProperties> = {
     paddingTop: 'var(--space-6)',
     borderTop: '1px solid var(--color-border)',
   },
-  actionGroup: {
-    display: 'flex',
-    gap: 'var(--space-3)',
-  },
   btnPrimary: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -342,9 +341,10 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
+  // 完成页样式
   completeSection: {
     textAlign: 'center',
-    padding: 'var(--space-12) var(--space-6)',
+    padding: 'var(--space-8) 0',
   },
   completeIcon: {
     width: '80px',
@@ -360,28 +360,28 @@ const styles: Record<string, React.CSSProperties> = {
   completeTitle: {
     fontSize: '1.75rem',
     fontWeight: 700,
-    marginBottom: 'var(--space-3)',
+    marginBottom: 'var(--space-4)',
   },
   completeDesc: {
+    fontSize: '1rem',
     color: 'var(--color-text-secondary)',
-    fontSize: '1.0625rem',
-    marginBottom: 'var(--space-8)',
     maxWidth: '500px',
     margin: '0 auto var(--space-8)',
+    lineHeight: 1.6,
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: 'var(--space-4)',
-    marginBottom: 'var(--space-8)',
     maxWidth: '500px',
-    marginLeft: 'auto',
-    marginRight: 'auto',
+    margin: '0 auto var(--space-8)',
   },
   statItem: {
     padding: 'var(--space-4)',
     background: 'var(--color-bg-secondary)',
-    borderRadius: 'var(--radius-md)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-lg)',
+    textAlign: 'center',
   },
   statValue: {
     fontSize: '1.5rem',
@@ -390,167 +390,173 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 'var(--space-1)',
   },
   statLabel: {
-    fontSize: '0.75rem',
-    color: 'var(--color-text-secondary)',
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: 'var(--space-10)',
-    color: 'var(--color-text-secondary)',
-  },
-  noteBox: {
-    padding: 'var(--space-3) var(--space-4)',
-    background: 'rgba(59, 130, 246, 0.08)',
-    borderRadius: 'var(--radius-md)',
     fontSize: '0.8125rem',
     color: 'var(--color-text-secondary)',
-    marginTop: 'var(--space-3)',
+  },
+  // Pro升级卡片样式
+  proUpgradeCard: {
+    maxWidth: '400px',
+    margin: '0 auto var(--space-6)',
+    padding: 'var(--space-6)',
+    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1))',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: 'var(--radius-xl)',
+    textAlign: 'center',
+  },
+  proUpgradeIcon: {
+    width: '56px',
+    height: '56px',
+    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto var(--space-4)',
+    boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)',
+  },
+  proUpgradeTitle: {
+    fontSize: '1.125rem',
+    fontWeight: 600,
+    marginBottom: 'var(--space-2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 'var(--space-2)',
+  },
+  proUpgradeDesc: {
+    fontSize: '0.875rem',
+    color: 'var(--color-text-secondary)',
+    marginBottom: 'var(--space-5)',
+  },
+  proUpgradeBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-3) var(--space-6)',
+    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+    color: 'white',
+    border: 'none',
+    borderRadius: 'var(--radius-md)',
+    fontSize: '0.9375rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
   },
 };
 
-const stepLabels = [
-  { key: 'select-source', label: '选择源平台' },
-  { key: 'export', label: '导出配置' },
-  { key: 'parse', label: '解析数据' },
-  { key: 'preview', label: '预览确认' },
-  { key: 'select-target', label: '选择目标平台' },
-  { key: 'import', label: '导入配置' },
+const STEPS = [
+  { id: 'select-source', label: '选择源平台' },
+  { id: 'export', label: '导出配置' },
+  { id: 'parse', label: '解析数据' },
+  { id: 'preview', label: '预览确认' },
+  { id: 'select-target', label: '选择目标' },
+  { id: 'import', label: '导入配置' },
+  { id: 'complete', label: '完成' },
 ];
 
-export const MigrationPage: React.FC = () => {
+// 免费版配置项限制
+const FREE_TIER_ITEM_LIMIT = 10;
+
+const MigrationPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
+  
   const {
     currentStep,
-    setStep,
-    goBack,
-    goNext,
+    setCurrentStep,
     sourcePlatform,
-    targetPlatform,
     setSourcePlatform,
-    setTargetPlatform,
     parsedSchema,
     parseResult,
-    rawExportData,
-    setRawExportData,
-    setParsedData,
-    setImportPrompt,
+    targetPlatform,
+    setTargetPlatform,
     reset,
-    saveDraft,
   } = useMigrationStore();
 
-  const [copied, setCopied] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
-  const [parseError, setParseError] = useState('');
+  // 额外的状态
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showItemLimitToast, setShowItemLimitToast] = useState(false);
+  const [itemLimitToastData, setItemLimitToastData] = useState({ current: 0, limit: FREE_TIER_ITEM_LIMIT });
 
-  // 自动保存草稿
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (currentStep !== 'complete' && currentStep !== 'select-source') {
-        saveDraft();
-      }
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [currentStep, saveDraft]);
+  // 步骤指示器
+  const renderStepIndicator = () => {
+    const currentIndex = STEPS.findIndex(s => s.id === currentStep);
 
-  const handleCopy = useCallback((text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, []);
+    return (
+      <div style={styles.stepsIndicator}>
+        {STEPS.map((step, index) => {
+          const isActive = step.id === currentStep;
+          const isCompleted = index < currentIndex;
 
-  const handleParse = useCallback(async () => {
-    if (!rawExportData.trim()) {
-      setParseError('请粘贴从平台获取的 JSON 数据');
-      return;
-    }
-
-    if (!sourcePlatform) {
-      setParseError('请先选择源平台');
-      return;
-    }
-
-    setIsParsing(true);
-    setParseError('');
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const result: ParseResult = sourcePlatform.parseExportResult(rawExportData);
-      setParsedData(result.data || null, result);
-      
-      if (result.success) {
-        goNext();
-      } else {
-        setParseError(result.errors[0]?.message || '解析失败，请检查数据格式');
-      }
-    } catch (err) {
-      setParseError('解析过程中发生错误，请重试');
-    } finally {
-      setIsParsing(false);
-    }
-  }, [rawExportData, sourcePlatform, setParsedData, goNext]);
-
-  const handleSelectTarget = useCallback(() => {
-    if (!targetPlatform || !parsedSchema) return;
-
-    const result = targetPlatform.generateImportPrompt(parsedSchema, {
-      categories: Object.values(MigrationCategory),
-    });
-    setImportPrompt(result.prompt, result.instructions);
-    goNext();
-  }, [targetPlatform, parsedSchema, setImportPrompt, goNext]);
-
-  const handleStartNew = () => {
-    reset();
+          return (
+            <React.Fragment key={step.id}>
+              {index > 0 && (
+                <div style={{
+                  ...styles.stepConnector,
+                  ...(isCompleted ? { background: 'var(--color-success)' } : {}),
+                }} />
+              )}
+              <div
+                style={{
+                  ...styles.stepDot,
+                  ...(isActive ? styles.stepDotActive : {}),
+                  ...(isCompleted ? styles.stepDotCompleted : {}),
+                }}
+              >
+                {isCompleted ? <Check size={14} /> : index + 1}
+                <span style={{ marginLeft: '4px' }}>{step.label}</span>
+              </div>
+            </React.Fragment>
+          );
+        })}
+      </div>
+    );
   };
 
-  const getCategoryIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      [MigrationCategory.SKILLS]: '🔌',
+  // 辅助函数
+  const getCategoryIcon = (category: MigrationCategory): string => {
+    const icons: Record<MigrationCategory, string> = {
+      [MigrationCategory.SKILLS]: '🎯',
       [MigrationCategory.AUTOMATIONS]: '⚡',
       [MigrationCategory.MCP_CONNECTIONS]: '🔗',
       [MigrationCategory.MEMORIES]: '🧠',
       [MigrationCategory.SETTINGS]: '⚙️',
-      [MigrationCategory.PROMPTS]: '💬',
+      [MigrationCategory.PROMPTS]: '📝',
       [MigrationCategory.KNOWLEDGE_BASES]: '📚',
     };
-    return icons[category] || '📄';
+    return icons[category] || '📦';
   };
 
-  const getSensitivityLabel = (level: SensitivityLevel) => {
+  const getSensitivityLabel = (level: SensitivityLevel): string => {
     const labels: Record<SensitivityLevel, string> = {
-      [SensitivityLevel.SAFE]: '',
-      [SensitivityLevel.REVIEW_SUGGESTED]: '需审核',
-      [SensitivityLevel.MUST_REMOVE]: '已脱敏',
+      [SensitivityLevel.SAFE]: '安全',
+      [SensitivityLevel.SENSITIVE]: '敏感',
+      [SensitivityLevel.CRITICAL]: '高危',
     };
-    return labels[level];
+    return labels[level] || '未知';
   };
 
-  const renderStepIndicator = () => (
-    <div className="step-indicator" style={styles.stepsIndicator}>
-      {stepLabels.map((step, index) => {
-        const stepKey = step.key as typeof currentStep;
-        const isActive = currentStep === stepKey;
-        const stepIndex = stepLabels.findIndex((s) => s.key === currentStep);
-        const isCompleted = index < stepIndex;
+  // 导航函数
+  const goNext = () => {
+    const currentIndex = STEPS.findIndex(s => s.id === currentStep);
+    if (currentIndex < STEPS.length - 1) {
+      setCurrentStep(STEPS[currentIndex + 1].id);
+    }
+  };
 
-        return (
-          <React.Fragment key={step.key}>
-            {index > 0 && <div style={styles.stepConnector} />}
-            <div
-              style={{
-                ...styles.stepDot,
-                ...(isActive ? styles.stepDotActive : {}),
-                ...(isCompleted ? styles.stepDotCompleted : {}),
-              }}
-            >
-              {isCompleted ? <Check size={14} /> : index + 1}
-              <span>{step.label}</span>
-            </div>
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
+  const goBack = () => {
+    const currentIndex = STEPS.findIndex(s => s.id === currentStep);
+    if (currentIndex > 0) {
+      setCurrentStep(STEPS[currentIndex - 1].id);
+    }
+  };
 
+  const handleStartNew = () => {
+    reset();
+    setCurrentStep('select-source');
+  };
+
+  // 选择源平台
   const renderSelectSource = () => {
     const sourceAdapters = registry.getSupportedSourcePlatforms();
 
@@ -561,7 +567,7 @@ export const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择你当前使用的 AI 助手平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div className="platform-grid" style={styles.platformGrid}>
+          <div style={styles.platformGrid}>
             {sourceAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -578,7 +584,7 @@ export const MigrationPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="actions-bar" style={styles.actions}>
+          <div style={styles.actions}>
             <div />
             <button
               style={{
@@ -598,64 +604,57 @@ export const MigrationPage: React.FC = () => {
     );
   };
 
+  // 导出步骤
   const renderExport = () => {
-    if (!sourcePlatform) return null;
-    const exportResult = sourcePlatform.generateExportPrompt({
-      categories: Object.values(MigrationCategory),
-    });
+    const [copied, setCopied] = useState(false);
+    const exportPrompt = sourcePlatform?.generateExportPrompt?.() || '生成导出提示词失败';
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(exportPrompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
 
     return (
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <h2 style={styles.cardTitle}>导出配置</h2>
-          <p style={styles.cardDesc}>按照以下步骤获取你的配置数据</p>
+          <p style={styles.cardDesc}>按照以下步骤从 {sourcePlatform?.name} 导出配置</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.warningBox}>
-            <AlertTriangle size={18} style={styles.warningIcon} />
-            <div style={styles.warningContent}>
-              <strong>提示：</strong>导出的数据中可能包含 API Key 等敏感信息，系统会在解析时自动进行脱敏处理。
-            </div>
-          </div>
-
-          <div className="prompt-box" style={styles.promptBox}>
-            <div className="prompt-header" style={styles.promptHeader}>
-              <span style={styles.promptLabel}>📋 导出提示词（点击复制）</span>
-              <button
-                style={{
-                  ...styles.copyBtn,
-                  ...(copied ? styles.copyBtnCopied : {}),
-                }}
-                onClick={() => handleCopy(exportResult.prompt)}
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? '已复制' : '复制'}
-              </button>
-            </div>
-            <div style={styles.promptContent}>
-              {exportResult.prompt}
-            </div>
-          </div>
-
           <div style={styles.instructions}>
             <div style={styles.instructionsTitle}>
               <Info size={16} />
               操作步骤
             </div>
             <ol style={styles.instructionsList}>
-              {exportResult.instructions.split('\n').map((line, i) => (
-                <li key={i}>{line.replace(/^\d+\.\s*/, '')}</li>
-              ))}
+              <li>复制下方提示词</li>
+              <li>打开 {sourcePlatform?.name}，新建一个对话</li>
+              <li>将提示词粘贴到对话中发送</li>
+              <li>等待 AI 返回 JSON 数据，复制全部内容</li>
             </ol>
           </div>
 
-          {exportResult.note && (
-            <div style={styles.noteBox}>
-              💡 {exportResult.note}
+          <div style={styles.promptBox}>
+            <div style={styles.promptHeader}>
+              <span style={styles.promptLabel}>📋 导出提示词（点击复制）</span>
+              <button
+                style={{
+                  ...styles.copyBtn,
+                  ...(copied ? styles.copyBtnCopied : {}),
+                }}
+                onClick={handleCopy}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? '已复制' : '复制'}
+              </button>
             </div>
-          )}
+            <div style={styles.promptContent}>
+              {exportPrompt}
+            </div>
+          </div>
 
-          <div className="actions-bar" style={styles.actions}>
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -670,45 +669,72 @@ export const MigrationPage: React.FC = () => {
     );
   };
 
+  // 解析步骤
   const renderParse = () => {
+    const [jsonData, setJsonData] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleParse = async () => {
+      if (!jsonData.trim()) {
+        setError('请粘贴 JSON 数据');
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await registry.parse(sourcePlatform!.id, jsonData);
+        
+        if (!result.success) {
+          setError(result.error || '解析失败');
+          return;
+        }
+
+        // 存储解析结果
+        useMigrationStore.setState({ 
+          parsedSchema: result.schema,
+          parseResult: result 
+        });
+
+        // 检查配置项数量是否超过限制
+        const totalItems = result.schema.metadata?.totalItems || 0;
+        if (totalItems > FREE_TIER_ITEM_LIMIT) {
+          setItemLimitToastData({ current: totalItems, limit: FREE_TIER_ITEM_LIMIT });
+          setShowItemLimitToast(true);
+        }
+
+        goNext();
+      } catch (err: any) {
+        setError(err.message || '解析失败，请检查 JSON 格式');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     return (
       <div style={styles.card}>
         <div style={styles.cardHeader}>
-          <h2 style={styles.cardTitle}>粘贴数据</h2>
-          <p style={styles.cardDesc}>将你从平台获取的 JSON 数据粘贴到下方</p>
+          <h2 style={styles.cardTitle}>解析数据</h2>
+          <p style={styles.cardDesc}>将获取的 JSON 数据粘贴到下方</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.warningBox}>
-            <AlertTriangle size={18} style={styles.warningIcon} />
-            <div style={styles.warningContent}>
-              请粘贴完整的 JSON 数据，系统会自动提取其中的配置信息。JSON 会被安全处理，敏感信息会自动脱敏。
-            </div>
-          </div>
-
           <textarea
             style={styles.textarea}
-            placeholder={`请粘贴 JSON 数据，例如：
-
-{
-  "bot_name": "我的助手",
-  "prompts": [...],
-  "skills": [...],
-  ...
-}`}
-            value={rawExportData}
-            onChange={(e) => setRawExportData(e.target.value)}
+            placeholder="在此粘贴 JSON 数据..."
+            value={jsonData}
+            onChange={(e) => setJsonData(e.target.value)}
           />
 
-          {parseError && (
+          {error && (
             <div style={styles.errorBox}>
               <AlertTriangle size={18} style={{ color: 'var(--color-danger)', flexShrink: 0 }} />
-              <div style={styles.errorContent}>
-                <strong>解析错误：</strong>{parseError}
-              </div>
+              <div style={styles.errorContent}>{error}</div>
             </div>
           )}
 
-          <div className="actions-bar" style={styles.actions}>
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -716,12 +742,13 @@ export const MigrationPage: React.FC = () => {
             <button
               style={{
                 ...styles.btnPrimary,
-                opacity: isParsing ? 0.7 : 1,
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? 'wait' : 'pointer',
               }}
               onClick={handleParse}
-              disabled={isParsing || !rawExportData.trim()}
+              disabled={loading}
             >
-              {isParsing ? (
+              {loading ? (
                 <>
                   <RefreshCw size={18} className="animate-spin" />
                   解析中...
@@ -739,10 +766,11 @@ export const MigrationPage: React.FC = () => {
     );
   };
 
+  // 预览步骤
   const renderPreview = () => {
     if (!parsedSchema) return null;
 
-    const configs = parsedSchema.configs;
+    const configs = parsedSchema.configs || {};
     const categories = Object.entries({
       [MigrationCategory.SKILLS]: { data: configs.skills, label: CATEGORY_LABELS[MigrationCategory.SKILLS] },
       [MigrationCategory.AUTOMATIONS]: { data: configs.automations, label: CATEGORY_LABELS[MigrationCategory.AUTOMATIONS] },
@@ -809,7 +837,7 @@ export const MigrationPage: React.FC = () => {
             </div>
           ))}
 
-          <div className="actions-bar" style={styles.actions}>
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               重新解析
@@ -824,6 +852,7 @@ export const MigrationPage: React.FC = () => {
     );
   };
 
+  // 选择目标平台
   const renderSelectTarget = () => {
     const targetAdapters = registry.getSupportedTargetPlatforms();
 
@@ -834,7 +863,7 @@ export const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择要迁移到的目标平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div className="platform-grid" style={styles.platformGrid}>
+          <div style={styles.platformGrid}>
             {targetAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -848,10 +877,11 @@ export const MigrationPage: React.FC = () => {
                 <div style={styles.platformName}>{adapter.name}</div>
                 <div style={styles.platformDesc}>{adapter.description}</div>
               </div>
+
             ))}
           </div>
 
-          <div className="actions-bar" style={styles.actions}>
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -862,7 +892,7 @@ export const MigrationPage: React.FC = () => {
                 opacity: targetPlatform ? 1 : 0.5,
                 cursor: targetPlatform ? 'pointer' : 'not-allowed',
               }}
-              onClick={handleSelectTarget}
+              onClick={goNext}
               disabled={!targetPlatform}
             >
               下一步
@@ -874,6 +904,7 @@ export const MigrationPage: React.FC = () => {
     );
   };
 
+  // 导入步骤
   const renderImport = () => {
     const { importPrompt, importInstructions } = useMigrationStore();
     const [importCopied, setImportCopied] = useState(false);
@@ -899,8 +930,8 @@ export const MigrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="prompt-box" style={styles.promptBox}>
-            <div className="prompt-header" style={styles.promptHeader}>
+          <div style={styles.promptBox}>
+            <div style={styles.promptHeader}>
               <span style={styles.promptLabel}>📋 导入提示词（点击复制）</span>
               <button
                 style={{
@@ -930,7 +961,7 @@ export const MigrationPage: React.FC = () => {
             </ol>
           </div>
 
-          <div className="actions-bar" style={styles.actions}>
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               返回
@@ -945,10 +976,11 @@ export const MigrationPage: React.FC = () => {
     );
   };
 
+  // 完成步骤 - 修改版
   const renderComplete = () => {
     if (!parsedSchema) return null;
-    const navigate = useNavigate();
-    const { isAuthenticated } = useAuthStore();
+    const { isPro } = useAuthStore();
+    const userIsPro = isPro();
 
     return (
       <div style={styles.completeSection}>
@@ -967,7 +999,7 @@ export const MigrationPage: React.FC = () => {
             <div style={styles.statLabel}>配置项</div>
           </div>
           <div style={styles.statItem}>
-            <div style={styles.statValue}>{parsedSchema.metadata.sensitiveItems.length}</div>
+            <div style={styles.statValue}>{parsedSchema.metadata.sensitiveItems?.length || 0}</div>
             <div style={styles.statLabel}>敏感项已脱敏</div>
           </div>
           <div style={styles.statItem}>
@@ -1016,6 +1048,37 @@ export const MigrationPage: React.FC = () => {
           </div>
         )}
 
+        {/* 免费用户Pro升级引导卡片 - 新增 */}
+        {isAuthenticated && !userIsPro && (
+          <div style={styles.proUpgradeCard}>
+            <div style={styles.proUpgradeIcon}>
+              <Crown size={28} color="white" />
+            </div>
+            <h3 style={styles.proUpgradeTitle}>
+              <Zap size={18} color="var(--color-warning)" />
+              升级 Pro 版本
+            </h3>
+            <p style={styles.proUpgradeDesc}>
+              解锁无限次迁移、迁移历史永久保存等高级功能
+            </p>
+            <button
+              style={styles.proUpgradeBtn}
+              onClick={() => setShowUpgradeModal(true)}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.4)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              立即升级 Pro
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center' }}>
           <button style={styles.btnSecondary} onClick={handleStartNew}>
             <Zap size={18} />
@@ -1031,6 +1094,13 @@ export const MigrationPage: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* 升级弹窗 */}
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          reason="complete-upgrade"
+        />
       </div>
     );
   };
@@ -1065,6 +1135,16 @@ export const MigrationPage: React.FC = () => {
 
       {currentStep !== 'complete' && renderStepIndicator()}
       {renderContent()}
+
+      {/* 配置项超限提示条 - 新增 */}
+      {showItemLimitToast && (
+        <ItemLimitToast
+          current={itemLimitToastData.current}
+          limit={itemLimitToastData.limit}
+          onUpgrade={() => setShowUpgradeModal(true)}
+          autoHideDuration={5000}
+        />
+      )}
     </div>
   );
 };
