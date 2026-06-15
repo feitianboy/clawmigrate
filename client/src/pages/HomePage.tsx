@@ -304,18 +304,6 @@ export const HomePage: React.FC = () => {
               <ArrowRight size={20} />
             </button>
           </UsageGuard>
-          <button
-            style={styles.secondaryBtn}
-            onClick={() => setAuthModalOpen(true)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--color-bg-tertiary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--color-bg-secondary)';
-            }}
-          >
-            登录账户
-          </button>
         </div>
       </section>
 

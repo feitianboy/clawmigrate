@@ -473,6 +473,13 @@ const MigrationPage: React.FC = () => {
     reset,
   } = useMigrationStore();
 
+  // 进入迁移页时重置到选择源平台步骤（避免persist恢复旧状态导致跳步）
+  useEffect(() => {
+    if (currentStep !== 'select-source') {
+      setCurrentStep('select-source');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 额外的状态
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showItemLimitToast, setShowItemLimitToast] = useState(false);
