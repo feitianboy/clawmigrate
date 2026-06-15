@@ -483,7 +483,7 @@ const MigrationPage: React.FC = () => {
     const currentIndex = STEPS.findIndex(s => s.id === currentStep);
 
     return (
-      <div style={styles.stepsIndicator}>
+      <div className="step-indicator" style={styles.stepsIndicator}>
         {STEPS.map((step, index) => {
           const isActive = step.id === currentStep;
           const isCompleted = index < currentIndex;
@@ -567,7 +567,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择你当前使用的 AI 助手平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid}>
+          <div className="platform-grid" style={styles.platformGrid}>
             {sourceAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -635,7 +635,7 @@ const MigrationPage: React.FC = () => {
             </ol>
           </div>
 
-          <div style={styles.promptBox}>
+          <div className="prompt-box" style={styles.promptBox}>
             <div style={styles.promptHeader}>
               <span style={styles.promptLabel}>📋 导出提示词（点击复制）</span>
               <button
@@ -863,7 +863,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择要迁移到的目标平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid}>
+          <div className="platform-grid" style={styles.platformGrid}>
             {targetAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -930,7 +930,7 @@ const MigrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={styles.promptBox}>
+          <div className="prompt-box" style={styles.promptBox}>
             <div style={styles.promptHeader}>
               <span style={styles.promptLabel}>📋 导入提示词（点击复制）</span>
               <button

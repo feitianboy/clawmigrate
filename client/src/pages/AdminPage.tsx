@@ -1026,7 +1026,7 @@ export const AdminPage: React.FC = () => {
       </div>
 
       {/* 统计卡片 */}
-      <div style={styles.statsGrid}>
+      <div className="stats-bar" style={styles.statsGrid}>
         <StatCard
           icon={<Users size={22} />}
           iconBg="rgba(249, 115, 22, 0.15)"
@@ -1113,7 +1113,7 @@ export const AdminPage: React.FC = () => {
       {/* 用户管理表格 */}
       {activeTab === 'users' && (
         <div style={styles.card}>
-          <div style={styles.cardHeader}>
+          <div className="card-header" style={styles.cardHeader}>
             <h2 style={styles.cardTitle}>用户列表</h2>
             <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
               共 {usersTotal} 个用户
@@ -1211,7 +1211,7 @@ export const AdminPage: React.FC = () => {
       {/* 迁移记录表格 */}
       {activeTab === 'migrations' && (
         <div style={styles.card}>
-          <div style={styles.cardHeader}>
+          <div className="card-header" style={styles.cardHeader}>
             <h2 style={styles.cardTitle}>迁移记录</h2>
             <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
               共 {migrationRecords.length} 条记录

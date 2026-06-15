@@ -274,7 +274,7 @@ export const HomePage: React.FC = () => {
 
   return (
     <div>
-      <section style={styles.hero}>
+      <section className="hero-section" style={styles.hero}>
         <div style={styles.badge}>
           <Sparkles size={16} />
           AI 助手配置迁移工具
@@ -286,7 +286,7 @@ export const HomePage: React.FC = () => {
           无需手动复制粘贴，ClawMigrate 可以帮助你在不同 AI 助手平台之间
           安全、快速地迁移技能、自动化、记忆和设置。
         </p>
-        <div style={styles.ctaSection}>
+        <div className="cta-section" style={styles.ctaSection}>
           <UsageGuard>
             <button
               style={styles.primaryBtn}
@@ -319,12 +319,12 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <section style={styles.steps}>
+      <section className="steps-section" style={styles.steps}>
         <div style={styles.sectionTitle}>
           <h2 style={styles.sectionTitleText}>简单五步，完成迁移</h2>
           <p style={styles.sectionSubtitle}>整个过程只需要几分钟，无需任何技术背景</p>
         </div>
-        <div style={styles.stepsGrid}>
+        <div className="steps-grid" style={styles.stepsGrid}>
           {steps.map((step) => (
             <div key={step.num} style={styles.stepCard}>
               <div style={styles.stepNumber}>{step.num}</div>
@@ -351,12 +351,12 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <section style={styles.features}>
+      <section className="features-section" style={styles.features}>
         <div style={styles.sectionTitle}>
           <h2 style={styles.sectionTitleText}>为什么选择 ClawMigrate</h2>
           <p style={styles.sectionSubtitle}>专为 AI 助手用户设计的功能特性</p>
         </div>
-        <div style={styles.featuresGrid}>
+        <div className="features-grid" style={styles.featuresGrid}>
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
