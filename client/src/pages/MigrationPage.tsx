@@ -463,7 +463,7 @@ const MigrationPage: React.FC = () => {
   
   const {
     currentStep,
-    setCurrentStep,
+    setStep,
     sourcePlatform,
     setSourcePlatform,
     parsedSchema,
@@ -473,11 +473,10 @@ const MigrationPage: React.FC = () => {
     reset,
   } = useMigrationStore();
 
-  // 进入迁移页时重置到选择源平台步骤（避免persist恢复旧状态导致跳步）
+  // 页面挂载时强制重置步骤，防止 zustand persist 恢复旧状态导致步骤错位
   useEffect(() => {
-    if (currentStep !== 'select-source') {
-      setCurrentStep('select-source');
-    }
+    reset();
+    setStep('select-source');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 额外的状态
@@ -490,7 +489,7 @@ const MigrationPage: React.FC = () => {
     const currentIndex = STEPS.findIndex(s => s.id === currentStep);
 
     return (
-      <div className="step-indicator" style={styles.stepsIndicator}>
+      <div style={styles.stepsIndicator}>
         {STEPS.map((step, index) => {
           const isActive = step.id === currentStep;
           const isCompleted = index < currentIndex;
@@ -547,20 +546,20 @@ const MigrationPage: React.FC = () => {
   const goNext = () => {
     const currentIndex = STEPS.findIndex(s => s.id === currentStep);
     if (currentIndex < STEPS.length - 1) {
-      setCurrentStep(STEPS[currentIndex + 1].id);
+      setStep(STEPS[currentIndex + 1].id);
     }
   };
 
   const goBack = () => {
     const currentIndex = STEPS.findIndex(s => s.id === currentStep);
     if (currentIndex > 0) {
-      setCurrentStep(STEPS[currentIndex - 1].id);
+      setStep(STEPS[currentIndex - 1].id);
     }
   };
 
   const handleStartNew = () => {
     reset();
-    setCurrentStep('select-source');
+    setStep('select-source');
   };
 
   // 选择源平台
@@ -574,7 +573,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择你当前使用的 AI 助手平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div className="platform-grid" style={styles.platformGrid}>
+          <div style={styles.platformGrid}>
             {sourceAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -642,7 +641,7 @@ const MigrationPage: React.FC = () => {
             </ol>
           </div>
 
-          <div className="prompt-box" style={styles.promptBox}>
+          <div style={styles.promptBox}>
             <div style={styles.promptHeader}>
               <span style={styles.promptLabel}>📋 导出提示词（点击复制）</span>
               <button
@@ -870,7 +869,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择要迁移到的目标平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div className="platform-grid" style={styles.platformGrid}>
+          <div style={styles.platformGrid}>
             {targetAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -937,7 +936,7 @@ const MigrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="prompt-box" style={styles.promptBox}>
+          <div style={styles.promptBox}>
             <div style={styles.promptHeader}>
               <span style={styles.promptLabel}>📋 导入提示词（点击复制）</span>
               <button
