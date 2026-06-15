@@ -8,6 +8,13 @@ export interface JwtPayload {
   role: string;
 }
 
+export interface AdminJwtPayload {
+  userId: string;
+  username: string;
+  role: string;
+  isAdmin: boolean;
+}
+
 export interface AuthUser {
   id: number;
   username: string;
@@ -16,9 +23,9 @@ export interface AuthUser {
 }
 
 // Helper function to extract token from cookies
-function extractTokenFromCookies(req: VercelRequest): string | null {
+function extractTokenFromCookies(req: VercelRequest): { token: string | null; isAdminCookie: boolean } {
   const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) return null;
+  if (!cookieHeader) return { token: null, isAdminCookie: false };
   
   // Parse cookies string
   const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
@@ -29,7 +36,12 @@ function extractTokenFromCookies(req: VercelRequest): string | null {
     return acc;
   }, {} as Record<string, string>);
   
-  return cookies['auth_token'] || null;
+  // Check admin_token first (admin dashboard uses this)
+  if (cookies['admin_token']) {
+    return { token: cookies['admin_token'], isAdminCookie: true };
+  }
+  
+  return { token: cookies['auth_token'] || null, isAdminCookie: false };
 }
 
 // Extract token from Authorization header
@@ -43,11 +55,8 @@ function extractTokenFromHeader(req: VercelRequest): string | null {
 
 // Get token from either cookie or header (cookie takes priority)
 function getToken(req: VercelRequest): string | null {
-  // Try cookie first (HttpOnly cookie is the secure way)
-  const cookieToken = extractTokenFromCookies(req);
-  if (cookieToken) return cookieToken;
-  
-  // Fallback to Authorization header
+  const { token } = extractTokenFromCookies(req);
+  if (token) return token;
   return extractTokenFromHeader(req);
 }
 
@@ -60,7 +69,17 @@ export async function verifyAuth(req: VercelRequest): Promise<AuthUser | null> {
   const secret = process.env.JWT_SECRET || 'default_secret';
 
   try {
-    const decoded = jwt.verify(token, secret) as JwtPayload;
+    const decoded = jwt.verify(token, secret) as JwtPayload | AdminJwtPayload;
+    
+    // If this is an admin token (from admin-login), return admin user
+    if ('isAdmin' in decoded && decoded.isAdmin) {
+      return {
+        id: 0,
+        username: 'admin',
+        email: 'admin@clawmigrate.xyz',
+        role: 'admin'
+      };
+    }
     
     // 从数据库验证用户仍然存在
     const { data: user } = await supabase
@@ -94,7 +113,19 @@ export async function requireAuth(req: VercelRequest): Promise<{ user: AuthUser;
   const secret = process.env.JWT_SECRET || 'default_secret';
 
   try {
-    const decoded = jwt.verify(token, secret) as JwtPayload;
+    const decoded = jwt.verify(token, secret) as JwtPayload | AdminJwtPayload;
+    
+    // If this is an admin token (from admin-login), return admin user directly
+    if ('isAdmin' in decoded && decoded.isAdmin) {
+      return {
+        user: {
+          id: 0,
+          username: 'admin',
+          email: 'admin@clawmigrate.xyz',
+          role: 'admin'
+        }
+      };
+    }
     
     const { data: user } = await supabase
       .from('users')
