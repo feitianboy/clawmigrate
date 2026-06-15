@@ -106,8 +106,8 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
         </div>
       ) : (
         <>
-          {/* 免费用户次数用完状态 - 显示禁用状态 */}
-          <div onClick={() => setUpgradeModalOpen(true)}>
+          {/* 免费用户次数用完状态 - 点击显示升级弹窗，阻止子元素onClick冒泡 */}
+          <div onClick={(e) => { e.stopPropagation(); setUpgradeModalOpen(true); }}>
             {children}
           </div>
         </>

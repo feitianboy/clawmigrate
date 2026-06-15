@@ -459,7 +459,6 @@ const FREE_TIER_ITEM_LIMIT = 10;
 
 const MigrationPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
   
   const {
     currentStep,
@@ -471,8 +470,13 @@ const MigrationPage: React.FC = () => {
     targetPlatform,
     setTargetPlatform,
     selectedCategories,
+    importPrompt,
+    importInstructions,
+    setImportPrompt,
     reset,
   } = useMigrationStore();
+
+  const { isAuthenticated, isPro } = useAuthStore();
 
   // 页面挂载时强制重置步骤，防止 zustand persist 恢复旧状态导致步骤错位
   useEffect(() => {
@@ -480,10 +484,18 @@ const MigrationPage: React.FC = () => {
     setStep('select-source');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 额外的状态
+  // 额外的状态（从render函数中提升到顶层，修复Rules of Hooks违规）
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showItemLimitToast, setShowItemLimitToast] = useState(false);
   const [itemLimitToastData, setItemLimitToastData] = useState({ current: 0, limit: FREE_TIER_ITEM_LIMIT });
+  // 导出步骤状态
+  const [exportCopied, setExportCopied] = useState(false);
+  // 解析步骤状态
+  const [jsonData, setJsonData] = useState('');
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [parseLoading, setParseLoading] = useState(false);
+  // 导入步骤状态
+  const [importCopied, setImportCopied] = useState(false);
 
   // 步骤指示器
   const renderStepIndicator = () => {
@@ -549,14 +561,16 @@ const MigrationPage: React.FC = () => {
     if (currentIndex < STEPS.length - 1) {
       const nextStep = STEPS[currentIndex + 1].id;
       
-      // 从"选择目标平台"进入"导入"步骤时，生成导入提示词
+      // select-target → import 时生成导入提示词
       if (currentStep === 'select-target' && nextStep === 'import' && targetPlatform && parsedSchema) {
-        const importResult = targetPlatform.generateImportPrompt?.(parsedSchema, { categories: selectedCategories });
-        if (importResult) {
-          useMigrationStore.setState({
-            importPrompt: importResult.prompt,
-            importInstructions: importResult.instructions,
+        try {
+          const importResult = targetPlatform.generateImportPrompt(parsedSchema, {
+            categories: selectedCategories,
           });
+          setImportPrompt(importResult.prompt, importResult.instructions);
+        } catch (err) {
+          console.error('生成导入提示词失败:', err);
+          setImportPrompt('生成导入提示词失败，请重试', '1. 返回上一步重新选择');
         }
       }
       
@@ -626,13 +640,14 @@ const MigrationPage: React.FC = () => {
 
   // 导出步骤
   const renderExport = () => {
-    const [copied, setCopied] = useState(false);
-    const exportPrompt = sourcePlatform?.generateExportPrompt?.({ categories: selectedCategories }) || '生成导出提示词失败';
+    const exportResult = sourcePlatform?.generateExportPrompt?.({ categories: selectedCategories });
+    const exportPromptText = exportResult?.prompt || '生成导出提示词失败';
+    const exportInstructions = exportResult?.instructions;
 
     const handleCopy = () => {
-      navigator.clipboard.writeText(exportPrompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard.writeText(exportPromptText);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
     };
 
     return (
@@ -661,16 +676,16 @@ const MigrationPage: React.FC = () => {
               <button
                 style={{
                   ...styles.copyBtn,
-                  ...(copied ? styles.copyBtnCopied : {}),
+                  ...(exportCopied ? styles.copyBtnCopied : {}),
                 }}
                 onClick={handleCopy}
               >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? '已复制' : '复制'}
+                {exportCopied ? <Check size={14} /> : <Copy size={14} />}
+                {exportCopied ? '已复制' : '复制'}
               </button>
             </div>
             <div style={styles.promptContent}>
-              {exportPrompt}
+              {exportPromptText}
             </div>
           </div>
 
@@ -691,24 +706,20 @@ const MigrationPage: React.FC = () => {
 
   // 解析步骤
   const renderParse = () => {
-    const [jsonData, setJsonData] = useState('');
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-
     const handleParse = async () => {
       if (!jsonData.trim()) {
-        setError('请粘贴 JSON 数据');
+        setParseError('请粘贴 JSON 数据');
         return;
       }
 
-      setLoading(true);
-      setError(null);
+      setParseLoading(true);
+      setParseError(null);
 
       try {
         const result = await registry.parse(sourcePlatform!.id, jsonData);
         
         if (!result.success) {
-          setError(result.error || '解析失败');
+          setParseError(result.error || '解析失败');
           return;
         }
 
@@ -727,9 +738,9 @@ const MigrationPage: React.FC = () => {
 
         goNext();
       } catch (err: any) {
-        setError(err.message || '解析失败，请检查 JSON 格式');
+        setParseError(err.message || '解析失败，请检查 JSON 格式');
       } finally {
-        setLoading(false);
+        setParseLoading(false);
       }
     };
 
@@ -747,10 +758,10 @@ const MigrationPage: React.FC = () => {
             onChange={(e) => setJsonData(e.target.value)}
           />
 
-          {error && (
+          {parseError && (
             <div style={styles.errorBox}>
               <AlertTriangle size={18} style={{ color: 'var(--color-danger)', flexShrink: 0 }} />
-              <div style={styles.errorContent}>{error}</div>
+              <div style={styles.errorContent}>{parseError}</div>
             </div>
           )}
 
@@ -762,13 +773,13 @@ const MigrationPage: React.FC = () => {
             <button
               style={{
                 ...styles.btnPrimary,
-                opacity: loading ? 0.7 : 1,
-                cursor: loading ? 'wait' : 'pointer',
+                opacity: parseLoading ? 0.7 : 1,
+                cursor: parseLoading ? 'wait' : 'pointer',
               }}
               onClick={handleParse}
-              disabled={loading}
+              disabled={parseLoading}
             >
-              {loading ? (
+              {parseLoading ? (
                 <>
                   <RefreshCw size={18} className="animate-spin" />
                   解析中...
@@ -926,9 +937,6 @@ const MigrationPage: React.FC = () => {
 
   // 导入步骤
   const renderImport = () => {
-    const { importPrompt, importInstructions } = useMigrationStore();
-    const [importCopied, setImportCopied] = useState(false);
-
     const handleCopyImport = () => {
       navigator.clipboard.writeText(importPrompt);
       setImportCopied(true);
@@ -996,10 +1004,9 @@ const MigrationPage: React.FC = () => {
     );
   };
 
-  // 完成步骤 - 修改版
+  // 完成步骤
   const renderComplete = () => {
     if (!parsedSchema) return null;
-    const { isPro } = useAuthStore();
     const userIsPro = isPro();
 
     return (
