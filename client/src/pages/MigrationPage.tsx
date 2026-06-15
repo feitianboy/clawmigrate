@@ -477,12 +477,36 @@ const MigrationPage: React.FC = () => {
   useEffect(() => {
     reset();
     setStep('select-source');
+    // 清理步骤级状态
+    setJsonData('');
+    setParseError(null);
+    setParseLoading(false);
+    setExportCopied(false);
+    setImportCopied(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 步骤切换时清理对应状态，避免残留数据
+  useEffect(() => {
+    if (currentStep === 'parse') {
+      setParseError(null);
+    }
+  }, [currentStep]);
 
   // 额外的状态
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showItemLimitToast, setShowItemLimitToast] = useState(false);
   const [itemLimitToastData, setItemLimitToastData] = useState({ current: 0, limit: FREE_TIER_ITEM_LIMIT });
+
+  // 步骤级状态（从 renderXxx 中提升到顶层，避免 hooks 违规导致黑屏）
+  const [exportCopied, setExportCopied] = useState(false);
+  const [jsonData, setJsonData] = useState('');
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [parseLoading, setParseLoading] = useState(false);
+  const [importCopied, setImportCopied] = useState(false);
+
+  // 从 store 获取 import 相关数据（避免在 renderImport 中条件调用 hooks）
+  const { importPrompt, importInstructions } = useMigrationStore();
+  const { isPro } = useAuthStore();
 
   // 步骤指示器
   const renderStepIndicator = () => {
@@ -612,13 +636,12 @@ const MigrationPage: React.FC = () => {
 
   // 导出步骤
   const renderExport = () => {
-    const [copied, setCopied] = useState(false);
     const exportPrompt = sourcePlatform?.generateExportPrompt?.() || '生成导出提示词失败';
 
     const handleCopy = () => {
       navigator.clipboard.writeText(exportPrompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
     };
 
     return (
@@ -647,12 +670,12 @@ const MigrationPage: React.FC = () => {
               <button
                 style={{
                   ...styles.copyBtn,
-                  ...(copied ? styles.copyBtnCopied : {}),
+                  ...(exportCopied ? styles.copyBtnCopied : {}),
                 }}
                 onClick={handleCopy}
               >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? '已复制' : '复制'}
+                {exportCopied ? <Check size={14} /> : <Copy size={14} />}
+                {exportCopied ? '已复制' : '复制'}
               </button>
             </div>
             <div style={styles.promptContent}>
@@ -677,13 +700,10 @@ const MigrationPage: React.FC = () => {
 
   // 解析步骤
   const renderParse = () => {
-    const [jsonData, setJsonData] = useState('');
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
 
     const handleParse = async () => {
       if (!jsonData.trim()) {
-        setError('请粘贴 JSON 数据');
+        setParseError('请粘贴 JSON 数据');
         return;
       }
 
@@ -694,7 +714,7 @@ const MigrationPage: React.FC = () => {
         const result = await registry.parse(sourcePlatform!.id, jsonData);
         
         if (!result.success) {
-          setError(result.error || '解析失败');
+          setParseError(result.error || '解析失败');
           return;
         }
 
@@ -713,7 +733,7 @@ const MigrationPage: React.FC = () => {
 
         goNext();
       } catch (err: any) {
-        setError(err.message || '解析失败，请检查 JSON 格式');
+        setParseError(err.message || '解析失败，请检查 JSON 格式');
       } finally {
         setLoading(false);
       }
@@ -733,10 +753,10 @@ const MigrationPage: React.FC = () => {
             onChange={(e) => setJsonData(e.target.value)}
           />
 
-          {error && (
+          {parseError && (
             <div style={styles.errorBox}>
               <AlertTriangle size={18} style={{ color: 'var(--color-danger)', flexShrink: 0 }} />
-              <div style={styles.errorContent}>{error}</div>
+              <div style={styles.errorContent}>{parseError}</div>
             </div>
           )}
 
@@ -748,13 +768,13 @@ const MigrationPage: React.FC = () => {
             <button
               style={{
                 ...styles.btnPrimary,
-                opacity: loading ? 0.7 : 1,
-                cursor: loading ? 'wait' : 'pointer',
+                opacity: parseLoading ? 0.7 : 1,
+                cursor: parseLoading ? 'wait' : 'pointer',
               }}
               onClick={handleParse}
-              disabled={loading}
+              disabled={parseLoading}
             >
-              {loading ? (
+              {parseLoading ? (
                 <>
                   <RefreshCw size={18} className="animate-spin" />
                   解析中...
@@ -912,8 +932,6 @@ const MigrationPage: React.FC = () => {
 
   // 导入步骤
   const renderImport = () => {
-    const { importPrompt, importInstructions } = useMigrationStore();
-    const [importCopied, setImportCopied] = useState(false);
 
     const handleCopyImport = () => {
       navigator.clipboard.writeText(importPrompt);
@@ -985,7 +1003,6 @@ const MigrationPage: React.FC = () => {
   // 完成步骤 - 修改版
   const renderComplete = () => {
     if (!parsedSchema) return null;
-    const { isPro } = useAuthStore();
     const userIsPro = isPro();
 
     return (
@@ -1128,7 +1145,14 @@ const MigrationPage: React.FC = () => {
       case 'complete':
         return renderComplete();
       default:
-        return null;
+        return (
+          <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--color-text-secondary)' }}>
+            <p>步骤状态异常，请刷新页面重试</p>
+            <button style={{ ...styles.btnPrimary, marginTop: 'var(--space-4)' }} onClick={() => { reset(); setStep('select-source'); }}>
+              重新开始
+            </button>
+          </div>
+        );
     }
   };
 
