@@ -342,10 +342,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             )}
             
-            {/* 迁移次数提示 */}
+            {/* 套餐状态提示 */}
             {isAuthenticated && planInfo && !isPro() && (
               <span style={styles.usageTag}>
-                剩余 {getRemainingUsage()} 次
+                免费版 · 剩余 {getRemainingUsage()} 次/月
+              </span>
+            )}
+            {isAuthenticated && isPro() && (
+              <span style={{
+                ...styles.usageTag,
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                color: 'white',
+                fontWeight: 600,
+              }}>
+                👑 Pro · 无限迁移
               </span>
             )}
 

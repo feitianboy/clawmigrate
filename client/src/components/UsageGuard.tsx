@@ -149,10 +149,11 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
           {!isAuthenticated && guestRemaining > 0 && (
             <div style={{
               fontSize: '12px',
-              color: 'var(--color-text-tertiary)',
+              color: guestRemaining <= 1 ? 'var(--color-warning)' : 'var(--color-text-tertiary)',
               marginTop: '4px',
+              fontWeight: guestRemaining <= 1 ? 600 : 400,
             }}>
-              游客还可迁移 {guestRemaining} 次，注册后享更多次数
+              🦐 游客还可迁移 {guestRemaining} 次 · 注册后享每月3次
             </div>
           )}
         </div>

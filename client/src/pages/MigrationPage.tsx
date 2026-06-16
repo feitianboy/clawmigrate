@@ -489,6 +489,7 @@ const MigrationPage: React.FC = () => {
   const [showItemLimitToast, setShowItemLimitToast] = useState(false);
   const [itemLimitToastData, setItemLimitToastData] = useState({ current: 0, limit: FREE_TIER_ITEM_LIMIT });
   // 导出步骤状态
+  const [migrationRecorded, setMigrationRecorded] = useState(false);
   const [exportCopied, setExportCopied] = useState(false);
   // 解析步骤状态
   const [jsonData, setJsonData] = useState('');
@@ -496,6 +497,27 @@ const MigrationPage: React.FC = () => {
   const [parseLoading, setParseLoading] = useState(false);
   // 导入步骤状态
   const [importCopied, setImportCopied] = useState(false);
+
+  // 迁移完成时记录到后端
+  useEffect(() => {
+    if (currentStep === 'complete' && sourcePlatform && targetPlatform && parsedSchema && !migrationRecorded) {
+      setMigrationRecorded(true);
+      if (isAuthenticated) {
+        fetch('/api/migrations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            sourcePlatform: sourcePlatform.id,
+            targetPlatform: targetPlatform.id,
+            itemsCount: parsedSchema.metadata?.totalItems || 0,
+            categories: selectedCategories,
+            status: 'completed',
+          }),
+        }).catch(err => console.error('记录迁移失败:', err));
+      }
+    }
+  }, [currentStep, sourcePlatform, targetPlatform, parsedSchema, migrationRecorded, isAuthenticated, selectedCategories]);
 
   // 步骤指示器
   const renderStepIndicator = () => {
