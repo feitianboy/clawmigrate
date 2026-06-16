@@ -8,11 +8,34 @@ interface UsageGuardProps {
   showUpgradeModal?: boolean;
 }
 
+const GUEST_MIGRATION_LIMIT = 2;
+const GUEST_MIGRATION_KEY = 'clawmigrate_guest_migrations';
+
+function getGuestMigrationCount(): number {
+  try {
+    const raw = localStorage.getItem(GUEST_MIGRATION_KEY);
+    return raw ? parseInt(raw, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function incrementGuestMigrationCount(): number {
+  const next = getGuestMigrationCount() + 1;
+  try {
+    localStorage.setItem(GUEST_MIGRATION_KEY, String(next));
+  } catch {
+    // localStorage 不可用时静默失败
+  }
+  return next;
+}
+
 /**
  * 迁移次数守卫组件
  * 包裹迁移操作区域，在用户点击"开始迁移"或进入迁移页时检查迁移次数
  * - 如果已登录+免费用户+次数用完→显示升级提示
- * - 如果未登录→允许继续（鼓励试用）
+ * - 如果未登录+已用2次→显示注册引导
+ * - 如果未登录+未达限→允许继续并计数
  * - Pro/企业版→直接通过
  */
 export const UsageGuard: React.FC<UsageGuardProps> = ({
@@ -23,16 +46,36 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
   const [checking, setChecking] = useState(false);
   const [canUse, setCanUse] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [guestRemaining, setGuestRemaining] = useState(GUEST_MIGRATION_LIMIT);
   
-  const { isAuthenticated, isPro, fetchPlanInfo, planInfo } = useAuthStore();
+  const { isAuthenticated, isPro, fetchPlanInfo } = useAuthStore();
+
+  // 同步未登录用户剩余次数
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const used = getGuestMigrationCount();
+      setGuestRemaining(Math.max(0, GUEST_MIGRATION_LIMIT - used));
+    }
+  }, [isAuthenticated]);
 
   // 检查是否可以迁移
   const checkCanMigrate = async () => {
     setChecking(true);
     
     try {
-      // 未登录用户允许继续（鼓励试用）
+      // 未登录用户检查本地次数
       if (!isAuthenticated) {
+        const used = getGuestMigrationCount();
+        if (used >= GUEST_MIGRATION_LIMIT) {
+          setCanUse(false);
+          setUpgradeModalOpen(true);
+          onLimitReached?.();
+          setChecking(false);
+          return false;
+        }
+        // 允许使用并计数
+        incrementGuestMigrationCount();
+        setGuestRemaining(Math.max(0, GUEST_MIGRATION_LIMIT - used - 1));
         setCanUse(true);
         setChecking(false);
         return true;
@@ -100,13 +143,22 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
         }}>
           检查迁移次数中...
         </div>
-      ) : canUse || !isAuthenticated ? (
+      ) : canUse || (!isAuthenticated && guestRemaining > 0) ? (
         <div onClick={checkCanMigrate}>
           {typeof children === 'function' ? children() : children}
+          {!isAuthenticated && guestRemaining > 0 && (
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '4px',
+            }}>
+              游客还可迁移 {guestRemaining} 次，注册后享更多次数
+            </div>
+          )}
         </div>
       ) : (
         <>
-          {/* 免费用户次数用完状态 - 点击显示升级弹窗，阻止子元素onClick冒泡 */}
+          {/* 次数用完状态 - 点击显示升级/注册弹窗，阻止子元素onClick冒泡 */}
           <div onClick={(e) => { e.stopPropagation(); setUpgradeModalOpen(true); }}>
             {children}
           </div>
@@ -116,7 +168,7 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
       <UpgradeModal
         isOpen={upgradeModalOpen}
         onClose={handleCloseModal}
-        reason="migration-limit"
+        reason={!isAuthenticated ? 'complete-guide' : 'migration-limit'}
       />
     </>
   );
