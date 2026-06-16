@@ -47,6 +47,7 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
   const [canUse, setCanUse] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [guestRemaining, setGuestRemaining] = useState(GUEST_MIGRATION_LIMIT);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
   
   const { isAuthenticated, isPro, fetchPlanInfo } = useAuthStore();
 
@@ -58,51 +59,82 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
     }
   }, [isAuthenticated]);
 
-  // 检查是否可以迁移
+  // 已认证用户在组件挂载时立即检查权限，避免闪屏
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // 未登录用户不需要立即检查
+      setInitialCheckDone(true);
+      return;
+    }
+
+    // 已认证用户：立即开始检查，显示 loading 状态直到结果返回
+    setChecking(true);
+    setInitialCheckDone(false);
+
+    const checkAuthUserPermission = async () => {
+      try {
+        // 先获取套餐信息
+        await fetchPlanInfo();
+        
+        // Pro/企业版直接通过
+        if (isPro()) {
+          setCanUse(true);
+          setChecking(false);
+          setInitialCheckDone(true);
+          return;
+        }
+
+        // 免费用户检查 API 权限
+        const response = await fetch('/api/membership/check', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        
+        const result = await response.json();
+        
+        if (result.ok && result.data.allowed) {
+          setCanUse(true);
+        } else {
+          setCanUse(false);
+          setUpgradeModalOpen(true);
+          onLimitReached?.();
+        }
+      } catch (error) {
+        console.error('检查迁移权限失败:', error);
+        // 网络错误时允许继续
+        setCanUse(true);
+      }
+      
+      setChecking(false);
+      setInitialCheckDone(true);
+    };
+
+    checkAuthUserPermission();
+  }, [isAuthenticated, fetchPlanInfo, isPro, onLimitReached]);
+
+  // 检查是否可以迁移（仅针对点击操作，未登录用户）
   const checkCanMigrate = async () => {
+    // 已认证用户已在上个 useEffect 中完成检查，无需重复检查
+    if (isAuthenticated) {
+      return canUse;
+    }
+
     setChecking(true);
     
     try {
       // 未登录用户检查本地次数
-      if (!isAuthenticated) {
-        const used = getGuestMigrationCount();
-        if (used >= GUEST_MIGRATION_LIMIT) {
-          setCanUse(false);
-          setUpgradeModalOpen(true);
-          onLimitReached?.();
-          setChecking(false);
-          return false;
-        }
-        // 允许使用并计数
-        incrementGuestMigrationCount();
-        setGuestRemaining(Math.max(0, GUEST_MIGRATION_LIMIT - used - 1));
-        setCanUse(true);
-        setChecking(false);
-        return true;
-      }
-
-      // Pro/企业版直接通过
-      if (isPro()) {
-        setCanUse(true);
-        setChecking(false);
-        return true;
-      }
-
-      // 免费用户检查次数
-      const response = await fetch('/api/membership/check', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      const result = await response.json();
-      
-      if (result.ok && result.data.allowed) {
-        setCanUse(true);
-      } else {
+      const used = getGuestMigrationCount();
+      if (used >= GUEST_MIGRATION_LIMIT) {
         setCanUse(false);
         setUpgradeModalOpen(true);
         onLimitReached?.();
+        setChecking(false);
+        return false;
       }
+      // 允许使用并计数
+      incrementGuestMigrationCount();
+      setGuestRemaining(Math.max(0, GUEST_MIGRATION_LIMIT - used - 1));
+      setCanUse(true);
     } catch (error) {
       console.error('检查迁移次数失败:', error);
       // 网络错误时允许继续
@@ -112,13 +144,6 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
     setChecking(false);
     return canUse;
   };
-
-  // 组件挂载时获取套餐信息
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchPlanInfo();
-    }
-  }, [isAuthenticated, fetchPlanInfo]);
 
   // 外部控制升级弹窗
   useEffect(() => {
@@ -130,6 +155,21 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
   const handleCloseModal = () => {
     setUpgradeModalOpen(false);
   };
+
+  // 未认证用户检查未完成时，显示 loading
+  if (!isAuthenticated && !initialCheckDone) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--space-8)',
+        color: 'var(--color-text-secondary)',
+      }}>
+        加载中...
+      </div>
+    );
+  }
 
   return (
     <>
