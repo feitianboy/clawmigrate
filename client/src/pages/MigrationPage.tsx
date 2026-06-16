@@ -524,7 +524,7 @@ const MigrationPage: React.FC = () => {
     const currentIndex = STEPS.findIndex(s => s.id === currentStep);
 
     return (
-      <div style={styles.stepsIndicator}>
+      <div style={styles.stepsIndicator} className="step-indicator">
         {STEPS.map((step, index) => {
           const isActive = step.id === currentStep;
           const isCompleted = index < currentIndex;
@@ -623,7 +623,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择你当前使用的 AI 助手平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid}>
+          <div style={styles.platformGrid} className="platform-grid">
             {sourceAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -640,7 +640,7 @@ const MigrationPage: React.FC = () => {
             ))}
           </div>
 
-          <div style={styles.actions}>
+          <div style={styles.actions} className="actions-bar">
             <div />
             <button
               style={{
@@ -711,7 +711,7 @@ const MigrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={styles.actions}>
+          <div style={styles.actions} className="actions-bar">
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -787,7 +787,7 @@ const MigrationPage: React.FC = () => {
             </div>
           )}
 
-          <div style={styles.actions}>
+          <div style={styles.actions} className="actions-bar">
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -870,7 +870,7 @@ const MigrationPage: React.FC = () => {
               </h3>
               {item.data.map((config: any, index: number) => (
                 <div key={index} style={styles.previewItem}>
-                  <div style={styles.previewItemHeader}>
+                  <div style={styles.previewItemHeader} className="preview-item-header">
                     <span style={styles.previewItemName}>{config.name || config.id}</span>
                     {config.sensitivityLevel !== SensitivityLevel.SAFE && (
                       <span style={styles.sensitiveTag}>
@@ -890,7 +890,7 @@ const MigrationPage: React.FC = () => {
             </div>
           ))}
 
-          <div style={styles.actions}>
+          <div style={styles.actions} className="actions-bar">
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               重新解析
@@ -916,7 +916,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择要迁移到的目标平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid}>
+          <div style={styles.platformGrid} className="platform-grid">
             {targetAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -934,7 +934,7 @@ const MigrationPage: React.FC = () => {
             ))}
           </div>
 
-          <div style={styles.actions}>
+          <div style={styles.actions} className="actions-bar">
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -1011,7 +1011,7 @@ const MigrationPage: React.FC = () => {
             </ol>
           </div>
 
-          <div style={styles.actions}>
+          <div style={styles.actions} className="actions-bar">
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               返回
@@ -1042,7 +1042,7 @@ const MigrationPage: React.FC = () => {
           请在目标平台确认所有配置是否正确。
         </p>
 
-        <div style={styles.statsGrid}>
+        <div style={styles.statsGrid} className="complete-stats">
           <div style={styles.statItem}>
             <div style={styles.statValue}>{parsedSchema.metadata.totalItems}</div>
             <div style={styles.statLabel}>配置项</div>

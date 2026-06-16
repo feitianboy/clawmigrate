@@ -465,3 +465,24 @@ pre {
     font-size: 16px !important; /* 防止iOS自动缩放 */
   }
 }
+
+/* 升级弹窗移动端适配 */
+@media (max-width: 768px) {
+  /* 导航栏标签移动端隐藏 */
+  .upgrade-tag {
+    display: none !important;
+  }
+  .usage-tag {
+    display: none !important;
+  }
+
+  /* 升级弹窗benefits列表单列 */
+  .benefits-list {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 升级弹窗套餐网格单列 */
+  .plan-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -326,7 +326,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* 升级入口 - 免费用户显示 */}
             {isAuthenticated && !isPro() && (
               <button
-                style={styles.upgradeTag}
+                style={styles.upgradeTag} className="upgrade-tag"
                 onClick={() => setUpgradeModalOpen(true)}
                 onMouseEnter={e => {
                   e.currentTarget.style.transform = 'scale(1.05)';
@@ -344,7 +344,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             
             {/* 套餐状态提示 */}
             {isAuthenticated && planInfo && !isPro() && (
-              <span style={styles.usageTag}>
+              <span style={styles.usageTag} className="usage-tag">
                 免费版 · 剩余 {getRemainingUsage()} 次/月
               </span>
             )}
@@ -432,6 +432,24 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             })}
             {/* 迁移历史 - 移动端 */}
             <HistoryNavItem isMobile />
+            {/* 套餐状态 - 移动端 */}
+            {isAuthenticated && (
+              <div style={{
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--color-bg-tertiary)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.8125rem',
+                color: 'var(--color-text-secondary)',
+                textAlign: 'center',
+                marginTop: 'var(--space-2)',
+              }}>
+                {isPro() ? (
+                  <span style={{ color: 'var(--color-warning)', fontWeight: 600 }}>👑 Pro · 无限迁移</span>
+                ) : (
+                  <span>免费版 · 剩余 {getRemainingUsage()} 次/月</span>
+                )}
+              </div>
+            )}
           </nav>
         )}
       </header>

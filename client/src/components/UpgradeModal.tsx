@@ -284,7 +284,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
 
         <div style={styles.body}>
           <h3 style={styles.sectionTitle}>Pro 用户专享</h3>
-          <div style={styles.benefitsList}>
+          <div style={styles.benefitsList} className="benefits-list">
             {benefits.map((benefit, index) => {
               const Icon = benefit.icon;
               return (
@@ -299,7 +299,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           </div>
 
           <h3 style={styles.sectionTitle}>选择套餐</h3>
-          <div style={styles.planGrid}>
+          <div style={styles.planGrid} className="plan-grid">
             <div 
               style={{
                 ...styles.planCard,
