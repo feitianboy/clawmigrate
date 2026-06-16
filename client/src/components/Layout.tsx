@@ -282,8 +282,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <header style={styles.header}>
         <div className="header-content" style={styles.headerContent}>
           <Link to="/" style={styles.logo}>
-            <div style={styles.logoIcon}>🔄</div>
-            <span>ClawMigrate</span>
+            <div style={styles.logoIcon}>🦐</div>
+            <span>虾管家</span>
           </Link>
 
           <nav className="desktop-nav" style={styles.nav}>
@@ -431,7 +431,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </main>
 
       <footer className="footer" style={styles.footer}>
-        <p>© 2026 ClawMigrate. AI 助手配置一键迁移工具</p>
+        <p>© 2026 虾管家. AI 助手配置一键迁移工具</p>
       </footer>
 
       {/* 升级弹窗 */}

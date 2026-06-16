@@ -283,7 +283,7 @@ export const HomePage: React.FC = () => {
           一键迁移你的 AI 助手配置
         </h1>
         <p style={styles.subtitle}>
-          无需手动复制粘贴，ClawMigrate 可以帮助你在不同 AI 助手平台之间
+          无需手动复制粘贴，虾管家可以帮助你在不同 AI 助手平台之间
           安全、快速地迁移技能、自动化、记忆和设置。
         </p>
         <div className="cta-section" style={styles.ctaSection}>
@@ -341,7 +341,7 @@ export const HomePage: React.FC = () => {
 
       <section className="features-section" style={styles.features}>
         <div style={styles.sectionTitle}>
-          <h2 style={styles.sectionTitleText}>为什么选择 ClawMigrate</h2>
+          <h2 style={styles.sectionTitleText}>为什么选择虾管家</h2>
           <p style={styles.sectionSubtitle}>专为 AI 助手用户设计的功能特性</p>
         </div>
         <div className="features-grid" style={styles.featuresGrid}>

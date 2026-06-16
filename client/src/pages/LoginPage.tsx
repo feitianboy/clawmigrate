@@ -210,8 +210,8 @@ export const LoginPage: React.FC = () => {
       <div style={styles.card}>
         <div style={styles.header}>
           <div style={styles.logo}>
-            <div style={styles.logoIcon}>🔄</div>
-            <span style={styles.logoText}>ClawMigrate</span>
+            <div style={styles.logoIcon}>🦐</div>
+            <span style={styles.logoText}>虾管家</span>
           </div>
           <h1 style={styles.title}>
             {mode === 'login' ? '欢迎回来' : '创建账户'}

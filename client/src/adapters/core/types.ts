@@ -1,4 +1,4 @@
-// ClawMigrate 适配器核心类型定义
+// 虾管家 适配器核心类型定义
 
 // ===== 迁移类别 =====
 export enum MigrationCategory {
