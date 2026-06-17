@@ -1,3 +1,4 @@
+import { useAuthStore } from '../stores/authStore';
 import React, { useState, useEffect } from 'react';
 import { X, Crown, Check, Zap, Shield, Clock, Star, Gift } from 'lucide-react';
 
@@ -22,6 +23,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const [trialLoading, setTrialLoading] = useState(false);
   const [isFirstPurchase, setIsFirstPurchase] = useState(false);
   const [discountPrice, setDiscountPrice] = useState<{ monthly: number; yearly: number } | null>(null);
+  const { isAuthenticated } = useAuthStore();
   const [originalPrice, setOriginalPrice] = useState<{ monthly: number; yearly: number }>({ monthly: 19, yearly: 149 });
 
   // 获取套餐信息（含首单折扣）
@@ -402,23 +404,33 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             </div>
           </div>
 
-          {/* 7天免费试用按钮 */}
-          <button
-            style={{
-              ...styles.trialBtn,
-              opacity: trialLoading ? 0.7 : 1,
-              cursor: trialLoading ? 'wait' : 'pointer',
-            }}
-            onClick={handleTrial}
-            disabled={trialLoading}
-          >
-            {trialLoading ? '开通中...' : (
-              <>
-                <Gift size={18} />
-                免费试用7天 Pro
-              </>
-            )}
-          </button>
+          {/* 7天免费试用按钮 - 已登录可试用，未登录引导登录 */}
+          {isAuthenticated ? (
+            <button
+              style={{
+                ...styles.trialBtn,
+                opacity: trialLoading ? 0.7 : 1,
+                cursor: trialLoading ? 'wait' : 'pointer',
+              }}
+              onClick={handleTrial}
+              disabled={trialLoading}
+            >
+              {trialLoading ? '开通中...' : (
+                <>
+                  <Gift size={18} />
+                  免费试用7天 Pro
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              style={styles.trialBtn}
+              onClick={() => window.location.href = '/login'}
+            >
+              <Gift size={18} />
+              登录后免费试用7天
+            </button>
+          )}
 
           <button
             style={{
