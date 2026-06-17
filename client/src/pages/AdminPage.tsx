@@ -400,7 +400,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(249, 115, 22, 0.15)',
     color: 'var(--color-primary)',
   },
-  },
   statusBadge: {
     display: 'inline-flex',
     alignItems: 'center',
