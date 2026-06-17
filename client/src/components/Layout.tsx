@@ -251,20 +251,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   };
 
-  // Define nav items - show all for non-authenticated users on certain pages
+  // Define nav items
   const getNavItems = () => {
-    const baseItems = [
+    return [
       { path: '/', label: '首页', icon: Home, requireAuth: false },
       { path: '/migrate', label: '开始迁移', icon: ArrowRightLeft, requireAuth: false },
     ];
-
-    if (isAuthenticated) {
-      baseItems.push(
-        { path: '/settings', label: '设置', icon: Settings, requireAuth: true }
-      );
-    }
-
-    return baseItems;
   };
 
   const navItems = getNavItems();
@@ -307,19 +299,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             
             {/* 迁移历史 - 带Pro门控 */}
             <HistoryNavItem />
-            
-            {isAuthenticated && user?.role === 'admin' && (
-              <Link
-                to="/admin"
-                style={{
-                  ...styles.navLink,
-                  ...(location.pathname === '/admin' ? styles.navLinkActive : {}),
-                }}
-              >
-                <Shield size={18} />
-                管理后台
-              </Link>
-            )}
           </nav>
 
           <div style={styles.userSection}>

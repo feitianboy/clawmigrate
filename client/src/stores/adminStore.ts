@@ -60,6 +60,7 @@ export interface UsersResponse {
 }
 
 interface AdminState {
+  adminToken: string | null;
   users: User[];
   usersTotal: number;
   usersPage: number;
@@ -70,6 +71,8 @@ interface AdminState {
   error: string | null;
 
   // Actions
+  verifyAdmin: (password: string) => Promise<{ success: boolean; error?: string }>;
+  clearAdminToken: () => void;
   fetchDashboard: () => Promise<void>;
   fetchUsers: (page?: number, limit?: number) => Promise<void>;
   fetchMigrationRecords: () => Promise<void>;
@@ -78,6 +81,7 @@ interface AdminState {
 }
 
 export const useAdminStore = create<AdminState>((set, get) => ({
+  adminToken: null,
   users: [],
   usersTotal: 0,
   usersPage: 1,
@@ -105,11 +109,48 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchDashboard: async () => {
+  verifyAdmin: async (password: string) => {
     set({ isLoading: true, error: null });
     try {
+      const response = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.ok) {
+        // 保存 admin token 到 localStorage
+        localStorage.setItem('admin_token', data.token);
+        set({ adminToken: data.token, isLoading: false });
+        return { success: true };
+      } else {
+        set({ error: data.error || '密码验证失败', isLoading: false });
+        return { success: false, error: data.error || '密码验证失败' };
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : '验证请求失败';
+      set({ error: errorMsg, isLoading: false });
+      return { success: false, error: errorMsg };
+    }
+  },
+
+  clearAdminToken: () => {
+    localStorage.removeItem('admin_token');
+    set({ adminToken: null });
+  },
+
+  fetchDashboard: async () => {
+    set({ isLoading: true, error: null });
+    const adminToken = get().adminToken || localStorage.getItem('admin_token');
+    try {
       const response = await fetch('/api/admin/stats', {
-        credentials: 'include',
+        headers: adminToken ? {
+          'X-Admin-Token': adminToken,
+        } : {},
       });
       
       if (!response.ok) {
@@ -150,9 +191,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   fetchUsers: async (page = 1, limit = 10) => {
     set({ isLoading: true, error: null });
+    const adminToken = get().adminToken || localStorage.getItem('admin_token');
     try {
       const response = await fetch(`/api/admin/users?page=${page}&limit=${limit}`, {
-        credentials: 'include',
+        headers: adminToken ? {
+          'X-Admin-Token': adminToken,
+        } : {},
       });
       
       if (!response.ok) {
@@ -178,9 +222,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   fetchMigrationRecords: async () => {
     set({ isLoading: true, error: null });
+    const adminToken = get().adminToken || localStorage.getItem('admin_token');
     try {
       const response = await fetch('/api/admin/migrations', {
-        credentials: 'include',
+        headers: adminToken ? {
+          'X-Admin-Token': adminToken,
+        } : {},
       });
       
       if (!response.ok) {
@@ -203,10 +250,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   deleteUser: async (userId: string) => {
     set({ isLoading: true, error: null });
+    const adminToken = get().adminToken || localStorage.getItem('admin_token');
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
-        credentials: 'include',
+        headers: adminToken ? {
+          'X-Admin-Token': adminToken,
+        } : {},
       });
       
       if (!response.ok) {

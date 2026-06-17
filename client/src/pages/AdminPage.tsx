@@ -515,10 +515,11 @@ const getInitials = (name: string) => {
 // 密码输入页面组件
 const PasswordPage: React.FC<{
   onSuccess: () => void;
-}> = ({ onSuccess }) => {
+  verifyAdmin: (password: string) => Promise<{ success: boolean; error?: string }>;
+  isLoading: boolean;
+}> = ({ onSuccess, verifyAdmin, isLoading }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -527,30 +528,13 @@ const PasswordPage: React.FC<{
       return;
     }
 
-    setIsLoading(true);
     setError('');
 
-    try {
-      const response = await fetch('/api/auth/admin-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        onSuccess();
-      } else {
-        setError(data.error || '密码验证失败');
-      }
-    } catch {
-      setError('验证请求失败，请稍后重试');
-    } finally {
-      setIsLoading(false);
+    const result = await verifyAdmin(password);
+    if (result.success) {
+      onSuccess();
+    } else {
+      setError(result.error || '密码验证失败');
     }
   };
 
@@ -876,11 +860,12 @@ const TierBadge: React.FC<{ tier?: string }> = ({ tier }) => {
 
 // 主组件
 export const AdminPage: React.FC = () => {
-  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState<'users' | 'migrations'>('users');
   
   const {
+    adminToken,
+    verifyAdmin,
     stats,
     users,
     usersTotal,
@@ -896,24 +881,12 @@ export const AdminPage: React.FC = () => {
     clearError,
   } = useAdminStore();
 
-  // 检查是否已认证
+  // 检查是否已有 admin token
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/check', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.isAdmin) {
-            setIsAuthenticated(true);
-          }
-        }
-      } catch {
-        // 未认证
-      }
-    };
-    checkAuth();
+    const savedToken = localStorage.getItem('admin_token');
+    if (savedToken) {
+      setIsAuthenticated(true);
+    }
   }, []);
 
   // 加载数据
@@ -965,7 +938,7 @@ export const AdminPage: React.FC = () => {
 
   // 未认证显示密码输入页面
   if (!isAuthenticated) {
-    return <PasswordPage onSuccess={handleAuthSuccess} />;
+    return <PasswordPage onSuccess={handleAuthSuccess} verifyAdmin={verifyAdmin} isLoading={isLoading} />;
   }
 
   return (
