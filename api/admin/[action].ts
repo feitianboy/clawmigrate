@@ -105,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('users')
       .select('tier');
     
-    const tierCount: Record<string, number> = { free: 0, pro: 0, enterprise: 0 };
+    const tierCount: Record<string, number> = { free: 0, pro: 0 };
     tierData?.forEach(u => {
       const tier = u.tier || 'free';
       tierCount[tier] = (tierCount[tier] || 0) + 1;

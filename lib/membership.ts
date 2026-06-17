@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 export type MembershipTier = 'free' | 'pro' | 'enterprise';
-export type PlanType = 'pro_monthly' | 'pro_yearly' | 'enterprise_monthly' | 'enterprise_yearly';
+export type PlanType = 'pro_monthly' | 'pro_yearly';
 
 export const USAGE_LIMITS: Record<MembershipTier, number> = {
   free: 3,
@@ -10,10 +10,10 @@ export const USAGE_LIMITS: Record<MembershipTier, number> = {
 };
 
 export const PLAN_PRICES: Record<PlanType, number> = {
-  pro_monthly: 29.9,
-  pro_yearly: 299,
-  enterprise_monthly: 99.9,
-  enterprise_yearly: 999
+  pro_monthly: 19,
+  pro_yearly: 149,
+  
+  
 };
 
 export interface UserMembership {
@@ -284,7 +284,7 @@ export async function getOrderStats() {
 
 export function getTierFromPlan(plan: string): 'pro' | 'enterprise' {
   if (plan.startsWith('enterprise')) {
-    return 'enterprise';
+    return 'pro';  // enterprise deprecated, fallback to pro
   }
   return 'pro';
 }

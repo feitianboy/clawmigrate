@@ -42,7 +42,7 @@ export function incrementGuestMigrationCount(): number {
  * - 如果已登录+免费用户+次数用完→显示升级提示
  * - 如果未登录+已用2次→显示注册引导
  * - 如果未登录+未达限→允许继续
- * - Pro/企业版→直接通过
+ * - Pro版→直接通过
  * 
  * 注意：计数逻辑已移至 MigrationPage 的 complete 步骤，不再在 checkCanMigrate 中提前计数
  */
@@ -84,7 +84,7 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
         // 先获取套餐信息
         await fetchPlanInfo();
         
-        // Pro/企业版直接通过
+        // Pro版直接通过
         if (isPro()) {
           setCanUse(true);
           setChecking(false);
