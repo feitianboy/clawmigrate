@@ -24,7 +24,7 @@ import {
   Zap,
   Crown,
 } from 'lucide-react';
-import { UsageGuard, incrementGuestMigrationCount } from '../components/UsageGuard';
+import { UsageGuard, incrementGuestMigrationCount, getGuestMigrationCount } from '../components/UsageGuard';
 import { ItemLimitToast } from '../components/ItemLimitToast';
 import { UpgradeModal } from '../components/UpgradeModal';
 
@@ -488,6 +488,9 @@ const MigrationPage: React.FC = () => {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showItemLimitToast, setShowItemLimitToast] = useState(false);
   const [itemLimitToastData, setItemLimitToastData] = useState({ current: 0, limit: FREE_TIER_ITEM_LIMIT });
+  // 入口权限检查状态
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [denyReason, setDenyReason] = useState<'guest-limit' | 'free-limit' | null>(null);
   // 导出步骤状态
   const [migrationRecorded, setMigrationRecorded] = useState(false);
   const [exportCopied, setExportCopied] = useState(false);
@@ -517,11 +520,44 @@ const MigrationPage: React.FC = () => {
           }),
         }).catch(err => console.error('记录迁移失败:', err));
       } else {
-        // 未登录用户记录到 localStorage（计数在真正完成迁移时递增）
+        // 未登录用户在真正完成迁移时递增计数
         incrementGuestMigrationCount();
       }
     }
   }, [currentStep, sourcePlatform, targetPlatform, parsedSchema, migrationRecorded, isAuthenticated, selectedCategories]);
+
+  // Bug 4: 入口权限检查 - 在页面挂载时检查用户是否有权限访问迁移页面
+  useEffect(() => {
+    const checkAccess = async () => {
+      // 未登录用户检查本地次数
+      if (!isAuthenticated) {
+        const guestCount = getGuestMigrationCount();
+        if (guestCount >= 2) {
+          setAccessDenied(true);
+          setDenyReason('guest-limit');
+          return;
+        }
+      }
+      // 已登录的非Pro用户调用API检查
+      if (isAuthenticated && !isPro()) {
+        try {
+          const response = await fetch('/api/membership/check', {
+            method: 'POST',
+            credentials: 'include',
+          });
+          const result = await response.json();
+          if (!result.ok || !result.data.allowed) {
+            setAccessDenied(true);
+            setDenyReason('free-limit');
+          }
+        } catch (err) {
+          console.error('检查迁移权限失败:', err);
+          // 网络错误时允许继续
+        }
+      }
+    };
+    checkAccess();
+  }, [isAuthenticated, isPro]);
 
   // 步骤指示器
   const renderStepIndicator = () => {
@@ -590,7 +626,61 @@ const MigrationPage: React.FC = () => {
       // select-target → import 时生成导入提示词
       if (currentStep === 'select-target' && nextStep === 'import' && targetPlatform && parsedSchema) {
         try {
-          const importResult = targetPlatform.generateImportPrompt(parsedSchema, {
+          // Bug 5: 对非Pro用户，生成导入提示词时只包含前10项配置
+          let schemaToUse = parsedSchema;
+          if (!isPro()) {
+            const configs = parsedSchema.configs || {};
+            const allItems: any[] = [];
+            const categoryMap = {
+              [MigrationCategory.SKILLS]: configs.skills || [],
+              [MigrationCategory.AUTOMATIONS]: configs.automations || [],
+              [MigrationCategory.MCP_CONNECTIONS]: configs.mcpConnections || [],
+              [MigrationCategory.MEMORIES]: configs.memories || [],
+              [MigrationCategory.SETTINGS]: configs.settings ? [configs.settings] : [],
+              [MigrationCategory.PROMPTS]: configs.prompts || [],
+              [MigrationCategory.KNOWLEDGE_BASES]: configs.knowledgeBases || [],
+            };
+            
+            Object.entries(categoryMap).forEach(([category, items]) => {
+              if (items && items.length > 0) {
+                items.forEach((config: any) => {
+                  allItems.push({ ...config, _category: category });
+                });
+              }
+            });
+            
+            // 只取前10项
+            const limitedItems = allItems.slice(0, FREE_TIER_ITEM_LIMIT);
+            
+            // 重新构建schema
+            const limitedConfigs: any = {};
+            limitedItems.forEach((item) => {
+              const cat = item._category;
+              delete item._category;
+              if (!limitedConfigs[cat]) {
+                limitedConfigs[cat] = [];
+              }
+              limitedConfigs[cat].push(item);
+            });
+            
+            // 处理settings（应该是单个对象而不是数组）
+            if (limitedConfigs[MigrationCategory.SETTINGS]?.length === 1) {
+              limitedConfigs[MigrationCategory.SETTINGS] = limitedConfigs[MigrationCategory.SETTINGS][0];
+            } else if (limitedConfigs[MigrationCategory.SETTINGS]?.length > 1) {
+              limitedConfigs[MigrationCategory.SETTINGS] = limitedConfigs[MigrationCategory.SETTINGS][0];
+            }
+            
+            schemaToUse = {
+              ...parsedSchema,
+              configs: limitedConfigs,
+              metadata: {
+                ...parsedSchema.metadata,
+                totalItems: limitedItems.length,
+              },
+            };
+          }
+          
+          const importResult = targetPlatform.generateImportPrompt(schemaToUse, {
             categories: selectedCategories,
           });
           setImportPrompt(importResult.prompt, importResult.instructions);
@@ -828,7 +918,12 @@ const MigrationPage: React.FC = () => {
     if (!parsedSchema) return null;
 
     const configs = parsedSchema.configs || {};
-    const categories = Object.entries({
+    const userIsPro = isPro();
+    
+    // Bug 5: 对非Pro用户，限制配置项显示数量
+    // 收集所有配置项并添加索引
+    const allItems: { category: MigrationCategory; label: string; data: any; index: number }[] = [];
+    const categoryMap = {
       [MigrationCategory.SKILLS]: { data: configs.skills, label: CATEGORY_LABELS[MigrationCategory.SKILLS] },
       [MigrationCategory.AUTOMATIONS]: { data: configs.automations, label: CATEGORY_LABELS[MigrationCategory.AUTOMATIONS] },
       [MigrationCategory.MCP_CONNECTIONS]: { data: configs.mcpConnections, label: CATEGORY_LABELS[MigrationCategory.MCP_CONNECTIONS] },
@@ -836,7 +931,36 @@ const MigrationPage: React.FC = () => {
       [MigrationCategory.SETTINGS]: { data: configs.settings ? [configs.settings] : [], label: CATEGORY_LABELS[MigrationCategory.SETTINGS] },
       [MigrationCategory.PROMPTS]: { data: configs.prompts, label: CATEGORY_LABELS[MigrationCategory.PROMPTS] },
       [MigrationCategory.KNOWLEDGE_BASES]: { data: configs.knowledgeBases, label: CATEGORY_LABELS[MigrationCategory.KNOWLEDGE_BASES] },
-    }).filter(([, item]) => item.data && item.data.length > 0);
+    };
+    
+    let globalIndex = 0;
+    Object.entries(categoryMap).forEach(([category, item]) => {
+      if (item.data && item.data.length > 0) {
+        item.data.forEach((config: any) => {
+          allItems.push({
+            category: category as MigrationCategory,
+            label: item.label,
+            data: config,
+            index: globalIndex++,
+          });
+        });
+      }
+    });
+    
+    const totalItems = allItems.length;
+    const displayItems = !userIsPro && totalItems > FREE_TIER_ITEM_LIMIT
+      ? allItems.slice(0, FREE_TIER_ITEM_LIMIT)
+      : allItems;
+    const hiddenItemsCount = totalItems - FREE_TIER_ITEM_LIMIT;
+    
+    // 按分类分组显示
+    const displayedCategories = displayItems.reduce((acc, item) => {
+      if (!acc[item.category]) {
+        acc[item.category] = { label: item.label, items: [] };
+      }
+      acc[item.category].items.push(item.data);
+      return acc;
+    }, {} as Record<MigrationCategory, { label: string; items: any[] }>);
 
     return (
       <div style={styles.card}>
@@ -864,15 +988,41 @@ const MigrationPage: React.FC = () => {
               <span>共 {parsedSchema.metadata.totalItems} 个配置项</span>
               <span style={styles.previewBadge}>来自 {sourcePlatform?.name}</span>
             </div>
+            {/* Bug 5: 非Pro用户配置项超限提示 */}
+            {!userIsPro && hiddenItemsCount > 0 && (
+              <div style={{
+                padding: 'var(--space-4)',
+                background: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: 'var(--space-4)',
+                textAlign: 'center',
+              }}>
+                <span style={{ color: '#fbbf24', fontSize: '0.875rem' }}>
+                  还有 {hiddenItemsCount} 项配置，<button
+                    onClick={() => setShowUpgradeModal(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-primary)',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      fontSize: 'inherit',
+                      padding: 0,
+                    }}
+                  >升级 Pro</button> 查看全部
+                </span>
+              </div>
+            )}
           </div>
 
-          {categories.map(([category, item]) => (
+          {Object.entries(displayedCategories).map(([category, item]) => (
             <div key={category} style={styles.previewSection}>
               <h3 style={styles.previewSectionTitle}>
-                {getCategoryIcon(category)} {item.label}
-                <span style={styles.previewBadge}>{item.data.length} 项</span>
+                {getCategoryIcon(category as MigrationCategory)} {item.label}
+                <span style={styles.previewBadge}>{item.items.length} 项</span>
               </h3>
-              {item.data.map((config: any, index: number) => (
+              {item.items.map((config: any, index: number) => (
                 <div key={index} style={styles.previewItem}>
                   <div style={styles.previewItemHeader} className="preview-item-header">
                     <span style={styles.previewItemName}>{config.name || config.id}</span>
@@ -1186,10 +1336,79 @@ const MigrationPage: React.FC = () => {
         <p style={styles.subtitle}>按照引导完成跨平台配置迁移</p>
       </div>
 
-      {currentStep !== 'complete' && renderStepIndicator()}
-      {renderContent()}
+      {/* Bug 4: 入口权限被拒绝时显示引导卡片 */}
+      {accessDenied && (
+        <div style={{
+          padding: 'var(--space-8)',
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-lg)',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>
+            {denyReason === 'guest-limit' ? '🦐' : '💎'}
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+            {denyReason === 'guest-limit' ? '游客迁移次数已用完' : '本月迁移次数已用完'}
+          </h2>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)', maxWidth: '400px', margin: '0 auto var(--space-6)' }}>
+            {denyReason === 'guest-limit' 
+              ? '您已用完2次游客迁移次数。注册账号后可享受每月3次免费迁移，升级Pro更可解锁无限次迁移。'
+              : '您的免费迁移次数已用完。升级Pro版本可解锁无限次迁移，还有更多高级功能。'}
+          </p>
+          <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {denyReason === 'guest-limit' && (
+              <button
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-3) var(--space-6)',
+                  background: 'var(--color-primary)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.9375rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+                onClick={() => navigate('/login')}
+              >
+                注册账号
+                <ArrowRight size={18} />
+              </button>
+            )}
+            <button
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                padding: 'var(--space-3) var(--space-6)',
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.9375rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              onClick={() => setShowUpgradeModal(true)}
+            >
+              <Crown size={18} />
+              升级 Pro 解锁
+            </button>
+          </div>
+        </div>
+      )}
 
-      {/* 配置项超限提示条 - 新增 */}
+      {!accessDenied && (
+        <>
+          {currentStep !== 'complete' && renderStepIndicator()}
+          {renderContent()}
+        </>
+      )}
+
+      {/* 配置项超限提示条 */}
       {showItemLimitToast && (
         <ItemLimitToast
           current={itemLimitToastData.current}
@@ -1198,6 +1417,13 @@ const MigrationPage: React.FC = () => {
           autoHideDuration={5000}
         />
       )}
+
+      {/* 升级弹窗 */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        reason="complete-upgrade"
+      />
     </div>
   );
 };

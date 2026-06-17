@@ -283,9 +283,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // 检查是否可以迁移
   canMigrate: async (): Promise<{ allowed: boolean; reason?: string }> => {
     const { isAuthenticated, isPro } = get();
-    
-    // 未登录用户允许继续（鼓励试用）
+
+    // 未登录用户检查本地迁移次数
     if (!isAuthenticated) {
+      const guestCount = (() => {
+        try {
+          const raw = localStorage.getItem('clawmigrate_guest_migrations');
+          return raw ? parseInt(raw, 10) || 0 : 0;
+        } catch {
+          return 0;
+        }
+      })();
+      if (guestCount >= 2) {
+        return { allowed: false, reason: '游客迁移次数已用完，注册后享更多次数' };
+      }
       return { allowed: true };
     }
 
