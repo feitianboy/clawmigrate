@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { Home, ArrowRightLeft, History, Settings, LogOut, Menu, X, User, Shield, Crown, Zap } from 'lucide-react';
-import { ProFeatureGate } from './ProFeatureGate';
+import { Home, ArrowRightLeft, LogOut, Menu, X, Zap } from 'lucide-react';
 import { UpgradeModal } from './UpgradeModal';
 
 const styles: Record<string, React.CSSProperties> = {
@@ -170,32 +169,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '0.9375rem',
     transition: 'all 0.2s',
   },
-  historyNavWrapper: {
-    position: 'relative',
-  },
-  historyNavLock: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-    padding: 'var(--space-2) var(--space-4)',
-    color: 'var(--color-text-muted)',
-    borderRadius: 'var(--radius-md)',
-    fontSize: '0.9375rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
-  historyNavUnlocked: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-    padding: 'var(--space-2) var(--space-4)',
-    color: 'var(--color-text-secondary)',
-    textDecoration: 'none',
-    borderRadius: 'var(--radius-md)',
-    fontSize: '0.9375rem',
-    fontWeight: 500,
-    transition: 'all 0.2s',
-  },
 };
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
@@ -217,38 +190,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const getInitials = (name: string) => {
     return name.charAt(0).toUpperCase();
-  };
-
-  // 定义迁移历史导航项（带Pro门控）
-  const HistoryNavItem: React.FC<{ isMobile?: boolean }> = ({ isMobile }) => {
-    if (isPro()) {
-      // Pro用户直接显示可点击的链接
-      return (
-        <Link
-          to="/history"
-          style={{
-            ...styles.historyNavUnlocked,
-            ...(location.pathname === '/history' ? styles.navLinkActive : {}),
-          }}
-          onClick={() => isMobile && setMobileMenuOpen(false)}
-        >
-          <History size={18} />
-          迁移历史
-        </Link>
-      );
-    }
-
-    // 非Pro用户显示锁定状态
-    return (
-      <div
-        style={styles.historyNavLock}
-        onClick={() => setUpgradeModalOpen(true)}
-      >
-        <History size={18} />
-        迁移历史
-        <Crown size={12} color="var(--color-warning)" />
-      </div>
-    );
   };
 
   // Define nav items
@@ -296,9 +237,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               );
             })}
-            
-            {/* 迁移历史 - 带Pro门控 */}
-            <HistoryNavItem />
+            {/* 迁移历史在完成页入口，导航栏不显示 */}
           </nav>
 
           <div style={styles.userSection}>
@@ -352,14 +291,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
                 {dropdownOpen && (
                   <div style={styles.dropdown}>
-                    <Link
-                      to="/settings"
-                      style={styles.dropdownItem}
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <User size={18} />
-                      账户设置
-                    </Link>
                     <button style={styles.dropdownItem} onClick={handleLogout}>
                       <LogOut size={18} />
                       退出登录
@@ -409,8 +340,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               );
             })}
-            {/* 迁移历史 - 移动端 */}
-            <HistoryNavItem isMobile />
             {/* 套餐状态 - 移动端 */}
             {isAuthenticated && (
               <div style={{
