@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Zap, Shield, Clock, BookOpen, MessageSquare, Database, Settings2, Sparkles } from 'lucide-react';
+import { ArrowRight, Zap, Shield, Clock, BookOpen, MessageSquare, Database, Sparkles } from 'lucide-react';
 import { AuthModal } from '../components/AuthModal';
-import { UsageGuard } from '../components/UsageGuard';
 import { UpgradeModal } from '../components/UpgradeModal';
 import { useState } from 'react';
 
@@ -60,6 +59,8 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: 'none',
     transition: 'all 0.2s',
     boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+    border: 'none',
+    cursor: 'pointer',
   },
   secondaryBtn: {
     display: 'inline-flex',
@@ -265,13 +266,6 @@ const steps = [
 export const HomePage: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  // UsageGuard 的点击处理函数
-  const handleMigrationClick = () => {
-    // UsageGuard 组件内部会处理权限检查和升级弹窗
-    // 这里直接导航到迁移页面即可
-    window.location.href = '/migrate';
-  };
-
   return (
     <div>
       <section className="hero-section" style={styles.hero}>
@@ -287,23 +281,21 @@ export const HomePage: React.FC = () => {
           安全、快速地迁移技能、自动化、记忆和设置。
         </p>
         <div className="cta-section" style={styles.ctaSection}>
-          <UsageGuard>
-            <button
-              style={styles.primaryBtn}
-              onClick={handleMigrationClick}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.4)';
-              }}
-            >
-              开始迁移
-              <ArrowRight size={20} />
-            </button>
-          </UsageGuard>
+          <Link
+            to="/migrate"
+            style={styles.primaryBtn}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.4)';
+            }}
+          >
+            开始迁移
+            <ArrowRight size={20} />
+          </Link>
         </div>
       </section>
 

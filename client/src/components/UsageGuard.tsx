@@ -11,7 +11,10 @@ interface UsageGuardProps {
 const GUEST_MIGRATION_LIMIT = 2;
 const GUEST_MIGRATION_KEY = 'clawmigrate_guest_migrations';
 
-function getGuestMigrationCount(): number {
+/**
+ * 获取游客已使用的迁移次数
+ */
+export function getGuestMigrationCount(): number {
   try {
     const raw = localStorage.getItem(GUEST_MIGRATION_KEY);
     return raw ? parseInt(raw, 10) || 0 : 0;
@@ -20,7 +23,10 @@ function getGuestMigrationCount(): number {
   }
 }
 
-function incrementGuestMigrationCount(): number {
+/**
+ * 递增游客迁移计数（仅在真正完成迁移时调用）
+ */
+export function incrementGuestMigrationCount(): number {
   const next = getGuestMigrationCount() + 1;
   try {
     localStorage.setItem(GUEST_MIGRATION_KEY, String(next));
@@ -35,8 +41,10 @@ function incrementGuestMigrationCount(): number {
  * 包裹迁移操作区域，在用户点击"开始迁移"或进入迁移页时检查迁移次数
  * - 如果已登录+免费用户+次数用完→显示升级提示
  * - 如果未登录+已用2次→显示注册引导
- * - 如果未登录+未达限→允许继续并计数
+ * - 如果未登录+未达限→允许继续
  * - Pro/企业版→直接通过
+ * 
+ * 注意：计数逻辑已移至 MigrationPage 的 complete 步骤，不再在 checkCanMigrate 中提前计数
  */
 export const UsageGuard: React.FC<UsageGuardProps> = ({
   children,
@@ -113,6 +121,7 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
   }, [isAuthenticated, fetchPlanInfo, isPro, onLimitReached]);
 
   // 检查是否可以迁移（仅针对点击操作，未登录用户）
+  // 注意：不再在此处递增计数，计数逻辑移至 MigrationPage 的 complete 步骤
   const checkCanMigrate = async () => {
     // 已认证用户已在上个 useEffect 中完成检查，无需重复检查
     if (isAuthenticated) {
@@ -122,7 +131,7 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
     setChecking(true);
     
     try {
-      // 未登录用户检查本地次数
+      // 未登录用户检查本地次数（只检查，不计数）
       const used = getGuestMigrationCount();
       if (used >= GUEST_MIGRATION_LIMIT) {
         setCanUse(false);
@@ -131,9 +140,8 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
         setChecking(false);
         return false;
       }
-      // 允许使用并计数
-      incrementGuestMigrationCount();
-      setGuestRemaining(Math.max(0, GUEST_MIGRATION_LIMIT - used - 1));
+      // 允许使用（不计数，计数在 MigrationPage 的 complete 步骤进行）
+      setGuestRemaining(Math.max(0, GUEST_MIGRATION_LIMIT - used));
       setCanUse(true);
     } catch (error) {
       console.error('检查迁移次数失败:', error);

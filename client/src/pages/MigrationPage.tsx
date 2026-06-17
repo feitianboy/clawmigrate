@@ -24,7 +24,7 @@ import {
   Zap,
   Crown,
 } from 'lucide-react';
-import { UsageGuard } from '../components/UsageGuard';
+import { UsageGuard, incrementGuestMigrationCount } from '../components/UsageGuard';
 import { ItemLimitToast } from '../components/ItemLimitToast';
 import { UpgradeModal } from '../components/UpgradeModal';
 
@@ -503,6 +503,7 @@ const MigrationPage: React.FC = () => {
     if (currentStep === 'complete' && sourcePlatform && targetPlatform && parsedSchema && !migrationRecorded) {
       setMigrationRecorded(true);
       if (isAuthenticated) {
+        // 已登录用户记录到后端
         fetch('/api/migrations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -515,6 +516,9 @@ const MigrationPage: React.FC = () => {
             status: 'completed',
           }),
         }).catch(err => console.error('记录迁移失败:', err));
+      } else {
+        // 未登录用户记录到 localStorage（计数在真正完成迁移时递增）
+        incrementGuestMigrationCount();
       }
     }
   }, [currentStep, sourcePlatform, targetPlatform, parsedSchema, migrationRecorded, isAuthenticated, selectedCategories]);
