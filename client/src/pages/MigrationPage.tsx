@@ -1353,7 +1353,7 @@ const MigrationPage: React.FC = () => {
           </h2>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)', maxWidth: '400px', margin: '0 auto var(--space-6)' }}>
             {denyReason === 'guest-limit' 
-              ? '您已用完2次游客迁移次数。注册账号后可享受每月3次免费迁移，升级Pro更可解锁无限次迁移。'
+              ? '您已用完2次游客迁移次数。注册账号后可享受每月2次免费迁移，升级Pro更可解锁无限次迁移。'
               : '您的免费迁移次数已用完。升级Pro版本可解锁无限次迁移，还有更多高级功能。'}
           </p>
           <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center', flexWrap: 'wrap' }}>

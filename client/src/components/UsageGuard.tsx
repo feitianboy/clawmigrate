@@ -201,7 +201,7 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
               marginTop: '4px',
               fontWeight: guestRemaining <= 1 ? 600 : 400,
             }}>
-              🦐 游客还可迁移 {guestRemaining} 次 · 注册后享每月3次
+              🦐 游客还可迁移 {guestRemaining} 次 · 注册后享每月2次
             </div>
           )}
         </div>

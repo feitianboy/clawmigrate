@@ -67,7 +67,7 @@ export function getTierName(tier: string): string {
 
 export function getTierBenefits(tier: string): string[] {
   const benefits: Record<string, string[]> = {
-    free: ['每月 3 次迁移', '基础导出格式', '社区支持'],
+    free: ['每月 2 次迁移', '基础导出格式', '社区支持'],
     pro: ['每月无限次迁移', '所有导出格式', '优先客服支持', '迁移历史永久保存'],
   // enterprise benefits removed
   };

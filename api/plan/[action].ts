@@ -30,7 +30,7 @@ const TIER_NAMES: Record<string, string> = {
 };
 
 const TIER_BENEFITS: Record<string, string[]> = {
-  free: ['每月3次迁移', '基础平台支持'],
+  free: ['每月2次迁移', '基础平台支持'],
   pro: ['无限次迁移', '迁移历史永久保存', '所有导出格式', '优先客服支持'],
 };
 

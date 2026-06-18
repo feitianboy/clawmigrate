@@ -4,7 +4,7 @@ export type MembershipTier = 'free' | 'pro' | 'enterprise';
 export type PlanType = 'pro_monthly' | 'pro_yearly';
 
 export const USAGE_LIMITS: Record<MembershipTier, number> = {
-  free: 3,
+  free: 2,
   pro: -1,
   enterprise: -1
 };

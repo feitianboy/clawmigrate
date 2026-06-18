@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           name: '免费版',
           price: 0,
           migrations: 3,
-          features: ['每月3次迁移', '基础平台支持'],
+          features: ['每月2次迁移', '基础平台支持'],
         },
         {
           id: 'pro_monthly',
