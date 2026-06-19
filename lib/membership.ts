@@ -61,15 +61,11 @@ export async function getEffectiveTier(userId: number): Promise<MembershipTier> 
   return membership?.membership_tier || 'free';
 }
 
-export async function getMonthlyUsage(userId: number): Promise<number> {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  
+export async function getTotalUsage(userId: number): Promise<number> {
   const { count } = await supabase
     .from('migrations')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('created_at', startOfMonth);
+    .eq('user_id', userId);
   
   return count || 0;
 }
@@ -77,7 +73,7 @@ export async function getMonthlyUsage(userId: number): Promise<number> {
 export async function getUsage(userId: number): Promise<MembershipUsage> {
   const tier = await getEffectiveTier(userId);
   const limit = USAGE_LIMITS[tier];
-  const used = await getMonthlyUsage(userId);
+  const used = await getTotalUsage(userId);
   
   return {
     used,
@@ -92,7 +88,7 @@ export async function canMigrate(userId: number): Promise<{ allowed: boolean; re
   if (!usage.unlimited && usage.used >= usage.limit) {
     return {
       allowed: false,
-      reason: '本月迁移次数已用完，请升级会员或等待下月重置'
+      reason: '免费迁移次数已用完，升级Pro解锁无限迁移'
     };
   }
   

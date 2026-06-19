@@ -266,7 +266,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* 套餐状态提示 */}
             {isAuthenticated && planInfo && !isPro() && (
               <span style={styles.usageTag} className="usage-tag">
-                免费版 · 剩余 {getRemainingUsage()} 次/月
+                免费版 · 剩余 {getRemainingUsage()} 次
               </span>
             )}
             {isAuthenticated && isPro() && (
@@ -357,7 +357,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {isPro() ? (
                   <span style={{ color: 'var(--color-warning)', fontWeight: 600 }}>👑 Pro · 无限迁移</span>
                 ) : (
-                  <span>免费版 · 剩余 {getRemainingUsage()} 次/月</span>
+                  <span>免费版 · 剩余 {getRemainingUsage()} 次</span>
                 )}
               </div>
             )}

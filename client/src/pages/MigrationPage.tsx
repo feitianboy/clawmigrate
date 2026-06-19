@@ -525,6 +525,13 @@ const MigrationPage: React.FC = () => {
     }
   }, [currentStep, sourcePlatform, targetPlatform, parsedSchema, migrationRecorded, isAuthenticated, selectedCategories]);
 
+  // Bug修复：迁移完成后刷新导航栏剩余次数
+  useEffect(() => {
+    if (currentStep === 'complete' && isAuthenticated) {
+      fetchPlanInfo();
+    }
+  }, [currentStep, isAuthenticated, fetchPlanInfo]);
+
   // Bug 4: 入口权限检查 - 在页面挂载时检查用户是否有权限访问迁移页面
   useEffect(() => {
     const checkAccess = async () => {
@@ -1341,11 +1348,11 @@ const MigrationPage: React.FC = () => {
             {denyReason === 'guest-limit' ? '🦐' : '💎'}
           </div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
-            {denyReason === 'guest-limit' ? '游客迁移次数已用完' : '本月迁移次数已用完'}
+            {denyReason === 'guest-limit' ? '游客迁移次数已用完' : '免费迁移次数已用完'}
           </h2>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)', maxWidth: '400px', margin: '0 auto var(--space-6)' }}>
             {denyReason === 'guest-limit' 
-              ? '您已用完2次游客迁移次数。注册账号后可享受每月2次免费迁移，升级Pro更可解锁无限次迁移。'
+              ? '您已用完2次免费迁移次数。升级Pro解锁无限迁移，迁移历史永久保存。'
               : '您的免费迁移次数已用完。升级Pro版本可解锁无限次迁移，还有更多高级功能。'}
           </p>
           <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center', flexWrap: 'wrap' }}>

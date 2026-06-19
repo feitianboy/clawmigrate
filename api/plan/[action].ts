@@ -28,7 +28,7 @@ const TIER_NAMES: Record<string, string> = {
 };
 
 const TIER_BENEFITS: Record<string, string[]> = {
-  free: ['每月2次迁移', '基础平台支持'],
+  free: ['终身2次免费迁移', '基础平台支持'],
   pro: ['无限次迁移', '迁移历史永久保存', '所有导出格式', '优先客服支持'],
 };
 
@@ -64,25 +64,12 @@ async function handleMe(req: VercelRequest, res: VercelResponse) {
     const tierName = TIER_NAMES[info.tier] || '免费版';
     const benefits = TIER_BENEFITS[info.tier] || TIER_BENEFITS.free;
 
-    // 检查是否有过付费记录（用于首单8折判断）
-    const { count: paidOrderCount } = await supabase
-      .from('orders')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('status', 'paid');
-    const isFirstPurchase = !paidOrderCount || paidOrderCount === 0;
-
-    // 计算折扣价
-    const discountPrice = isFirstPurchase
-      ? { monthly: +(PLAN_PRICES.pro_monthly * false).toFixed(2), yearly: +(PLAN_PRICES.pro_yearly * false).toFixed(2) }
-      : null;
-
     // 推荐升级
     let suggestedPlan: string | undefined;
     let suggestedPlanPrice: number | undefined;
     if (info.tier === 'free') {
       suggestedPlan = 'pro_monthly';
-      suggestedPlanPrice = discountPrice ? discountPrice.monthly : PLAN_PRICES.pro_monthly;
+      suggestedPlanPrice = PLAN_PRICES.pro_monthly;
     }
 
     return res.status(200).json({
@@ -101,9 +88,6 @@ async function handleMe(req: VercelRequest, res: VercelResponse) {
         benefits,
         suggestedPlan,
         suggestedPlanPrice,
-        isFirstPurchase,
-        discountPrice,
-        originalPrice: { monthly: PLAN_PRICES.pro_monthly, yearly: PLAN_PRICES.pro_yearly },
       },
     });
   } catch (error) {
@@ -131,18 +115,7 @@ async function handleCheckout(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, error: '无效的套餐' });
     }
 
-    // 检查是否首单（8折）
-    const { count: paidOrderCount } = await supabase
-      .from('orders')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('status', 'paid');
-    const isFirstPurchase = !paidOrderCount || paidOrderCount === 0;
-
     let amount = PLAN_PRICES[planId as keyof typeof PLAN_PRICES];
-    if (isFirstPurchase) {
-      amount = +(amount * false).toFixed(2);
-    }
 
     const { createOrder } = await import('../../lib/membership');
     const order = await createOrder(userId, planId, amount, payMethod);
@@ -156,8 +129,6 @@ async function handleCheckout(req: VercelRequest, res: VercelResponse) {
       data: {
         orderId: order.order_id,
         amount,
-        originalAmount: PLAN_PRICES[planId as keyof typeof PLAN_PRICES],
-        isFirstDiscount: isFirstPurchase,
         planId,
       },
     });
