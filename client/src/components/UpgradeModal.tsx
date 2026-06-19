@@ -1,6 +1,6 @@
 import { useAuthStore } from '../stores/authStore';
-import React, { useState, useEffect } from 'react';
-import { X, Crown, Check, Zap, Shield, Clock, Star, Gift } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Crown, Check, Zap, Clock } from 'lucide-react';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -9,51 +9,21 @@ interface UpgradeModalProps {
 }
 
 /**
- * 升级弹窗组件
- * 展示当前套餐信息、免费版限制、Pro版优势
- * 支持选择套餐（月度/年度）、、首单8折
+ * 升级弹窗组件 - 精简版
+ * 只展示 Pro 套餐：¥19/月 和 ¥149/年
  */
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   isOpen,
   onClose,
   reason,
 }) => {
-  const [selectedPlan, setSelectedPlan] = useState<'pro_monthly' | 'pro_yearly'>('pro_monthly');
+  const [selectedPlan, setSelectedPlan] = useState<'pro_monthly' | 'pro_yearly'>('pro_yearly');
   const [loading, setLoading] = useState(false);
-  const [trialLoading, setTrialLoading] = useState(false);
-  const [selectedPayMethod, setSelectedPayMethod] = useState<'wechat' | 'alipay'>('alipay');
   const [notification, setNotification] = useState<{type: 'success' | 'error'; message: string} | null>(null);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
-  };
-  const [isFirstPurchase, setIsFirstPurchase] = useState(false);
-  const [discountPrice, setDiscountPrice] = useState<{ monthly: number; yearly: number } | null>(null);
-  const { isAuthenticated } = useAuthStore();
-  const [originalPrice, setOriginalPrice] = useState<{ monthly: number; yearly: number }>({ monthly: 19, yearly: 149 });
-
-  // 获取套餐信息（含首单折扣）
-  useEffect(() => {
-    if (isOpen) {
-      fetchPlanInfo();
-    }
-  }, [isOpen]);
-
-  const fetchPlanInfo = async () => {
-    try {
-      const response = await fetch('/api/plan/me', { credentials: 'include' });
-      const result = await response.json();
-      if (result.ok) {
-        setIsFirstPurchase(result.data.isFirstPurchase ?? true);
-        setDiscountPrice(result.data.discountPrice ?? null);
-        if (result.data.originalPrice) {
-          setOriginalPrice(result.data.originalPrice);
-        }
-      }
-    } catch (error) {
-      console.error('获取套餐失败:', error);
-    }
   };
 
   const handleUpgrade = async () => {
@@ -63,59 +33,27 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ 
-          planId: selectedPlan,
-          payMethod: selectedPayMethod 
-        }),
+        body: JSON.stringify({ planId: selectedPlan }),
       });
       
       const result = await response.json();
       
       if (result.ok) {
-        const discountNote = result.data.isFirstDiscount ? `\n🎉 首单8折优惠已自动应用！` : '';
-        showNotification('success', `订单创建成功！订单号: ${result.data.orderId}，应付金额: ¥${result.data.amount}${discountNote}，请完成支付后刷新页面`);
+        showNotification('success', `订单创建成功！订单号: ${result.data.orderId}，应付金额: ¥${result.data.amount}，请完成支付后刷新页面`);
         onClose();
         window.location.reload();
       } else {
-        showNotification('error', result.error || '创建订单失败，请稍后重试');
+        showNotification('error', result.error || '创建订单失败');
       }
     } catch (error) {
       console.error('升级失败:', error);
-      alert('网络错误，请稍后重试');
+      showNotification('error', '网络错误，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTrial = async () => {
-    setTrialLoading(true);
-    try {
-      const response = await fetch('/api/plan/trial', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      
-      const result = await response.json();
-      
-      if (result.ok) {
-        showNotification('success', '🎉 7天Pro试用已开通！到期后可继续购买。');
-        onClose();
-        window.location.reload();
-      } else {
-        showNotification('error', result.error || '开通试用失败');
-      }
-    } catch (error) {
-      console.error('开通试用失败:', error);
-      alert('网络错误，请稍后重试');
-    } finally {
-      setTrialLoading(false);
-    }
-  };
-
   if (!isOpen) return null;
-
-  const monthlyPrice = isFirstPurchase && discountPrice ? discountPrice.monthly : originalPrice.monthly;
-  const yearlyPrice = isFirstPurchase && discountPrice ? discountPrice.yearly : originalPrice.yearly;
 
   const styles: Record<string, React.CSSProperties> = {
     overlay: {
@@ -131,7 +69,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     modal: {
       background: 'var(--color-bg-secondary)',
       borderRadius: 'var(--radius-xl)',
-      maxWidth: '600px',
+      maxWidth: '480px',
       width: '100%',
       maxHeight: '90vh',
       overflow: 'auto',
@@ -153,7 +91,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       cursor: 'pointer',
       padding: 'var(--space-2)',
       borderRadius: 'var(--radius-md)',
-      transition: 'all 0.2s',
     },
     crownIcon: {
       width: '64px',
@@ -173,7 +110,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       background: 'linear-gradient(135deg, #f59e0b, #d97706)',
       WebkitBackgroundClip: 'text',
       WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
     },
     subtitle: {
       color: 'var(--color-text-secondary)',
@@ -182,15 +118,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     body: {
       padding: 'var(--space-6)',
     },
-    sectionTitle: {
-      fontSize: '1rem',
-      fontWeight: 600,
-      marginBottom: 'var(--space-4)',
-      color: 'var(--color-text)',
-    },
     benefitsList: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(2, 1fr)',
+      display: 'flex',
+      flexDirection: 'column',
       gap: 'var(--space-3)',
       marginBottom: 'var(--space-6)',
     },
@@ -213,7 +143,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       flexShrink: 0,
     },
     benefitText: {
-      fontSize: '0.8125rem',
+      fontSize: '0.875rem',
       color: 'var(--color-text)',
     },
     planGrid: {
@@ -233,7 +163,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     },
     planCardSelected: {
       borderColor: 'var(--color-primary)',
-      background: 'var(--color-primary-light)',
+      background: 'rgba(249, 115, 22, 0.1)',
     },
     planBadge: {
       display: 'inline-block',
@@ -254,43 +184,10 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       fontSize: '1.75rem',
       fontWeight: 700,
       color: 'var(--color-primary)',
-      marginBottom: 'var(--space-1)',
     },
     planUnit: {
       fontSize: '0.75rem',
       color: 'var(--color-text-secondary)',
-    },
-    planOriginal: {
-      fontSize: '0.75rem',
-      color: 'var(--color-text-muted)',
-      textDecoration: 'line-through',
-    },
-    discountBadge: {
-      display: 'inline-block',
-      padding: '2px 6px',
-      background: '#ef4444',
-      color: 'white',
-      borderRadius: '4px',
-      fontSize: '0.6875rem',
-      fontWeight: 600,
-      marginLeft: 'var(--space-2)',
-    },
-    trialBtn: {
-      width: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 'var(--space-2)',
-      padding: 'var(--space-3)',
-      background: 'transparent',
-      color: 'var(--color-primary)',
-      border: '1px solid var(--color-primary)',
-      borderRadius: 'var(--radius-lg)',
-      fontSize: '0.9375rem',
-      fontWeight: 500,
-      cursor: 'pointer',
-      transition: 'all 0.2s',
-      marginBottom: 'var(--space-4)',
     },
     upgradeBtn: {
       width: '100%',
@@ -318,62 +215,46 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   };
 
   const benefits = [
-    { icon: Zap, text: '无限次迁移' },
+    { icon: Zap, text: '每月无限次迁移' },
     { icon: Clock, text: '迁移历史永久保存' },
-    { icon: Star, text: '所有导出格式' },
-    { icon: Shield, text: '优先客服支持' },
   ];
 
   return (
     <div style={styles.overlay} onClick={onClose}>
-        {/* 通知提示 */}
-        {notification && (
-          <div style={{
-            position: 'fixed',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 10000,
-            padding: '12px 24px',
-            borderRadius: '8px',
-            background: notification.type === 'success' ? '#10b981' : '#ef4444',
-            color: 'white',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            animation: 'fadeIn 0.3s ease',
-          }}>
-            {notification.message}
-          </div>
-        )}
+      {notification && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10000,
+          padding: '12px 24px',
+          borderRadius: '8px',
+          background: notification.type === 'success' ? '#10b981' : '#ef4444',
+          color: 'white',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        }}>
+          {notification.message}
+        </div>
+      )}
       <div style={styles.modal} onClick={e => e.stopPropagation()}>
         <div style={styles.header}>
-          <button 
-            style={styles.closeBtn}
-            onClick={onClose}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-tertiary)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
+          <button style={styles.closeBtn} onClick={onClose}>
             <X size={20} />
           </button>
-          
           <div style={styles.crownIcon}>
             <Crown size={32} color="white" />
           </div>
-          
           <h2 style={styles.title}>升级到 Pro 版本</h2>
-          
           <p style={styles.subtitle}>
-            {reason === 'migration-limit' 
-              ? '本月迁移次数已用完，解锁无限迁移' 
-              : '解锁更多高级功能'}
+            {reason === 'migration-limit' ? '本月迁移次数已用完，解锁无限迁移' : '解锁更多高级功能'}
           </p>
         </div>
 
         <div style={styles.body}>
-          <h3 style={styles.sectionTitle}>Pro 用户专享</h3>
-          
-          <div style={styles.benefitsList} className="benefits-list">
+          <div style={styles.benefitsList}>
             {benefits.map((benefit, index) => {
               const Icon = benefit.icon;
               return (
@@ -387,9 +268,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             })}
           </div>
 
-          <h3 style={styles.sectionTitle}>选择套餐</h3>
-          
-          <div style={styles.planGrid} className="plan-grid">
+          <div style={styles.planGrid}>
             <div 
               style={{
                 ...styles.planCard,
@@ -399,13 +278,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             >
               <div style={styles.planBadge}>月度</div>
               <div style={styles.planName}>Pro 月度</div>
-              <div style={styles.planPrice}>
-                ¥{monthlyPrice}
-                {isFirstPurchase && discountPrice && <span style={styles.discountBadge}>首单8折</span>}
-              </div>
-              {isFirstPurchase && discountPrice && (
-                <div style={styles.planOriginal}>原价 ¥{originalPrice.monthly}</div>
-              )}
+              <div style={styles.planPrice}>¥19</div>
               <div style={styles.planUnit}>每月</div>
             </div>
             
@@ -420,44 +293,10 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 年度特惠
               </div>
               <div style={styles.planName}>Pro 年度</div>
-              <div style={styles.planPrice}>
-                ¥{yearlyPrice}
-                {isFirstPurchase && discountPrice && <span style={styles.discountBadge}>首单8折</span>}
-              </div>
-              {isFirstPurchase && discountPrice && (
-                <div style={styles.planOriginal}>原价 ¥{originalPrice.yearly}</div>
-              )}
+              <div style={styles.planPrice}>¥149</div>
               <div style={styles.planUnit}>每年</div>
             </div>
           </div>
-
-          {/* 7天免费试用按钮 - 已登录可试用，未登录引导登录 */}
-          {isAuthenticated ? (
-            <button
-              style={{
-                ...styles.trialBtn,
-                opacity: trialLoading ? 0.7 : 1,
-                cursor: trialLoading ? 'wait' : 'pointer',
-              }}
-              onClick={handleTrial}
-              disabled={trialLoading}
-            >
-              {trialLoading ? '开通中...' : (
-                <>
-                  <Gift size={18} />
-                  免费试用7天 Pro
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              style={styles.trialBtn}
-              onClick={() => window.location.href = '/login'}
-            >
-              <Gift size={18} />
-              登录后免费试用7天
-            </button>
-          )}
 
           <button
             style={{
@@ -467,20 +306,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             }}
             onClick={handleUpgrade}
             disabled={loading}
-            onMouseEnter={e => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.4)';
-              }
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
           >
-            {loading ? (
-              '处理中...'
-            ) : (
+            {loading ? '处理中...' : (
               <>
                 <Crown size={20} />
                 立即升级 Pro
