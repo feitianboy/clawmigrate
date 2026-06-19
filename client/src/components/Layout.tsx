@@ -295,6 +295,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
                 {dropdownOpen && (
                   <div style={styles.dropdown}>
+                    <button style={styles.dropdownItem} onClick={() => { navigate('/settings'); setDropdownOpen(false); }}>
+                      <Settings size={18} />
+                      个人设置
+                    </button>
+                    <button style={styles.dropdownItem} onClick={() => { navigate('/history'); setDropdownOpen(false); }}>
+                      <History size={18} />
+                      迁移历史
+                    </button>
+                    <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
                     <button style={styles.dropdownItem} onClick={handleLogout}>
                       <LogOut size={18} />
                       退出登录
