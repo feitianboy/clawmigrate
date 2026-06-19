@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { Home, ArrowRightLeft, LogOut, Menu, X, Zap } from 'lucide-react';
+import { Home, ArrowRightLeft, LogOut, Menu, X, Zap, Settings, History } from 'lucide-react';
 import { UpgradeModal } from './UpgradeModal';
 
 const styles: Record<string, React.CSSProperties> = {
@@ -177,6 +177,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, isAuthenticated, checkAuth, logout, planInfo, isPro } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const navigate = useNavigate();
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   // Check auth status on mount

@@ -537,9 +537,6 @@ const MigrationPage: React.FC = () => {
   useEffect(() => {
     const checkAccess = async () => {
       setAccessChecking(true);
-      // 未登录用户访问会被 UsageGuard 拦截到这里
-      setAccessChecking(false);
-      // 已登录的非Pro用户调用API检查
       if (isAuthenticated && !isPro()) {
         try {
           const response = await fetch('/api/membership/check', {
@@ -547,18 +544,21 @@ const MigrationPage: React.FC = () => {
             credentials: 'include',
           });
           const result = await response.json();
-          if (!result.ok || !result.data.allowed) {
+          if (!result.ok || !result.data?.allowed) {
             setAccessDenied(true);
             setDenyReason('free-limit');
           }
+          // 无论是否通过，都刷新导航栏的剩余次数
+          fetchPlanInfo();
         } catch (err) {
           console.error('检查迁移权限失败:', err);
           // 网络错误时允许继续
         }
       }
+      setAccessChecking(false);
     };
     checkAccess();
-  }, [isAuthenticated, isPro]);
+  }, [isAuthenticated, isPro, fetchPlanInfo]);
 
   // 步骤指示器
   const renderStepIndicator = () => {
