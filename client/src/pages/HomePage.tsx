@@ -353,11 +353,7 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        initialMode="login"
-      />
+
     </div>
   );
 };
