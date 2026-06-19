@@ -78,29 +78,26 @@ export const cozeAdapter: PlatformAdapter = {
       return labels[c] || c;
     });
 
-    const prompt = `请将你当前的所有配置以 JSON 格式导出。我需要以下类别的配置信息：
+    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
 
-${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
-
-请按以下 JSON 格式输出（不要添加任何其他文字说明，只输出 JSON）：
+请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
 
 \`\`\`json
 {
-  "bot_name": "你的智能体名称",
-  "bot_description": "智能体描述",
+  "bot_name": "你的名称",
+  "bot_description": "简短描述你的功能",
   "prompts": [
     {
-      "name": "提示词名称",
-      "content": "完整的提示词内容",
+      "name": "人设/角色名称",
+      "content": "你的人设描述和回复规则",
       "type": "system"
     }
   ],
   "skills": [
     {
-      "name": "插件名称",
-      "description": "插件描述",
-      "type": "plugin",
-      "config": {},
+      "name": "插件/技能名称",
+      "description": "功能描述",
+      "type": "plugin 或 skill 或 tool",
       "enabled": true
     }
   ],
@@ -118,11 +115,8 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
   "mcp_connections": [
     {
       "name": "MCP服务名称",
-      "server_url": "服务器地址",
       "transport_type": "stdio 或 sse 或 streamable-http",
-      "tools": ["可用工具列表"],
-      "config": {},
-      "enabled": true
+      "tools": ["可用工具列表"]
     }
   ],
   "memories": [
@@ -137,30 +131,28 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     "temperature": 0.7,
     "max_tokens": 4096,
     "language": "zh",
-    "system_prompt": "系统提示词",
-    "custom_settings": {}
+    "persona_description": "你的人设/角色描述（不是系统提示词原文，用你自己的话概括）"
   },
   "knowledge_bases": [
     {
       "name": "知识库名称",
       "description": "知识库描述",
-      "file_count": 0,
-      "total_size": "0 MB",
-      "source_type": "upload 或 url 或 api"
+      "file_count": 0
     }
   ]
 }
 \`\`\`
 
-注意事项：
-- 对于你无法获取或不存在的配置项，请用空数组 [] 或空对象 {} 代替
-- API Key、密码等敏感信息请原样输出，我会做脱敏处理
-- 工作流/自动化任务请尽量描述清楚触发条件和执行步骤`;
+说明：
+- 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
+- 对于不存在的配置项，用空数组 [] 或空对象 {} 代替
+- 工作流/自动化任务请尽量描述清楚触发条件和执行步骤
+- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息`;
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\n2. 打开扣子 Coze 平台（coze.cn）\n3. 进入你的智能体对话界面\n4. 粘贴提示词并发送\n5. 复制 AI 返回的 JSON 结果',
-      note: '扣子平台的 AI 可能会在 JSON 前后添加说明文字，我们会自动提取其中的 JSON 内容。',
+      instructions: '1. 复制上方提示词\\n2. 打开扣子 Coze 平台（coze.cn）\\n3. 进入你的智能体对话界面\\n4. 粘贴提示词并发送\\n5. 复制 AI 返回的 JSON 结果',
+      note: '如果 AI 没有完整输出，可以分多次对话，每次只问一个类别的配置。',
     };
   },
 
@@ -266,19 +258,21 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
           originalFieldNames: { name: 'MCP名称', server_url: '服务器地址', transport_type: '传输方式', tools: '工具列表', config: '配置详情', enabled: '是否启用' },
         };
 
-        warnings.push({
-          category: MigrationCategory.MCP_CONNECTIONS,
-          field: `mcp_connections[${i}].config`,
-          message: `MCP连接"${mcp.name}"可能包含 API Key 或认证信息`,
-          sensitivityLevel: SensitivityLevel.MUST_REMOVE,
-        });
-        sensitiveItems.push({
-          category: MigrationCategory.MCP_CONNECTIONS,
-          field: `mcp_connections[${i}].config`,
-          level: SensitivityLevel.MUST_REMOVE,
-          originalValue: JSON.stringify(m.config || {}),
-          maskedValue: maskSensitiveData(JSON.stringify(m.config || {})),
-        });
+        if (m.server_url || (m.config && Object.keys(m.config).length > 0)) {
+          warnings.push({
+            category: MigrationCategory.MCP_CONNECTIONS,
+            field: `mcp_connections[${i}].config`,
+            message: `MCP连接"${mcp.name}"可能包含 API Key 或认证信息`,
+            sensitivityLevel: SensitivityLevel.MUST_REMOVE,
+          });
+          sensitiveItems.push({
+            category: MigrationCategory.MCP_CONNECTIONS,
+            field: `mcp_connections[${i}]`,
+            level: SensitivityLevel.MUST_REMOVE,
+            originalValue: JSON.stringify({ server_url: m.server_url, config: m.config }),
+            maskedValue: maskSensitiveData(JSON.stringify({ server_url: m.server_url ? '[已隐藏]' : undefined, config: m.config ? '[已隐藏]' : undefined })),
+          });
+        }
 
         mcpConnections.push(mcp);
       });
@@ -288,18 +282,20 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     const rawMemories = json.memories as Record<string, unknown>[] | undefined;
     if (rawMemories && Array.isArray(rawMemories)) {
       rawMemories.forEach((m, i) => {
+        const content = String(m.content || '');
+        const sensitivity = detectMemorySensitivity(content);
         memories.push({
           id: `memory_${i}`,
-          content: String(m.content || ''),
+          content,
           type: mapMemoryType(String(m.type || 'fact')),
           tags: Array.isArray(m.tags) ? m.tags.map(String) : [],
-          sensitivityLevel: detectMemorySensitivity(String(m.content || '')),
+          sensitivityLevel: sensitivity,
           originalFieldNames: { content: '记忆内容', type: '记忆类型', tags: '标签' },
         });
       });
     }
 
-    // 解析设置
+    // 解析设置 - 兼容新版 persona_description 和旧版 system_prompt
     const rawSettings = json.settings as Record<string, unknown> | undefined;
     if (rawSettings) {
       settings = {
@@ -308,9 +304,10 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         maxTokens: typeof rawSettings.max_tokens === 'number' ? rawSettings.max_tokens : undefined,
         language: rawSettings.language ? String(rawSettings.language) : undefined,
         systemPrompt: rawSettings.system_prompt ? String(rawSettings.system_prompt) : undefined,
+        personaDescription: rawSettings.persona_description ? String(rawSettings.persona_description) : undefined,
         customSettings: (rawSettings.custom_settings as Record<string, unknown>) || {},
         sensitivityLevel: SensitivityLevel.SAFE,
-        originalFieldNames: { model: '模型', temperature: '温度', max_tokens: '最大Token数', language: '语言', system_prompt: '系统提示词', custom_settings: '自定义设置' },
+        originalFieldNames: { model: '模型', temperature: '温度', max_tokens: '最大Token数', language: '语言', system_prompt: '系统提示词', persona_description: '人设描述', custom_settings: '自定义设置' },
       };
     }
 
@@ -381,7 +378,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到我的扣子 Coze 智能体中：\n');
+    parts.push('请帮我配置以下内容到我的扣子 Coze 智能体中：\\n');
 
     // 提示词
     if (configs.prompts && configs.prompts.length > 0 && options.categories.includes(MigrationCategory.PROMPTS)) {
@@ -392,6 +389,14 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         parts.push(p.content);
         parts.push('');
       });
+    }
+
+    // 人设描述（来自新版导出）
+    if (configs.settings?.personaDescription && options.categories.includes(MigrationCategory.SETTINGS)) {
+      parts.push('## 人设/角色设定');
+      parts.push('请按照以下人设描述设置你的角色：');
+      parts.push(configs.settings.personaDescription);
+      parts.push('');
     }
 
     // 技能/插件
@@ -410,6 +415,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         }
         parts.push(`- ${s.name}：${s.description || '无描述'}（类型：${s.type}，${s.enabled ? '启用' : '禁用'}）`);
       });
+      parts.push('⚠️ 注意：插件需要重新授权配置');
       parts.push('');
     }
 
@@ -483,15 +489,15 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     }
 
     if (importWarnings.length > 0) {
-      parts.push('\n⚠️ 注意：以下内容需要你在扣子平台手动配置：');
+      parts.push('\\n⚠️ 注意：以下内容需要你在扣子平台手动配置：');
       importWarnings.forEach((w) => {
         parts.push(`- ${w.field}：${w.reason}${w.alternative ? ` → ${w.alternative}` : ''}`);
       });
     }
 
     return {
-      prompt: parts.join('\n'),
-      instructions: '1. 复制上方导入提示词\n2. 打开扣子 Coze 平台（coze.cn）\n3. 进入你要配置的智能体\n4. 粘贴提示词并发送\n5. 按照提示逐步完成配置',
+      prompt: parts.join('\\n'),
+      instructions: '1. 复制上方导入提示词\\n2. 打开扣子 Coze 平台（coze.cn）\\n3. 进入你要配置的智能体\\n4. 粘贴提示词并发送\\n5. 按照提示逐步完成配置',
       warnings: importWarnings.length > 0 ? importWarnings : undefined,
     };
   },
@@ -533,6 +539,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         max_tokens: { unifiedField: 'maxTokens', displayName: '最大Token数', type: 'number', required: false },
         language: { unifiedField: 'language', displayName: '语言', type: 'string', required: false },
         system_prompt: { unifiedField: 'systemPrompt', displayName: '系统提示词', type: 'string', required: false },
+        persona_description: { unifiedField: 'personaDescription', displayName: '人设描述', type: 'string', required: false },
         custom_settings: { unifiedField: 'customSettings', displayName: '自定义设置', type: 'object', required: false },
       },
       prompts: {
@@ -550,5 +557,3 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     };
   },
 };
-
-

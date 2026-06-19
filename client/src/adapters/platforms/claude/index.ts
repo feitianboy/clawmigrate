@@ -69,11 +69,9 @@ export const claudeAdapter: PlatformAdapter = {
       return labels[c] || c;
     });
 
-    const prompt = `请将你当前的所有配置以 JSON 格式导出。我需要以下类别的配置信息：
+    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
 
-${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
-
-请按以下 JSON 格式输出（不要添加任何其他文字说明，只输出 JSON）：
+请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
 
 \`\`\`json
 {
@@ -81,17 +79,13 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     {
       "name": "项目名称",
       "description": "项目描述",
-      "system_prompt": "项目的系统指令/提示词",
+      "persona_description": "你的人设/角色描述（用你自己的话概括，不是系统提示词原文）",
       "custom_instructions": "自定义指令"
     }
   ],
   "mcp_servers": [
     {
       "name": "MCP服务器名称",
-      "command": "启动命令（如 npx）",
-      "args": ["参数列表"],
-      "env": {},
-      "url": "HTTP模式的URL（如有）",
       "transport_type": "stdio 或 sse 或 streamable-http",
       "tools": ["可用工具列表"]
     }
@@ -101,7 +95,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     "temperature": 0.7,
     "language": "语言偏好",
     "effort_level": "思考量 low/normal/high/max",
-    "custom_settings": {}
+    "persona_description": "你的人设/角色描述（用你自己的话概括）"
   },
   "memories": [
     {
@@ -113,15 +107,14 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 }
 \`\`\`
 
-注意事项：
-- MCP 配置通常位于 claude_desktop_config.json，请包含完整的服务器信息
-- Projects 中的提示词和自定义指令请完整输出
-- API Key 等敏感信息请原样输出，我会做脱敏处理
-- 对于你无法获取的配置项，请用空数组 [] 代替`;
+说明：
+- 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
+- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息
+- Projects 中的提示词用你的人设描述来概括即可，不需要完整原文`;
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\n2. 打开 Claude 对话界面（claude.ai）\n3. 在任意项目或对话中粘贴提示词并发送\n4. 复制 AI 返回的 JSON 结果\n\n💡 提示：MCP 配置也可以手动从 ~/.claude/settings.json 或 claude_desktop_config.json 中获取',
+      instructions: '1. 复制上方提示词\\n2. 打开 Claude 对话界面（claude.ai）\\n3. 在任意项目或对话中粘贴提示词并发送\\n4. 复制 AI 返回的 JSON 结果\\n\\n💡 提示：MCP 配置也可以手动从 ~/.claude/settings.json 或 claude_desktop_config.json 中获取',
       note: 'Claude 的 MCP 配置通常存储在本地文件系统中。如果 AI 无法完整导出，建议用户手动检查配置文件。',
     };
   },
@@ -155,16 +148,26 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     const rawProjects = json.projects as Record<string, unknown>[] | undefined;
     if (rawProjects && Array.isArray(rawProjects)) {
       rawProjects.forEach((p, i) => {
+        if (p.persona_description) {
+          prompts.push({
+            id: `prompt_${i}`,
+            name: String(p.name || `项目 ${i + 1}`),
+            content: String(p.persona_description),
+            type: 'system',
+            sensitivityLevel: SensitivityLevel.SAFE,
+            originalFieldNames: { name: '项目名称', persona_description: '人设描述', custom_instructions: '自定义指令' },
+          });
+        }
         if (p.system_prompt) {
           const content = String(p.system_prompt);
           const sensitivity = detectSensitivity({ content });
           prompts.push({
-            id: `prompt_${i}`,
+            id: `prompt_sp_${i}`,
             name: String(p.name || `项目 ${i + 1} - 系统指令`),
             content,
             type: 'system',
             sensitivityLevel: sensitivity,
-            originalFieldNames: { name: '项目名称', system_prompt: '系统指令', custom_instructions: '自定义指令' },
+            originalFieldNames: { name: '项目名称', system_prompt: '系统指令' },
           });
           if (sensitivity !== SensitivityLevel.SAFE) {
             sensitiveItems.push({
@@ -221,8 +224,8 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
           originalFieldNames: { name: '服务器名称', command: '启动命令', args: '参数', env: '环境变量', url: 'URL', transport_type: '传输方式', tools: '工具列表' },
         };
 
-        const envStr = JSON.stringify(m.env || {});
-        if (envStr !== '{}') {
+        if (m.env && Object.keys(m.env as object).length > 0) {
+          const envStr = JSON.stringify(m.env || {});
           sensitiveItems.push({
             category: MigrationCategory.MCP_CONNECTIONS,
             field: `mcp_servers[${i}].env`,
@@ -277,7 +280,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
       });
     }
 
-    // 解析设置
+    // 解析设置 - 兼容新版 persona_description 和旧版 system_prompt
     const rawSettings = json.settings as Record<string, unknown> | undefined;
     if (rawSettings) {
       const customSettings = {
@@ -291,9 +294,10 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         temperature: typeof rawSettings.temperature === 'number' ? rawSettings.temperature : undefined,
         language: rawSettings.language ? String(rawSettings.language) : undefined,
         systemPrompt: undefined,
+        personaDescription: rawSettings.persona_description ? String(rawSettings.persona_description) : undefined,
         customSettings,
         sensitivityLevel: sensitivity,
-        originalFieldNames: { model: '模型', temperature: '温度', language: '语言', effort_level: '思考量', custom_settings: '自定义设置' },
+        originalFieldNames: { model: '模型', temperature: '温度', language: '语言', effort_level: '思考量', persona_description: '人设描述', custom_settings: '自定义设置' },
       };
 
       if (sensitivity !== SensitivityLevel.SAFE) {
@@ -330,12 +334,12 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 Claude 中：\n');
+    parts.push('请帮我配置以下内容到 Claude 中：\\n');
 
     // 处理其他平台导入的技能 → 转为 Claude Projects
     if (configs.skills && configs.skills.length > 0 && options.categories.includes(MigrationCategory.SKILLS)) {
       parts.push('## Projects（来自其他平台的技能）');
-      parts.push('请在 Claude 中创建对应的 Project，将以下技能配置为项目指令：\n');
+      parts.push('请在 Claude 中创建对应的 Project，将以下技能配置为项目指令：\\n');
       configs.skills.forEach((s) => {
         if (s.sensitivityLevel === SensitivityLevel.MUST_REMOVE) {
           importWarnings.push({
@@ -357,7 +361,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
     if (configs.prompts && configs.prompts.length > 0 && options.categories.includes(MigrationCategory.PROMPTS)) {
       parts.push('## Projects / 提示词');
-      parts.push('请在 Claude 中创建对应的 Project，并设置以下内容：\n');
+      parts.push('请在 Claude 中创建对应的 Project，并设置以下内容：\\n');
       configs.prompts.forEach((p) => {
         if (p.sensitivityLevel === SensitivityLevel.MUST_REMOVE) return;
         parts.push(`### ${p.name}`);
@@ -368,7 +372,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 
     if (configs.mcpConnections && configs.mcpConnections.length > 0 && options.categories.includes(MigrationCategory.MCP_CONNECTIONS)) {
       parts.push('## MCP 服务器配置');
-      parts.push('请将以下配置添加到 claude_desktop_config.json 中：\n');
+      parts.push('请将以下配置添加到 claude_desktop_config.json 中：\\n');
       parts.push('```json');
       parts.push('{');
       parts.push('  "mcpServers": {');
@@ -390,14 +394,15 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
       parts.push('  }');
       parts.push('}');
       parts.push('```');
-      parts.push('\n配置文件位置：');
+      parts.push('⚠️ 注意：需要手动配置认证信息');
+      parts.push('\\n配置文件位置：');
       parts.push('- macOS: ~/Library/Application Support/Claude/claude_desktop_config.json');
-      parts.push('- Windows: %APPDATA%\\Claude\\claude_desktop_config.json\n');
+      parts.push('- Windows: %APPDATA%\\Claude\\claude_desktop_config.json\\n');
     }
 
     if (configs.memories && configs.memories.length > 0 && options.categories.includes(MigrationCategory.MEMORIES)) {
       parts.push('## 记忆/偏好');
-      parts.push('请在 Claude 设置中添加以下记忆：\n');
+      parts.push('请在 Claude 设置中添加以下记忆：\\n');
       configs.memories.forEach((m) => {
         if (m.sensitivityLevel !== SensitivityLevel.MUST_REMOVE) {
           parts.push(`- [${m.type}] ${m.content}`);
@@ -412,20 +417,25 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
       if (s.model) parts.push(`- 默认模型：${s.model}`);
       if (s.temperature !== undefined) parts.push(`- 温度：${s.temperature}`);
       if (s.language) parts.push(`- 语言：${s.language}`);
+      if (s.personaDescription) {
+        parts.push('## 人设/角色设定');
+        parts.push('请按照以下人设描述设置你的角色：');
+        parts.push(s.personaDescription);
+      }
       if (s.customSettings.effortLevel) parts.push(`- 思考量：${s.customSettings.effortLevel}`);
-      parts.push('这些设置可在 ~/.claude/settings.json 中配置\n');
+      parts.push('这些设置可在 ~/.claude/settings.json 中配置\\n');
     }
 
     if (importWarnings.length > 0) {
-      parts.push('\n⚠️ 以下内容需要手动配置：');
+      parts.push('\\n⚠️ 以下内容需要手动配置：');
       importWarnings.forEach((w) => {
         parts.push(`- ${w.field}：${w.reason}${w.alternative ? ` → ${w.alternative}` : ''}`);
       });
     }
 
     return {
-      prompt: parts.join('\n'),
-      instructions: '1. 复制上方导入提示词\n2. 打开 Claude（claude.ai）\n3. 按照提示创建 Projects、配置 MCP 服务器和设置\n4. MCP 配置需要手动编辑 claude_desktop_config.json 文件',
+      prompt: parts.join('\\n'),
+      instructions: '1. 复制上方导入提示词\\n2. 打开 Claude（claude.ai）\\n3. 按照提示创建 Projects、配置 MCP 服务器和设置\\n4. MCP 配置需要手动编辑 claude_desktop_config.json 文件',
       warnings: importWarnings.length > 0 ? importWarnings : undefined,
     };
   },
@@ -435,6 +445,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
       prompts: {
         name: { unifiedField: 'name', displayName: '项目名称', type: 'string', required: true },
         system_prompt: { unifiedField: 'content', displayName: '系统指令', type: 'string', required: true },
+        persona_description: { unifiedField: 'content', displayName: '人设描述', type: 'string', required: false },
         custom_instructions: { unifiedField: 'content', displayName: '自定义指令', type: 'string', required: false },
       },
       mcp_connections: {
@@ -456,6 +467,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         temperature: { unifiedField: 'temperature', displayName: '温度', type: 'number', required: false },
         language: { unifiedField: 'language', displayName: '语言', type: 'string', required: false },
         effort_level: { unifiedField: 'customSettings.effortLevel', displayName: '思考量', type: 'string', required: false },
+        persona_description: { unifiedField: 'personaDescription', displayName: '人设描述', type: 'string', required: false },
         custom_settings: { unifiedField: 'customSettings', displayName: '自定义设置', type: 'object', required: false },
       },
     };

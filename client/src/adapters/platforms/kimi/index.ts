@@ -66,28 +66,22 @@ export const kimiAdapter: PlatformAdapter = {
       return labels[c] || c;
     });
 
-    const prompt = `请将你当前的所有配置以 JSON 格式导出。我需要以下类别的配置信息：
+    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
 
-${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
-
-请按以下 JSON 格式输出（不要添加任何其他文字说明，只输出 JSON）：
+请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
 
 \`\`\`json
 {
   "prompts": [
     {
       "name": "提示词名称",
-      "content": "完整的提示词内容",
+      "content": "你的人设描述和回复规则",
       "type": "system"
     }
   ],
   "mcp_servers": [
     {
       "name": "MCP服务器名称",
-      "command": "启动命令（如 npx 或 python）",
-      "args": ["参数列表"],
-      "env": {},
-      "url": "HTTP模式的URL（如有）",
       "transport_type": "stdio 或 sse 或 streamable-http",
       "tools": ["可用工具列表"]
     }
@@ -96,7 +90,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     "model": "默认模型名称（如 moonshot-v1-8k）",
     "temperature": 0.7,
     "language": "语言偏好",
-    "custom_settings": {}
+    "persona_description": "你的人设/角色描述（用你自己的话概括）"
   },
   "memories": [
     {
@@ -108,15 +102,14 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
 }
 \`\`\`
 
-注意事项：
-- MCP 配置通常位于 ~/.kimi/mcp_config.json 或用户目录下，请包含完整的服务器信息
-- 提示词和系统指令请完整输出
-- API Key 等敏感信息请原样输出，我会做脱敏处理
-- 对于你无法获取的配置项，请用空数组 [] 代替`;
+说明：
+- 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
+- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息
+- 提示词用你的人设描述来概括即可，不需要完整原文`;
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\n2. 打开 Kimi 对话界面（kimi.moonshot.cn）\n3. 在任意对话中粘贴提示词并发送\n4. 复制 AI 返回的 JSON 结果\n\n💡 提示：MCP 配置也可以从 Kimi 的设置页面或配置文件中获取',
+      instructions: '1. 复制上方提示词\\n2. 打开 Kimi 对话界面（kimi.moonshot.cn）\\n3. 在任意对话中粘贴提示词并发送\\n4. 复制 AI 返回的 JSON 结果\\n\\n💡 提示：MCP 配置也可以从 Kimi 的设置页面或配置文件中获取',
       note: 'Kimi 的 MCP 配置通常存储在用户目录下。如果 AI 无法完整导出，建议用户手动检查配置文件。',
     };
   },
@@ -195,8 +188,8 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
           originalFieldNames: { name: '服务器名称', command: '启动命令', args: '参数', env: '环境变量', url: 'URL', transport_type: '传输方式', tools: '工具列表' },
         };
 
-        const envStr = JSON.stringify(m.env || {});
-        if (envStr !== '{}') {
+        if (m.env && Object.keys(m.env as object).length > 0) {
+          const envStr = JSON.stringify(m.env || {});
           sensitiveItems.push({
             category: MigrationCategory.MCP_CONNECTIONS,
             field: `mcp_servers[${i}].env`,
@@ -251,7 +244,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
       });
     }
 
-    // 解析设置
+    // 解析设置 - 兼容新版 persona_description 和旧版 system_prompt
     const rawSettings = json.settings as Record<string, unknown> | undefined;
     if (rawSettings) {
       const sensitivity = detectSensitivity(rawSettings);
@@ -261,9 +254,10 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         temperature: typeof rawSettings.temperature === 'number' ? rawSettings.temperature : undefined,
         language: rawSettings.language ? String(rawSettings.language) : undefined,
         systemPrompt: undefined,
+        personaDescription: rawSettings.persona_description ? String(rawSettings.persona_description) : undefined,
         customSettings: (rawSettings.custom_settings as Record<string, unknown>) || {},
         sensitivityLevel: sensitivity,
-        originalFieldNames: { model: '模型', temperature: '温度', language: '语言', custom_settings: '自定义设置' },
+        originalFieldNames: { model: '模型', temperature: '温度', language: '语言', persona_description: '人设描述', custom_settings: '自定义设置' },
       };
 
       if (sensitivity !== SensitivityLevel.SAFE) {
@@ -300,7 +294,15 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 Kimi 中：\n');
+    parts.push('请帮我配置以下内容到 Kimi 中：\\n');
+
+    // 人设描述（来自新版导出）
+    if (configs.settings?.personaDescription && options.categories.includes(MigrationCategory.SETTINGS)) {
+      parts.push('## 人设/角色设定');
+      parts.push('请按照以下人设描述设置你的角色：');
+      parts.push(configs.settings.personaDescription);
+      parts.push('');
+    }
 
     // 提示词
     if (configs.prompts && configs.prompts.length > 0 && options.categories.includes(MigrationCategory.PROMPTS)) {
@@ -316,7 +318,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     // MCP 连接
     if (configs.mcpConnections && configs.mcpConnections.length > 0 && options.categories.includes(MigrationCategory.MCP_CONNECTIONS)) {
       parts.push('## MCP 服务器配置');
-      parts.push('请将以下配置添加到 Kimi 的 MCP 配置中：\n');
+      parts.push('请将以下配置添加到 Kimi 的 MCP 配置中：\\n');
       parts.push('```json');
       parts.push('{');
       parts.push('  "mcpServers": {');
@@ -338,7 +340,8 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
       parts.push('  }');
       parts.push('}');
       parts.push('```');
-      parts.push('\n配置文件位置和具体配置方式请参考 Kimi 官方文档。\n');
+      parts.push('⚠️ 注意：需要手动配置认证信息');
+      parts.push('\\n配置文件位置和具体配置方式请参考 Kimi 官方文档。\\n');
     }
 
     // 记忆
@@ -370,8 +373,8 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
     }
 
     return {
-      prompt: parts.join('\n'),
-      instructions: '1. 复制上方导入提示词\n2. 打开 Kimi（kimi.moonshot.cn）\n3. 按照提示完成配置\n4. MCP 配置需要参考 Kimi 官方文档进行配置',
+      prompt: parts.join('\\n'),
+      instructions: '1. 复制上方导入提示词\\n2. 打开 Kimi（kimi.moonshot.cn）\\n3. 按照提示完成配置\\n4. MCP 配置需要参考 Kimi 官方文档进行配置',
       warnings: importWarnings.length > 0 ? importWarnings : undefined,
     };
   },
@@ -401,6 +404,7 @@ ${categories.map((c, i) => `${i + 1}. ${c}`).join('\n')}
         model: { unifiedField: 'model', displayName: '模型', type: 'string', required: false },
         temperature: { unifiedField: 'temperature', displayName: '温度', type: 'number', required: false },
         language: { unifiedField: 'language', displayName: '语言', type: 'string', required: false },
+        persona_description: { unifiedField: 'personaDescription', displayName: '人设描述', type: 'string', required: false },
         custom_settings: { unifiedField: 'customSettings', displayName: '自定义设置', type: 'object', required: false },
       },
     };

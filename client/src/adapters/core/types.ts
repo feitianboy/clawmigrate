@@ -156,6 +156,7 @@ export interface MemoryConfig {
 }
 
 export interface SettingsConfig {
+  personaDescription?: string;
   language?: string;
   model?: string;
   temperature?: number;
