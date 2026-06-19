@@ -5,6 +5,14 @@ import { cozeAdapter } from './coze';
 import { claudeAdapter } from './claude';
 import { kimiAdapter } from './kimi';
 import { openclawAdapter } from './openclaw';
+import { qclawAdapter } from './qclaw';
+import { workbuddyAdapter } from './workbuddy';
+import { maxclawAdapter } from './maxclaw';
+import { duclawAdapter } from './duclaw';
+import { autoclawAdapter } from './autoclw';
+import { arkclawAdapter } from './arkclaw';
+import { claw360Adapter } from './claw360';
+import { easyclawAdapter } from './easyclaw';
 import { PlatformAdapter } from '../core/types';
 
 export const adapters: PlatformAdapter[] = [
@@ -12,6 +20,14 @@ export const adapters: PlatformAdapter[] = [
   claudeAdapter,
   kimiAdapter,
   openclawAdapter,
+  qclawAdapter,
+  workbuddyAdapter,
+  maxclawAdapter,
+  duclawAdapter,
+  autoclawAdapter,
+  arkclawAdapter,
+  claw360Adapter,
+  easyclawAdapter,
 ];
 
 export const getAdapterById = (id: string): PlatformAdapter | undefined =>
@@ -22,3 +38,11 @@ export { cozeAdapter } from './coze';
 export { claudeAdapter } from './claude';
 export { kimiAdapter } from './kimi';
 export { openclawAdapter } from './openclaw';
+export { qclawAdapter } from './qclaw';
+export { workbuddyAdapter } from './workbuddy';
+export { maxclawAdapter } from './maxclaw';
+export { duclawAdapter } from './duclaw';
+export { autoclawAdapter } from './autoclw';
+export { arkclawAdapter } from './arkclaw';
+export { claw360Adapter } from './claw360';
+export { easyclawAdapter } from './easyclaw';

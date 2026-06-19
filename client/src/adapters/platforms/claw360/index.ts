@@ -35,13 +35,13 @@ import {
   mapSourceType,
 } from '@/adapters/core/utils';
 
-export const openclawAdapter: PlatformAdapter = {
-  id: 'openclaw',
-  name: 'OpenClaw',
+export const claw360Adapter: PlatformAdapter = {
+  id: 'claw360',
+  name: '360龙虾',
   version: '1.0.0',
-  icon: '🐾',
-  description: '开源 AI 助手平台，支持插件、工作流、MCP、知识库',
-  website: 'https://openclaw.dev',
+  icon: '🛡️',
+  description: '360 出品的 AI 智能体，主打安全模式',
+  website: 'https://claw.360.cn',
 
   supportedExportCategories: [
     MigrationCategory.SKILLS,
@@ -81,7 +81,7 @@ export const openclawAdapter: PlatformAdapter = {
 
 请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
 
-\`\`\`json
+\\`\\`\\`json
 {
   "agent_name": "助手名称",
   "agent_description": "简短描述你的功能",
@@ -140,7 +140,7 @@ export const openclawAdapter: PlatformAdapter = {
     }
   ]
 }
-\`\`\`
+\\`\\`\\`
 
 说明：
 - 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
@@ -150,7 +150,7 @@ export const openclawAdapter: PlatformAdapter = {
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\\n2. 打开 OpenClaw 平台\\n3. 进入你的 AI 助手对话界面\\n4. 粘贴提示词并发送\\n5. 复制 AI 返回的 JSON 结果',
+      instructions: '1. 复制上方提示词\\n2. 打开 360龙虾 平台\\n3. 进入你的 AI 助手对话界面\\n4. 粘贴提示词并发送\\n5. 复制 AI 返回的 JSON 结果',
       note: '如果 AI 没有完整输出，可以分多次对话，每次只问一个类别的配置。',
     };
   },
@@ -268,18 +268,10 @@ export const openclawAdapter: PlatformAdapter = {
           sensitivityLevel: SensitivityLevel.MUST_REMOVE,
           originalFieldNames: { name: 'MCP名称', server_url: '服务器地址', transport_type: '传输方式', tools: '工具列表', config: '配置', enabled: '是否启用' },
         });
-
-        sensitiveItems.push({
-          category: MigrationCategory.MCP_CONNECTIONS,
-          field: `mcp_connections[${i}].config`,
-          level: SensitivityLevel.MUST_REMOVE,
-          originalValue: JSON.stringify(m.config || {}),
-          maskedValue: maskSensitiveData(JSON.stringify(m.config || {})),
-        });
         warnings.push({
           category: MigrationCategory.MCP_CONNECTIONS,
-          field: `mcp_connections[${i}].config`,
-          message: `MCP连接"${m.name}"可能包含认证信息`,
+          field: `mcp_connections[${i}]`,
+          message: `MCP连接"${m.name}"包含敏感认证信息，需手动配置`,
           sensitivityLevel: SensitivityLevel.MUST_REMOVE,
         });
       });
@@ -289,14 +281,26 @@ export const openclawAdapter: PlatformAdapter = {
     const rawMemories = json.memories as Record<string, unknown>[] | undefined;
     if (rawMemories && Array.isArray(rawMemories)) {
       rawMemories.forEach((m, i) => {
+        const contentStr = JSON.stringify(m.content || '');
+        const hasMemorySensitive = detectMemorySensitivity(contentStr);
+
         memories.push({
           id: `memory_${i}`,
           content: String(m.content || ''),
           type: mapMemoryType(String(m.type || 'fact')),
           tags: Array.isArray(m.tags) ? m.tags.map(String) : [],
-          sensitivityLevel: SensitivityLevel.SAFE,
+          sensitivityLevel: hasMemorySensitive ? SensitivityLevel.REVIEW_SUGGESTED : SensitivityLevel.SAFE,
           originalFieldNames: { content: '记忆内容', type: '类型', tags: '标签' },
         });
+
+        if (hasMemorySensitive) {
+          warnings.push({
+            category: MigrationCategory.MEMORIES,
+            field: `memories[${i}].content`,
+            message: `记忆内容可能包含敏感信息，建议人工复核`,
+            sensitivityLevel: SensitivityLevel.REVIEW_SUGGESTED,
+          });
+        }
       });
     }
 
@@ -337,7 +341,7 @@ export const openclawAdapter: PlatformAdapter = {
 
     const schema: UnifiedSchema = {
       version: '1.0.0',
-      sourcePlatform: 'openclaw',
+      sourcePlatform: 'claw360',
       exportTime: new Date().toISOString(),
       configs: {
         skills: skills.length > 0 ? skills : undefined,
@@ -359,7 +363,7 @@ export const openclawAdapter: PlatformAdapter = {
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 OpenClaw 中：\\n');
+    parts.push('请帮我配置以下内容到 360龙虾 中：\\n');
 
     // 人设描述（来自新版导出）
     if (configs.settings?.personaDescription && options.categories.includes(MigrationCategory.SETTINGS)) {
@@ -470,7 +474,7 @@ export const openclawAdapter: PlatformAdapter = {
 
     return {
       prompt: parts.join('\\n'),
-      instructions: '1. 复制上方导入提示词\\n2. 打开 OpenClaw 平台\\n3. 进入你的 AI 助手\\n4. 粘贴提示词并发送\\n5. 按照提示逐步完成配置',
+      instructions: '1. 复制上方导入提示词\\n2. 打开 360龙虾 平台\\n3. 进入你的 AI 助手\\n4. 粘贴提示词并发送\\n5. 按照提示逐步完成配置',
       warnings: importWarnings.length > 0 ? importWarnings : undefined,
     };
   },

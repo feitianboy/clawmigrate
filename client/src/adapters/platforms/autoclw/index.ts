@@ -35,13 +35,13 @@ import {
   mapSourceType,
 } from '@/adapters/core/utils';
 
-export const openclawAdapter: PlatformAdapter = {
-  id: 'openclaw',
-  name: 'OpenClaw',
+export const autoclawAdapter: PlatformAdapter = {
+  id: 'autoclw',
+  name: 'AutoClaw',
   version: '1.0.0',
-  icon: '🐾',
-  description: '开源 AI 助手平台，支持插件、工作流、MCP、知识库',
-  website: 'https://openclaw.dev',
+  icon: '🧠',
+  description: '智谱 AI 出品的 AI 智能体，内置 50+ 技能',
+  website: 'https://autoglm.zhipuai.cn',
 
   supportedExportCategories: [
     MigrationCategory.SKILLS,
@@ -77,11 +77,11 @@ export const openclawAdapter: PlatformAdapter = {
       return labels[c] || c;
     });
 
-    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
+    const prompt = \`你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
 
 请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
 
-\`\`\`json
+\\\`\\\`\\\`json
 {
   "agent_name": "助手名称",
   "agent_description": "简短描述你的功能",
@@ -140,17 +140,17 @@ export const openclawAdapter: PlatformAdapter = {
     }
   ]
 }
-\`\`\`
+\\\`\\\`\\\`
 
 说明：
 - 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
 - 对于不存在的配置项，用空数组 [] 或空对象 {} 代替
 - 工作流请尽量描述清楚触发条件和执行步骤
-- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息`;
+- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息\`;
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\\n2. 打开 OpenClaw 平台\\n3. 进入你的 AI 助手对话界面\\n4. 粘贴提示词并发送\\n5. 复制 AI 返回的 JSON 结果',
+      instructions: '1. 复制上方提示词\\\\n2. 打开 AutoClaw 平台\\\\n3. 进入你的 AI 助手对话界面\\\\n4. 粘贴提示词并发送\\\\n5. 复制 AI 返回的 JSON 结果',
       note: '如果 AI 没有完整输出，可以分多次对话，每次只问一个类别的配置。',
     };
   },
@@ -183,13 +183,12 @@ export const openclawAdapter: PlatformAdapter = {
     const knowledgeBases: KnowledgeBaseConfig[] = [];
     let settings: SettingsConfig | undefined;
 
-    // 解析提示词
     const rawPrompts = json.prompts as Record<string, unknown>[] | undefined;
     if (rawPrompts && Array.isArray(rawPrompts)) {
       rawPrompts.forEach((p, i) => {
         prompts.push({
-          id: `prompt_${i}`,
-          name: String(p.name || `未命名提示词 ${i + 1}`),
+          id: \`prompt_\${i}\`,
+          name: String(p.name || \`未命名提示词 \${i + 1}\`),
           content: String(p.content || ''),
           type: mapPromptType(String(p.type || 'system')),
           sensitivityLevel: SensitivityLevel.SAFE,
@@ -198,7 +197,6 @@ export const openclawAdapter: PlatformAdapter = {
       });
     }
 
-    // 解析技能
     const rawSkills = json.skills as Record<string, unknown>[] | undefined;
     if (rawSkills && Array.isArray(rawSkills)) {
       rawSkills.forEach((s, i) => {
@@ -206,8 +204,8 @@ export const openclawAdapter: PlatformAdapter = {
         const hasSensitive = containsSensitiveData(configStr);
 
         skills.push({
-          id: `skill_${i}`,
-          name: String(s.name || `未命名技能 ${i + 1}`),
+          id: \`skill_\${i}\`,
+          name: String(s.name || \`未命名技能 \${i + 1}\`),
           description: s.description ? String(s.description) : undefined,
           type: mapSkillType(String(s.type || 'plugin')),
           config: (s.config as Record<string, unknown>) || {},
@@ -219,28 +217,27 @@ export const openclawAdapter: PlatformAdapter = {
         if (hasSensitive) {
           sensitiveItems.push({
             category: MigrationCategory.SKILLS,
-            field: `skills[${i}].config`,
+            field: \`skills[\${i}].config\`,
             level: SensitivityLevel.MUST_REMOVE,
             originalValue: configStr,
             maskedValue: maskSensitiveData(configStr),
           });
           warnings.push({
             category: MigrationCategory.SKILLS,
-            field: `skills[${i}].config`,
-            message: `技能"${s.name}"的配置中包含敏感信息`,
+            field: \`skills[\${i}].config\`,
+            message: \`技能"\${s.name}"的配置中包含敏感信息\`,
             sensitivityLevel: SensitivityLevel.MUST_REMOVE,
           });
         }
       });
     }
 
-    // 解析自动化
     const rawAutomations = json.automations as Record<string, unknown>[] | undefined;
     if (rawAutomations && Array.isArray(rawAutomations)) {
       rawAutomations.forEach((a, i) => {
         automations.push({
-          id: `automation_${i}`,
-          name: String(a.name || `未命名自动化 ${i + 1}`),
+          id: \`automation_\${i}\`,
+          name: String(a.name || \`未命名自动化 \${i + 1}\`),
           description: a.description ? String(a.description) : undefined,
           type: mapAutomationType(String(a.type || 'workflow')),
           trigger: a.trigger ? String(a.trigger) : undefined,
@@ -253,13 +250,12 @@ export const openclawAdapter: PlatformAdapter = {
       });
     }
 
-    // 解析 MCP
     const rawMcp = json.mcp_connections as Record<string, unknown>[] | undefined;
     if (rawMcp && Array.isArray(rawMcp)) {
       rawMcp.forEach((m, i) => {
         mcpConnections.push({
-          id: `mcp_${i}`,
-          name: String(m.name || `MCP服务器 ${i + 1}`),
+          id: \`mcp_\${i}\`,
+          name: String(m.name || \`MCP服务器 \${i + 1}\`),
           serverUrl: m.server_url ? String(m.server_url) : undefined,
           transportType: mapTransportType(String(m.transport_type || 'stdio')),
           tools: Array.isArray(m.tools) ? m.tools.map(String) : [],
@@ -268,39 +264,41 @@ export const openclawAdapter: PlatformAdapter = {
           sensitivityLevel: SensitivityLevel.MUST_REMOVE,
           originalFieldNames: { name: 'MCP名称', server_url: '服务器地址', transport_type: '传输方式', tools: '工具列表', config: '配置', enabled: '是否启用' },
         });
-
-        sensitiveItems.push({
-          category: MigrationCategory.MCP_CONNECTIONS,
-          field: `mcp_connections[${i}].config`,
-          level: SensitivityLevel.MUST_REMOVE,
-          originalValue: JSON.stringify(m.config || {}),
-          maskedValue: maskSensitiveData(JSON.stringify(m.config || {})),
-        });
         warnings.push({
           category: MigrationCategory.MCP_CONNECTIONS,
-          field: `mcp_connections[${i}].config`,
-          message: `MCP连接"${m.name}"可能包含认证信息`,
+          field: \`mcp_connections[\${i}]\`,
+          message: \`MCP连接"\${m.name}"包含敏感认证信息，需手动配置\`,
           sensitivityLevel: SensitivityLevel.MUST_REMOVE,
         });
       });
     }
 
-    // 解析记忆
     const rawMemories = json.memories as Record<string, unknown>[] | undefined;
     if (rawMemories && Array.isArray(rawMemories)) {
       rawMemories.forEach((m, i) => {
+        const contentStr = JSON.stringify(m.content || '');
+        const hasMemorySensitive = detectMemorySensitivity(contentStr);
+
         memories.push({
-          id: `memory_${i}`,
+          id: \`memory_\${i}\`,
           content: String(m.content || ''),
           type: mapMemoryType(String(m.type || 'fact')),
           tags: Array.isArray(m.tags) ? m.tags.map(String) : [],
-          sensitivityLevel: SensitivityLevel.SAFE,
+          sensitivityLevel: hasMemorySensitive ? SensitivityLevel.REVIEW_SUGGESTED : SensitivityLevel.SAFE,
           originalFieldNames: { content: '记忆内容', type: '类型', tags: '标签' },
         });
+
+        if (hasMemorySensitive) {
+          warnings.push({
+            category: MigrationCategory.MEMORIES,
+            field: \`memories[\${i}].content\`,
+            message: '记忆内容可能包含敏感信息，建议人工复核',
+            sensitivityLevel: SensitivityLevel.REVIEW_SUGGESTED,
+          });
+        }
       });
     }
 
-    // 解析设置 - 兼容新版 persona_description 和旧版 system_prompt
     const rawSettings = json.settings as Record<string, unknown> | undefined;
     if (rawSettings) {
       settings = {
@@ -316,13 +314,12 @@ export const openclawAdapter: PlatformAdapter = {
       };
     }
 
-    // 解析知识库
     const rawKBs = json.knowledge_bases as Record<string, unknown>[] | undefined;
     if (rawKBs && Array.isArray(rawKBs)) {
       rawKBs.forEach((k, i) => {
         knowledgeBases.push({
-          id: `kb_${i}`,
-          name: String(k.name || `未命名知识库 ${i + 1}`),
+          id: \`kb_\${i}\`,
+          name: String(k.name || \`未命名知识库 \${i + 1}\`),
           description: k.description ? String(k.description) : undefined,
           fileCount: typeof k.file_count === 'number' ? k.file_count : undefined,
           totalSize: k.total_size ? String(k.total_size) : undefined,
@@ -337,7 +334,7 @@ export const openclawAdapter: PlatformAdapter = {
 
     const schema: UnifiedSchema = {
       version: '1.0.0',
-      sourcePlatform: 'openclaw',
+      sourcePlatform: 'autoclw',
       exportTime: new Date().toISOString(),
       configs: {
         skills: skills.length > 0 ? skills : undefined,
@@ -359,9 +356,8 @@ export const openclawAdapter: PlatformAdapter = {
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 OpenClaw 中：\\n');
+    parts.push('请帮我配置以下内容到 AutoClaw 中：\\\\n');
 
-    // 人设描述（来自新版导出）
     if (configs.settings?.personaDescription && options.categories.includes(MigrationCategory.SETTINGS)) {
       parts.push('## 人设/角色设定');
       parts.push('请按照以下人设描述设置你的角色：');
@@ -373,7 +369,7 @@ export const openclawAdapter: PlatformAdapter = {
       parts.push('## 提示词/角色设定');
       configs.prompts.forEach((p) => {
         if (p.sensitivityLevel === SensitivityLevel.MUST_REMOVE) return;
-        parts.push(`### ${p.name}（类型：${p.type === 'system' ? '系统提示词' : p.type}）`);
+        parts.push(\`### \${p.name}（类型：\${p.type === 'system' ? '系统提示词' : p.type}）\`);
         parts.push(p.content);
         parts.push('');
       });
@@ -392,7 +388,7 @@ export const openclawAdapter: PlatformAdapter = {
           });
           return;
         }
-        parts.push(`- ${s.name}：${s.description || '无描述'}（类型：${s.type}，${s.enabled ? '启用' : '禁用'}）`);
+        parts.push(\`- \${s.name}：\${s.description || '无描述'}（类型：\${s.type}，\${s.enabled ? '启用' : '禁用'}）\`);
       });
       parts.push('⚠️ 注意：插件需要重新授权配置');
       parts.push('');
@@ -401,10 +397,10 @@ export const openclawAdapter: PlatformAdapter = {
     if (configs.automations && configs.automations.length > 0 && options.categories.includes(MigrationCategory.AUTOMATIONS)) {
       parts.push('## 自动化工作流');
       configs.automations.forEach((a) => {
-        parts.push(`- ${a.name}：${a.description || '无描述'}`);
-        if (a.trigger) parts.push(`  触发条件：${a.trigger}`);
-        if (a.schedule) parts.push(`  定时规则：${a.schedule}`);
-        parts.push(`  执行动作：${a.actions.join(' → ')}`);
+        parts.push(\`- \${a.name}：\${a.description || '无描述'}\`);
+        if (a.trigger) parts.push(\`  触发条件：\${a.trigger}\`);
+        if (a.schedule) parts.push(\`  定时规则：\${a.schedule}\`);
+        parts.push(\`  执行动作：\${a.actions.join(' → ')}\`);
       });
       parts.push('');
     }
@@ -419,8 +415,8 @@ export const openclawAdapter: PlatformAdapter = {
           reason: 'MCP 连接通常包含认证信息，需手动配置',
           alternative: '请在 MCP 配置页面手动添加',
         });
-        parts.push(`- ${m.name}（传输方式：${m.transportType}，需手动配置认证信息）`);
-        if (m.tools && m.tools.length > 0) parts.push(`  工具：${m.tools.join(', ')}`);
+        parts.push(\`- \${m.name}（传输方式：\${m.transportType}，需手动配置认证信息）\`);
+        if (m.tools && m.tools.length > 0) parts.push(\`  工具：\${m.tools.join(', ')}\`);
       });
       parts.push('');
     }
@@ -429,7 +425,7 @@ export const openclawAdapter: PlatformAdapter = {
       parts.push('## 记忆');
       configs.memories.forEach((m) => {
         if (m.sensitivityLevel !== SensitivityLevel.MUST_REMOVE) {
-          parts.push(`- [${m.type}] ${m.content}`);
+          parts.push(\`- [\${m.type}] \${m.content}\`);
         }
       });
       parts.push('');
@@ -438,11 +434,11 @@ export const openclawAdapter: PlatformAdapter = {
     if (configs.settings && options.categories.includes(MigrationCategory.SETTINGS)) {
       parts.push('## 系统设置');
       const s = configs.settings;
-      if (s.model) parts.push(`- 默认模型：${s.model}`);
-      if (s.temperature !== undefined) parts.push(`- 温度：${s.temperature}`);
-      if (s.maxTokens !== undefined) parts.push(`- 最大Token数：${s.maxTokens}`);
-      if (s.language) parts.push(`- 语言：${s.language}`);
-      if (s.systemPrompt) parts.push(`- 系统提示词：${s.systemPrompt}`);
+      if (s.model) parts.push(\`- 默认模型：\${s.model}\`);
+      if (s.temperature !== undefined) parts.push(\`- 温度：\${s.temperature}\`);
+      if (s.maxTokens !== undefined) parts.push(\`- 最大Token数：\${s.maxTokens}\`);
+      if (s.language) parts.push(\`- 语言：\${s.language}\`);
+      if (s.systemPrompt) parts.push(\`- 系统提示词：\${s.systemPrompt}\`);
       parts.push('');
     }
 
@@ -456,21 +452,21 @@ export const openclawAdapter: PlatformAdapter = {
         alternative: '请手动创建知识库并上传文件',
       });
       configs.knowledgeBases.forEach((k) => {
-        parts.push(`- ${k.name}（${k.fileCount || 0} 个文件，需手动上传）`);
+        parts.push(\`- \${k.name}（\${k.fileCount || 0} 个文件，需手动上传）\`);
       });
       parts.push('');
     }
 
     if (importWarnings.length > 0) {
-      parts.push('\\n⚠️ 以下内容需要手动配置：');
+      parts.push('\\\\n⚠️ 以下内容需要手动配置：');
       importWarnings.forEach((w) => {
-        parts.push(`- ${w.field}：${w.reason}${w.alternative ? ` → ${w.alternative}` : ''}`);
+        parts.push(\`- \${w.field}：\${w.reason}\${w.alternative ? \` → \${w.alternative}\` : ''}\`);
       });
     }
 
     return {
-      prompt: parts.join('\\n'),
-      instructions: '1. 复制上方导入提示词\\n2. 打开 OpenClaw 平台\\n3. 进入你的 AI 助手\\n4. 粘贴提示词并发送\\n5. 按照提示逐步完成配置',
+      prompt: parts.join('\\\\n'),
+      instructions: '1. 复制上方导入提示词\\\\n2. 打开 AutoClaw 平台\\\\n3. 进入你的 AI 助手\\\\n4. 粘贴提示词并发送\\\\n5. 按照提示逐步完成配置',
       warnings: importWarnings.length > 0 ? importWarnings : undefined,
     };
   },
