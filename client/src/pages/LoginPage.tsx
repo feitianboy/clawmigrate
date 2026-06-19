@@ -195,8 +195,8 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    // 密码强度校验
-    if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(password)) {
+    // 密码强度校验（仅注册时）
+    if (mode === 'register' && !/(?=.*[a-zA-Z])(?=.*\d)/.test(password)) {
       setError('密码必须包含字母和数字');
       return;
     }
@@ -206,11 +206,7 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    // 确认密码校验
-    if (password !== confirmPassword) {
-      setError('两次输入的密码不一致');
-      return;
-    }
+
 
     try {
       const result = mode === 'login'
