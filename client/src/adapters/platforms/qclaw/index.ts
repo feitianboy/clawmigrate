@@ -81,7 +81,7 @@ export const qclawAdapter: PlatformAdapter = {
 
 请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
 
-\\`\\`\\`json
+\`\`\`json
 {
   "agent_name": "助手名称",
   "agent_description": "简短描述你的功能",
@@ -140,7 +140,7 @@ export const qclawAdapter: PlatformAdapter = {
     }
   ]
 }
-\\`\\`\\`
+\`\`\`
 
 说明：
 - 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
