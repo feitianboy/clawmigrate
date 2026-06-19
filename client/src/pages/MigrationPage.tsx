@@ -533,20 +533,32 @@ const MigrationPage: React.FC = () => {
     }
   }, [currentStep, isAuthenticated, fetchPlanInfo]);
 
-  // Bug 4: 入口权限检查 - 在页面挂载时检查用户是否有权限访问迁移页面
+  // 入口权限检查 - 在页面挂载时检查用户是否有权限访问迁移页面
   useEffect(() => {
     const checkAccess = async () => {
       setAccessChecking(true);
-      if (isAuthenticated && !isPro()) {
+      // 未登录用户直接跳转登录页
+      if (!isAuthenticated) {
+        navigate('/login');
+        setAccessChecking(false);
+        return;
+      }
+      if (!isPro()) {
         try {
           const response = await fetch('/api/membership/check', {
             method: 'POST',
             credentials: 'include',
           });
           const result = await response.json();
-          if (!result.ok || !result.data?.allowed) {
+          if (result.ok && result.data?.allowed === false) {
+            // 只有API明确返回allowed=false才是次数用完
             setAccessDenied(true);
             setDenyReason('free-limit');
+          } else if (!result.ok && (result.error?.includes('token') || result.error?.includes('No token') || response.status === 401)) {
+            // 认证失败，跳转登录
+            navigate('/login');
+            setAccessChecking(false);
+            return;
           }
           // 无论是否通过，都刷新导航栏的剩余次数
           fetchPlanInfo();
@@ -558,7 +570,7 @@ const MigrationPage: React.FC = () => {
       setAccessChecking(false);
     };
     checkAccess();
-  }, [isAuthenticated, isPro, fetchPlanInfo]);
+  }, [isAuthenticated, isPro, fetchPlanInfo, navigate]);
 
   // 步骤指示器
   const renderStepIndicator = () => {

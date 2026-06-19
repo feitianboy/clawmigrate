@@ -174,7 +174,7 @@ const styles: Record<string, React.CSSProperties> = {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const { user, isAuthenticated, checkAuth, logout, planInfo, isPro } = useAuthStore();
+  const { user, isAuthenticated, checkAuth, logout, planInfo, isPro, isLoading } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
@@ -182,10 +182,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Check auth status on mount
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isLoading) {
       checkAuth();
     }
-  }, [checkAuth, isAuthenticated]);
+  }, [checkAuth, isAuthenticated, isLoading]);
 
   const handleLogout = async () => {
     await logout();
@@ -265,7 +265,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             )}
             
             {/* 套餐状态提示 */}
-            {isAuthenticated && planInfo && !isPro() && (
+            {isAuthenticated && planInfo && !isPro() && planInfo.usage && (
               <span style={styles.usageTag} className="usage-tag">
                 免费版 · 剩余 {getRemainingUsage()} 次
               </span>
@@ -281,7 +281,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </span>
             )}
 
-            {isAuthenticated ? (
+            {isLoading && !isAuthenticated ? (
+              <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>加载中...</span>
+            ) : isAuthenticated ? (
+              <>
               <div style={{ position: 'relative' }}>
                 <button
                   style={styles.userButton}
@@ -311,12 +314,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </div>
                 )}
               </div>
+              </>
             ) : (
               <Link to="/login" className="btn btn-primary">
                 登录 / 注册
               </Link>
             )}
-
             <button
               className="mobile-menu-btn"
               style={styles.mobileMenuBtn}
