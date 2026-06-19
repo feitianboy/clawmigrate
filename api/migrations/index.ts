@@ -110,7 +110,7 @@ async function handleCreateMigration(req: VercelRequest, res: VercelResponse) {
         itemsCount: migration.items_count,
         status: migration.status
       },
-      req.headers['x-forwarded-for'] || req.ip
+      req.headers['x-forwarded-for'] as string || 'unknown'
     );
 
     return res.status(201).json({

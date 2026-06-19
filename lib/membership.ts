@@ -40,7 +40,7 @@ export async function getUserMembership(userId: number): Promise<UserMembership 
     .eq('id', userId)
     .single();
   
-  return data as UserMembership | null;
+  return data as unknown as UserMembership | null;
 }
 
 export async function isMembershipValid(userId: number): Promise<boolean> {

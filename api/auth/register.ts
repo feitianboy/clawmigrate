@@ -18,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method === 'OPTIONS') {
+  if ((req.method as string) === 'OPTIONS') {
     return res.status(200).end();
   }
 
@@ -87,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ ok: false, error: 'Failed to create user' });
     }
 
-    await logActivity(newUser.id, 'register', { username: newUser.username }, req.headers['x-forwarded-for'] || req.ip);
+    await logActivity(newUser.id, 'register', { username: newUser.username }, req.headers['x-forwarded-for'] as string || 'unknown');
 
     const secret = process.env.JWT_SECRET || 'default_secret';
     const token = jwt.sign(
