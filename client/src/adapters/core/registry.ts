@@ -2,6 +2,8 @@ import {
   PlatformAdapter,
   MigrationCategory,
   FieldMappingTable,
+  ParseResult,
+  ParseWarning,
 } from './types';
 
 export class AdapterRegistry {
@@ -9,7 +11,7 @@ export class AdapterRegistry {
 
   register(adapter: PlatformAdapter): void {
     if (this.adapters.has(adapter.id)) {
-      console.warn(`Adapter "${adapter.id}" is already registered, overwriting.`);
+      console.warn('Adapter "' + adapter.id + '" is already registered, overwriting.');
     }
     this.adapters.set(adapter.id, adapter);
   }
@@ -52,6 +54,28 @@ export class AdapterRegistry {
     return {
       source: source.getFieldMapping(),
       target: target.getFieldMapping(),
+    };
+  }
+
+  parse(
+    platformId: string,
+    rawData: string
+  ): { success: boolean; error?: string; schema?: unknown; warnings: ParseWarning[] } {
+    const adapter = this.adapters.get(platformId);
+    if (!adapter) {
+      return {
+        success: false,
+        error: 'Adapter for platform "' + platformId + '" not found.',
+        warnings: [],
+      };
+    }
+
+    const result: ParseResult = adapter.parseExportResult(rawData);
+    return {
+      success: result.success,
+      error: result.errors.length > 0 ? result.errors[0].message : undefined,
+      schema: result.data,
+      warnings: result.warnings,
     };
   }
 }
