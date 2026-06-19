@@ -24,7 +24,7 @@ registry.register(qclawAdapter);
 registry.register(workbuddyAdapter);
 registry.register(maxclawAdapter);
 registry.register(duclawAdapter);
-registry.register(autoclwAdapter);
+registry.register(autoclawAdapter);
 registry.register(arkclawAdapter);
 registry.register(claw360Adapter);
 registry.register(easyclawAdapter);
