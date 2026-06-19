@@ -63,7 +63,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <button
             onClick={() => {
               this.setState({ hasError: false, error: null });
-              window.location.href = '/';
+              window.history.back();
             }}
             style={{
               padding: '0.5rem 1.5rem',

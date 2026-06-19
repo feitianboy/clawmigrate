@@ -200,7 +200,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const getNavItems = () => {
     return [
       { path: '/', label: '首页', icon: Home, requireAuth: false },
-      { path: '/migrate', label: '开始迁移', icon: ArrowRightLeft, requireAuth: false },
+      { path: '/migrate', label: '开始迁移', icon: ArrowRightLeft, requireAuth: true },
     ];
   };
 

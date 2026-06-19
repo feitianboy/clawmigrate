@@ -491,7 +491,7 @@ const MigrationPage: React.FC = () => {
   // 入口权限检查状态
   const [accessDenied, setAccessDenied] = useState(false);
   const [accessChecking, setAccessChecking] = useState(true);
-  const [denyReason, setDenyReason] = useState<'guest-limit' | 'free-limit' | null>(null);
+  const [denyReason, setDenyReason] = useState<'free-limit' | null>(null);
   // 导出步骤状态
   const [migrationRecorded, setMigrationRecorded] = useState(false);
   const [exportCopied, setExportCopied] = useState(false);
@@ -1383,38 +1383,16 @@ const MigrationPage: React.FC = () => {
           textAlign: 'center',
         }}>
           <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>
-            {denyReason === 'guest-limit' ? '🦐' : '💎'}
+            '💎'
           </div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
-            {denyReason === 'guest-limit' ? '游客迁移次数已用完' : '免费迁移次数已用完'}
+            '免费迁移次数已用完'
           </h2>
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)', maxWidth: '400px', margin: '0 auto var(--space-6)' }}>
-            {denyReason === 'guest-limit' 
-              ? '您已用完2次免费迁移次数。升级Pro解锁无限迁移，迁移历史永久保存。'
-              : '您的免费迁移次数已用完。升级Pro版本可解锁无限次迁移，还有更多高级功能。'}
+            '您的免费迁移次数已用完。升级Pro解锁无限迁移'
           </p>
           <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {denyReason === 'guest-limit' && (
-              <button
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  padding: 'var(--space-3) var(--space-6)',
-                  background: 'var(--color-primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: '0.9375rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-                onClick={() => navigate('/login')}
-              >
-                注册账号
-                <ArrowRight size={18} />
-              </button>
-            )}
+
             <button
               style={{
                 display: 'inline-flex',
