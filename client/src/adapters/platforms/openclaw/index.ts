@@ -35,6 +35,206 @@ import {
   mapSourceType,
 } from '@/adapters/core/utils';
 
+// ===== 自然语言解析辅助函数 =====
+function extractListItems(text: string, keyword: string): string[] {
+  const regex = new RegExp(
+    `${keyword}[：:：]?\\s*([\\s\\S]*?)(?=\\n\\n|\\n(?:插件|技能|工作流|定时|MCP|外部|知识库|模型|记忆|设置|agent)|$)`,
+    'i'
+  );
+  const match = text.match(regex);
+  if (!match) return [];
+
+  const section = match[1];
+  return section
+    .split(/\n/)
+    .map((line) =>
+      line
+        .replace(/^[\d]+[.、）)]?\s*|^[-•·*]\s*/gm, '')
+        .trim()
+    )
+    .filter((line) => line.length > 1 && line.length < 500);
+}
+
+function parseNaturalLanguage(raw: string, sourcePlatform: string): ParseResult {
+  const warnings: ParseWarning[] = [];
+  const sensitiveItems: SensitiveItem[] = [];
+
+  const skills: SkillConfig[] = [];
+  const automations: AutomationConfig[] = [];
+  const mcpConnections: MCPConfig[] = [];
+  const memories: MemoryConfig[] = [];
+  const prompts: PromptConfig[] = [];
+  const knowledgeBases: KnowledgeBaseConfig[] = [];
+  let settings: SettingsConfig | undefined;
+
+  const text = raw.trim();
+
+  // 提取名称
+  const nameMatch = text.match(
+    /(?:我叫|我的名字是|我是|我叫做)\s*[：:]?\s*([^\s，。,.!?！？\n]{2,20})/
+  );
+  const botName = nameMatch ? nameMatch[1].trim() : '未命名助手';
+
+  // 提取功能描述
+  const firstPara = text.split(/\n\n/)[0] || text.slice(0, 200);
+  const botDescription = firstPara.slice(0, 200);
+
+  // 提取 agent 设定
+  const personaMatch = text.match(
+    /(?:agent设定|设定|角色|说话风格|性格)[：:：]?\s*([\s\S]*?)(?=\n\n|\n(?:插件|技能|工作流|定时|MCP|外部|知识库|模型|记忆|设置)|$)/i
+  );
+  if (personaMatch) {
+    prompts.push({
+      id: 'prompt_0',
+      name: 'Agent 设定',
+      content: personaMatch[1].trim().slice(0, 2000),
+      type: 'character',
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { content: 'Agent 设定' },
+    });
+  }
+
+  // 提取技能模块
+  const skillItems = extractListItems(text, '技能模块|技能|插件|功能');
+  skillItems.forEach((item, i) => {
+    const parts = item.split(/[：:—–-]\s*/);
+    const name = parts[0].trim().slice(0, 50);
+    const description = parts.slice(1).join('：').trim() || undefined;
+    skills.push({
+      id: `skill_${i}`,
+      name: name || `技能 ${i + 1}`,
+      description,
+      type: 'plugin',
+      config: {},
+      enabled: true,
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { name: '技能名称', description: '技能描述' },
+    });
+  });
+
+  // 提取工作流/自动化
+  const automationItems = extractListItems(text, '工作流|自动化|定时任务');
+  automationItems.forEach((item, i) => {
+    const parts = item.split(/[：:—–-]\s*/);
+    automations.push({
+      id: `automation_${i}`,
+      name: parts[0].trim().slice(0, 50) || `自动化 ${i + 1}`,
+      description: parts.slice(1).join('：').trim() || undefined,
+      type: 'workflow',
+      trigger: undefined,
+      actions: [item],
+      enabled: true,
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { name: '名称', description: '描述' },
+    });
+  });
+
+  // 提取 MCP
+  const mcpItems = extractListItems(text, 'MCP|外部工具|外部服务');
+  mcpItems.forEach((item, i) => {
+    const parts = item.split(/[：:—–-]\s*/);
+    mcpConnections.push({
+      id: `mcp_${i}`,
+      name: parts[0].trim().slice(0, 50) || `外部服务 ${i + 1}`,
+      transportType: undefined,
+      tools: [],
+      config: {},
+      enabled: true,
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { name: '服务名称', description: '描述' },
+    });
+  });
+
+  // 提取记忆
+  const memoryItems = extractListItems(text, '记忆|用户信息|偏好');
+  memoryItems.forEach((item, i) => {
+    memories.push({
+      id: `memory_${i}`,
+      content: item,
+      type: 'fact',
+      tags: [],
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { content: '记忆内容' },
+    });
+  });
+
+  // 提取设置
+  const modelMatch = text.match(/模型[：:：]?\s*([^\s，。,.！？\n]+)/i);
+  const tempMatch = text.match(/温度[：:：]?\s*([\d.]+)/i);
+  if (modelMatch || personaMatch) {
+    settings = {
+      model: modelMatch ? modelMatch[1].trim() : undefined,
+      temperature: tempMatch ? parseFloat(tempMatch[1]) : undefined,
+      customSettings: {},
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { model: '模型', temperature: '温度' },
+    };
+  }
+
+  // 提取知识库
+  const kbItems = extractListItems(text, '知识库');
+  kbItems.forEach((item, i) => {
+    const parts = item.split(/[：:—–-]\s*/);
+    knowledgeBases.push({
+      id: `kb_${i}`,
+      name: parts[0].trim().slice(0, 50) || `知识库 ${i + 1}`,
+      description: parts.slice(1).join('：').trim() || undefined,
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { name: '名称', description: '描述' },
+    });
+  });
+
+  // 如果什么都没提取到
+  const totalItems =
+    skills.length +
+    automations.length +
+    mcpConnections.length +
+    memories.length +
+    prompts.length +
+    knowledgeBases.length +
+    (settings ? 1 : 0);
+
+  if (totalItems === 0) {
+    return {
+      success: false,
+      errors: [
+        {
+          category: MigrationCategory.SETTINGS,
+          message: '未能从对话内容中识别出有效配置信息',
+          suggestion:
+            '请确保粘贴了AI的完整回复。如果AI回复内容较少，可以尝试追问更多细节后再粘贴。',
+        },
+      ],
+      warnings: [],
+    };
+  }
+
+  warnings.push({
+    category: MigrationCategory.SETTINGS,
+    field: 'all',
+    message: '本次解析基于自然语言对话内容，信息可能不完整，建议在迁移预览页面逐项核对',
+    sensitivityLevel: SensitivityLevel.SAFE,
+  });
+
+  const schema: UnifiedSchema = {
+    version: '1.0.0',
+    sourcePlatform,
+    exportTime: new Date().toISOString(),
+    configs: {
+      skills: skills.length > 0 ? skills : undefined,
+      automations: automations.length > 0 ? automations : undefined,
+      mcpConnections: mcpConnections.length > 0 ? mcpConnections : undefined,
+      memories: memories.length > 0 ? memories : undefined,
+      settings,
+      prompts: prompts.length > 0 ? prompts : undefined,
+      knowledgeBases: knowledgeBases.length > 0 ? knowledgeBases : undefined,
+    },
+    metadata: { totalItems, sensitiveItems, unsupportedItems: [] },
+  };
+
+  return { success: true, data: schema, errors: [], warnings };
+}
+
 export const openclawAdapter: PlatformAdapter = {
   id: 'openclaw',
   name: 'OpenClaw',
@@ -64,116 +264,65 @@ export const openclawAdapter: PlatformAdapter = {
   ],
 
   generateExportPrompt(options: ExportOptions): ExportPromptResult {
-    const categories = options.categories.map((c) => {
-      const labels: Record<string, string> = {
-        skills: '插件/技能',
-        automations: '自动化工作流',
-        mcp_connections: 'MCP 连接配置',
-        memories: '用户记忆/上下文',
-        settings: '系统设置（模型、温度等）',
-        prompts: '系统提示词/角色设定',
-        knowledge_bases: '知识库',
-      };
-      return labels[c] || c;
-    });
+    const categories = options.categories;
 
-    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
+    // 主提示词 — 对话式开头
+    const prompt = '你好！我想了解一下你的情况，方便我做个记录。能先简单介绍一下自己吗？';
 
-请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
+    // 根据选的类别生成追问
+    const followUpQuestions: string[] = [];
 
-\`\`\`json
-{
-  "agent_name": "助手名称",
-  "agent_description": "简短描述你的功能",
-  "prompts": [
-    {
-      "name": "人设/角色名称",
-      "content": "你的人设描述和回复规则",
-      "type": "system 或 character 或 template"
+    if (categories.includes(MigrationCategory.PROMPTS)) {
+      followUpQuestions.push('你的 agent 设定是什么样的？');
     }
-  ],
-  "skills": [
-    {
-      "name": "技能名称",
-      "description": "功能描述",
-      "type": "plugin 或 skill 或 tool",
-      "enabled": true
-    }
-  ],
-  "automations": [
-    {
-      "name": "工作流名称",
-      "description": "工作流描述",
-      "type": "workflow 或 schedule 或 trigger",
-      "trigger": "触发条件",
-      "actions": ["动作列表"],
-      "schedule": "定时规则（如有）",
-      "enabled": true
-    }
-  ],
-  "mcp_connections": [
-    {
-      "name": "MCP服务名称",
-      "transport_type": "stdio 或 sse 或 streamable-http",
-      "tools": ["可用工具列表"]
-    }
-  ],
-  "memories": [
-    {
-      "content": "记忆内容",
-      "type": "fact 或 preference 或 instruction 或 context",
-      "tags": []
-    }
-  ],
-  "settings": {
-    "model": "模型名称",
-    "temperature": 0.7,
-    "max_tokens": 4096,
-    "language": "zh",
-    "persona_description": "你的人设/角色描述（不是系统提示词原文，用你自己的话概括）"
-  },
-  "knowledge_bases": [
-    {
-      "name": "知识库名称",
-      "description": "描述",
-      "file_count": 0
-    }
-  ]
-}
-\`\`\`
 
-说明：
-- 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
-- 对于不存在的配置项，用空数组 [] 或空对象 {} 代替
-- 工作流请尽量描述清楚触发条件和执行步骤
-- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息`;
+    if (categories.includes(MigrationCategory.SKILLS)) {
+      followUpQuestions.push('你有哪些技能模块？能分别说说每个的功能吗？');
+    }
+
+    if (categories.includes(MigrationCategory.AUTOMATIONS)) {
+      followUpQuestions.push('你有设置什么自动化工作流吗？大概是什么触发条件、做什么事？');
+    }
+
+    if (categories.includes(MigrationCategory.MCP_CONNECTIONS)) {
+      followUpQuestions.push('你有连接什么外部工具或服务吗？分别是什么，能做什么？');
+    }
+
+    if (categories.includes(MigrationCategory.MEMORIES)) {
+      followUpQuestions.push('你记得关于用户的什么信息或偏好吗？');
+    }
+
+    if (categories.includes(MigrationCategory.SETTINGS)) {
+      followUpQuestions.push('你用的什么模型？有没有什么特别的参数设置？');
+    }
+
+    if (categories.includes(MigrationCategory.KNOWLEDGE_BASES)) {
+      followUpQuestions.push('你有没有挂载知识库？大概是什么内容的？');
+    }
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\\n2. 打开 OpenClaw 平台\\n3. 进入你的 AI 助手对话界面\\n4. 粘贴提示词并发送\\n5. 复制 AI 返回的 JSON 结果',
-      note: '如果 AI 没有完整输出，可以分多次对话，每次只问一个类别的配置。',
+      instructions: '1. 复制上方提示词\n2. 打开 OpenClaw 平台\n3. 进入你的 AI 助手对话界面\n4. 粘贴提示词并发送\n5. 等 AI 回复后，依次发送下方追问问题\n6. 把所有对话内容复制回来粘贴到解析框',
+      note: '每个问题单独发送，等 AI 回复后再发下一个。把所有回复拼在一起粘贴回来即可。',
+      followUpQuestions,
     };
   },
 
   parseExportResult(raw: string): ParseResult {
-    const warnings: ParseWarning[] = [];
-    const sensitiveItems: SensitiveItem[] = [];
-
-    let json: Record<string, unknown>;
+    // 先尝试 JSON 解析（兼容旧版或万一 AI 输出了 JSON）
     try {
       const cleaned = preprocessRawInput(raw);
-      json = JSON.parse(cleaned);
-    } catch (e) {
-      return {
-        success: false,
-        errors: [{
-          category: MigrationCategory.SETTINGS,
-          message: '无法解析粘贴的内容，请确保是完整的 JSON 格式',
-          suggestion: '请确保粘贴的是完整的 JSON 结果。常见问题：被 markdown 代码块包裹、多余文字前缀。',
-        }],
-        warnings: [],
-      };
+      const json = JSON.parse(cleaned);
+      return this.parseExportResultJson(json);
+    } catch {
+      // JSON 解析失败，走自然语言解析
+      return parseNaturalLanguage(raw, 'openclaw');
     }
+  },
+
+  parseExportResultJson(json: Record<string, unknown>): ParseResult {
+    const warnings: ParseWarning[] = [];
+    const sensitiveItems: SensitiveItem[] = [];
 
     const skills: SkillConfig[] = [];
     const automations: AutomationConfig[] = [];
@@ -213,7 +362,13 @@ export const openclawAdapter: PlatformAdapter = {
           config: (s.config as Record<string, unknown>) || {},
           enabled: s.enabled !== false,
           sensitivityLevel: hasSensitive ? SensitivityLevel.MUST_REMOVE : SensitivityLevel.SAFE,
-          originalFieldNames: { name: '技能名称', description: '技能描述', type: '技能类型', config: '配置详情', enabled: '是否启用' },
+          originalFieldNames: {
+            name: '技能名称',
+            description: '技能描述',
+            type: '技能类型',
+            config: '配置详情',
+            enabled: '是否启用',
+          },
         });
 
         if (hasSensitive) {
@@ -248,7 +403,15 @@ export const openclawAdapter: PlatformAdapter = {
           schedule: a.schedule ? String(a.schedule) : undefined,
           enabled: a.enabled !== false,
           sensitivityLevel: SensitivityLevel.SAFE,
-          originalFieldNames: { name: '工作流名称', description: '描述', type: '类型', trigger: '触发条件', actions: '动作列表', schedule: '定时规则', enabled: '是否启用' },
+          originalFieldNames: {
+            name: '工作流名称',
+            description: '描述',
+            type: '类型',
+            trigger: '触发条件',
+            actions: '动作列表',
+            schedule: '定时规则',
+            enabled: '是否启用',
+          },
         });
       });
     }
@@ -266,7 +429,14 @@ export const openclawAdapter: PlatformAdapter = {
           config: (m.config as Record<string, unknown>) || {},
           enabled: m.enabled !== false,
           sensitivityLevel: SensitivityLevel.MUST_REMOVE,
-          originalFieldNames: { name: 'MCP名称', server_url: '服务器地址', transport_type: '传输方式', tools: '工具列表', config: '配置', enabled: '是否启用' },
+          originalFieldNames: {
+            name: 'MCP名称',
+            server_url: '服务器地址',
+            transport_type: '传输方式',
+            tools: '工具列表',
+            config: '配置',
+            enabled: '是否启用',
+          },
         });
 
         sensitiveItems.push({
@@ -300,19 +470,26 @@ export const openclawAdapter: PlatformAdapter = {
       });
     }
 
-    // 解析设置 - 兼容新版 persona_description 和旧版 system_prompt
+    // 解析设置
     const rawSettings = json.settings as Record<string, unknown> | undefined;
     if (rawSettings) {
       settings = {
         model: rawSettings.model ? String(rawSettings.model) : undefined,
-        temperature: typeof rawSettings.temperature === 'number' ? rawSettings.temperature : undefined,
+        temperature:
+          typeof rawSettings.temperature === 'number' ? rawSettings.temperature : undefined,
         maxTokens: typeof rawSettings.max_tokens === 'number' ? rawSettings.max_tokens : undefined,
         language: rawSettings.language ? String(rawSettings.language) : undefined,
         systemPrompt: rawSettings.system_prompt ? String(rawSettings.system_prompt) : undefined,
-        personaDescription: rawSettings.persona_description ? String(rawSettings.persona_description) : undefined,
         customSettings: (rawSettings.custom_settings as Record<string, unknown>) || {},
         sensitivityLevel: SensitivityLevel.SAFE,
-        originalFieldNames: { model: '模型', temperature: '温度', max_tokens: '最大Token数', language: '语言', system_prompt: '系统提示词', persona_description: '人设描述', custom_settings: '自定义设置' },
+        originalFieldNames: {
+          model: '模型',
+          temperature: '温度',
+          max_tokens: '最大Token数',
+          language: '语言',
+          system_prompt: '系统提示词',
+          custom_settings: '自定义设置',
+        },
       };
     }
 
@@ -328,12 +505,25 @@ export const openclawAdapter: PlatformAdapter = {
           totalSize: k.total_size ? String(k.total_size) : undefined,
           sourceType: mapSourceType(String(k.source_type || 'upload')),
           sensitivityLevel: SensitivityLevel.REVIEW_SUGGESTED,
-          originalFieldNames: { name: '知识库名称', description: '描述', file_count: '文件数量', total_size: '总大小', source_type: '来源类型' },
+          originalFieldNames: {
+            name: '知识库名称',
+            description: '描述',
+            file_count: '文件数量',
+            total_size: '总大小',
+            source_type: '来源类型',
+          },
         });
       });
     }
 
-    const totalItems = skills.length + automations.length + mcpConnections.length + memories.length + prompts.length + knowledgeBases.length + (settings ? 1 : 0);
+    const totalItems =
+      skills.length +
+      automations.length +
+      mcpConnections.length +
+      memories.length +
+      prompts.length +
+      knowledgeBases.length +
+      (settings ? 1 : 0);
 
     const schema: UnifiedSchema = {
       version: '1.0.0',
@@ -359,17 +549,13 @@ export const openclawAdapter: PlatformAdapter = {
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 OpenClaw 中：\\n');
+    parts.push('我整理了一份智能体配置信息，请帮我按照以下内容设置：\n');
 
-    // 人设描述（来自新版导出）
-    if (configs.settings?.personaDescription && options.categories.includes(MigrationCategory.SETTINGS)) {
-      parts.push('## 人设/角色设定');
-      parts.push('请按照以下人设描述设置你的角色：');
-      parts.push(configs.settings.personaDescription);
-      parts.push('');
-    }
-
-    if (configs.prompts && configs.prompts.length > 0 && options.categories.includes(MigrationCategory.PROMPTS)) {
+    if (
+      configs.prompts &&
+      configs.prompts.length > 0 &&
+      options.categories.includes(MigrationCategory.PROMPTS)
+    ) {
       parts.push('## 提示词/角色设定');
       configs.prompts.forEach((p) => {
         if (p.sensitivityLevel === SensitivityLevel.MUST_REMOVE) return;
@@ -379,7 +565,11 @@ export const openclawAdapter: PlatformAdapter = {
       });
     }
 
-    if (configs.skills && configs.skills.length > 0 && options.categories.includes(MigrationCategory.SKILLS)) {
+    if (
+      configs.skills &&
+      configs.skills.length > 0 &&
+      options.categories.includes(MigrationCategory.SKILLS)
+    ) {
       parts.push('## 技能/插件');
       configs.skills.forEach((s) => {
         if (s.sensitivityLevel === SensitivityLevel.MUST_REMOVE) {
@@ -392,13 +582,18 @@ export const openclawAdapter: PlatformAdapter = {
           });
           return;
         }
-        parts.push(`- ${s.name}：${s.description || '无描述'}（类型：${s.type}，${s.enabled ? '启用' : '禁用'}）`);
+        parts.push(
+          `- ${s.name}：${s.description || '无描述'}（类型：${s.type}，${s.enabled ? '启用' : '禁用'}）`
+        );
       });
-      parts.push('⚠️ 注意：插件需要重新授权配置');
       parts.push('');
     }
 
-    if (configs.automations && configs.automations.length > 0 && options.categories.includes(MigrationCategory.AUTOMATIONS)) {
+    if (
+      configs.automations &&
+      configs.automations.length > 0 &&
+      options.categories.includes(MigrationCategory.AUTOMATIONS)
+    ) {
       parts.push('## 自动化工作流');
       configs.automations.forEach((a) => {
         parts.push(`- ${a.name}：${a.description || '无描述'}`);
@@ -409,7 +604,11 @@ export const openclawAdapter: PlatformAdapter = {
       parts.push('');
     }
 
-    if (configs.mcpConnections && configs.mcpConnections.length > 0 && options.categories.includes(MigrationCategory.MCP_CONNECTIONS)) {
+    if (
+      configs.mcpConnections &&
+      configs.mcpConnections.length > 0 &&
+      options.categories.includes(MigrationCategory.MCP_CONNECTIONS)
+    ) {
       parts.push('## MCP 连接');
       configs.mcpConnections.forEach((m) => {
         importWarnings.push({
@@ -425,7 +624,11 @@ export const openclawAdapter: PlatformAdapter = {
       parts.push('');
     }
 
-    if (configs.memories && configs.memories.length > 0 && options.categories.includes(MigrationCategory.MEMORIES)) {
+    if (
+      configs.memories &&
+      configs.memories.length > 0 &&
+      options.categories.includes(MigrationCategory.MEMORIES)
+    ) {
       parts.push('## 记忆');
       configs.memories.forEach((m) => {
         if (m.sensitivityLevel !== SensitivityLevel.MUST_REMOVE) {
@@ -446,12 +649,16 @@ export const openclawAdapter: PlatformAdapter = {
       parts.push('');
     }
 
-    if (configs.knowledgeBases && configs.knowledgeBases.length > 0 && options.categories.includes(MigrationCategory.KNOWLEDGE_BASES)) {
+    if (
+      configs.knowledgeBases &&
+      configs.knowledgeBases.length > 0 &&
+      options.categories.includes(MigrationCategory.KNOWLEDGE_BASES)
+    ) {
       parts.push('## 知识库');
       importWarnings.push({
         category: MigrationCategory.KNOWLEDGE_BASES,
         field: 'knowledge_bases',
-        originalValue: configs.knowledgeBases.map(k => k.name).join(', '),
+        originalValue: configs.knowledgeBases.map((k) => k.name).join(', '),
         reason: '知识库文件无法通过提示词迁移',
         alternative: '请手动创建知识库并上传文件',
       });
@@ -462,15 +669,16 @@ export const openclawAdapter: PlatformAdapter = {
     }
 
     if (importWarnings.length > 0) {
-      parts.push('\\n⚠️ 以下内容需要手动配置：');
+      parts.push('\n⚠️ 以下内容需要手动配置：');
       importWarnings.forEach((w) => {
         parts.push(`- ${w.field}：${w.reason}${w.alternative ? ` → ${w.alternative}` : ''}`);
       });
     }
 
     return {
-      prompt: parts.join('\\n'),
-      instructions: '1. 复制上方导入提示词\\n2. 打开 OpenClaw 平台\\n3. 进入你的 AI 助手\\n4. 粘贴提示词并发送\\n5. 按照提示逐步完成配置',
+      prompt: parts.join('\n'),
+      instructions:
+        '1. 复制上方导入提示词\n2. 打开 OpenClaw 平台\n3. 进入你的 AI 助手\n4. 粘贴提示词并发送\n5. 按照提示逐步完成配置',
       warnings: importWarnings.length > 0 ? importWarnings : undefined,
     };
   },
@@ -481,7 +689,13 @@ export const openclawAdapter: PlatformAdapter = {
         name: { unifiedField: 'name', displayName: '技能名称', type: 'string', required: true },
         description: { unifiedField: 'description', displayName: '技能描述', type: 'string', required: false },
         type: { unifiedField: 'type', displayName: '技能类型', type: 'string', required: true },
-        config: { unifiedField: 'config', displayName: '配置详情', type: 'object', required: true, sensitivityLevel: SensitivityLevel.REVIEW_SUGGESTED },
+        config: {
+          unifiedField: 'config',
+          displayName: '配置详情',
+          type: 'object',
+          required: true,
+          sensitivityLevel: SensitivityLevel.REVIEW_SUGGESTED,
+        },
         enabled: { unifiedField: 'enabled', displayName: '是否启用', type: 'boolean', required: false },
       },
       automations: {
@@ -498,7 +712,13 @@ export const openclawAdapter: PlatformAdapter = {
         server_url: { unifiedField: 'serverUrl', displayName: '服务器地址', type: 'string', required: false },
         transport_type: { unifiedField: 'transportType', displayName: '传输方式', type: 'string', required: false },
         tools: { unifiedField: 'tools', displayName: '工具列表', type: 'array', required: false },
-        config: { unifiedField: 'config', displayName: '配置', type: 'object', required: true, sensitivityLevel: SensitivityLevel.MUST_REMOVE },
+        config: {
+          unifiedField: 'config',
+          displayName: '配置',
+          type: 'object',
+          required: true,
+          sensitivityLevel: SensitivityLevel.MUST_REMOVE,
+        },
         enabled: { unifiedField: 'enabled', displayName: '是否启用', type: 'boolean', required: false },
       },
       memories: {
@@ -512,7 +732,6 @@ export const openclawAdapter: PlatformAdapter = {
         max_tokens: { unifiedField: 'maxTokens', displayName: '最大Token数', type: 'number', required: false },
         language: { unifiedField: 'language', displayName: '语言', type: 'string', required: false },
         system_prompt: { unifiedField: 'systemPrompt', displayName: '系统提示词', type: 'string', required: false },
-        persona_description: { unifiedField: 'personaDescription', displayName: '人设描述', type: 'string', required: false },
         custom_settings: { unifiedField: 'customSettings', displayName: '自定义设置', type: 'object', required: false },
       },
       prompts: {

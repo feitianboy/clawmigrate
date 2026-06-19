@@ -30,6 +30,159 @@ import {
   mapPromptType,
 } from '@/adapters/core/utils';
 
+// ===== 自然语言解析辅助函数 =====
+function extractListItems(text: string, keyword: string): string[] {
+  const regex = new RegExp(
+    `${keyword}[：:：]?\\s*([\\s\\S]*?)(?=\\n\\n|\\n(?:插件|工具|工作流|定时|MCP|外部|知识库|模型|记忆|设置|功能)|$)`,
+    'i'
+  );
+  const match = text.match(regex);
+  if (!match) return [];
+
+  const section = match[1];
+  return section
+    .split(/\n/)
+    .map((line) =>
+      line
+        .replace(/^[\d]+[.、）)]?\s*|^[-•·*]\s*/gm, '')
+        .trim()
+    )
+    .filter((line) => line.length > 1 && line.length < 500);
+}
+
+function parseNaturalLanguage(raw: string, sourcePlatform: string): ParseResult {
+  const errors: ParseError[] = [];
+  const warnings: ParseWarning[] = [];
+  const sensitiveItems: SensitiveItem[] = [];
+
+  const prompts: PromptConfig[] = [];
+  const mcpConnections: MCPConfig[] = [];
+  const memories: MemoryConfig[] = [];
+  let settings: SettingsConfig | undefined;
+
+  const text = raw.trim();
+
+  // 提取名称
+  const nameMatch = text.match(
+    /(?:我叫|我的名字是|我是|我叫做)\s*[：:]?\s*([^\s，。,.!?！？\n]{2,20})/
+  );
+  const botName = nameMatch ? nameMatch[1].trim() : '未命名助手';
+
+  // 提取功能描述
+  const firstPara = text.split(/\n\n/)[0] || text.slice(0, 200);
+  const botDescription = firstPara.slice(0, 200);
+
+  // 提取项目设定
+  const personaMatch = text.match(
+    /(?:项目设定|项目描述|角色|说话风格|性格|设定)[：:：]?\s*([\s\S]*?)(?=\n\n|\n(?:插件|工具|工作流|定时|MCP|外部|知识库|模型|记忆|设置|工具|功能)|$)/i
+  );
+  if (personaMatch) {
+    prompts.push({
+      id: 'prompt_0',
+      name: '设定描述',
+      content: personaMatch[1].trim().slice(0, 2000),
+      type: 'character',
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { content: '设定描述' },
+    });
+  }
+
+  // 提取工具/功能
+  const skillItems = extractListItems(text, '工具|功能|插件');
+  skillItems.forEach((item, i) => {
+    const parts = item.split(/[：:—–-]\s*/);
+    prompts.push({
+      id: `prompt_skill_${i}`,
+      name: parts[0].trim().slice(0, 50) || `功能 ${i + 1}`,
+      content: parts.slice(1).join('：').trim() || item,
+      type: 'character',
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { name: '功能名称', content: '功能描述' },
+    });
+  });
+
+  // 提取外部服务/MCP
+  const mcpItems = extractListItems(text, '外部服务|MCP|连接.*服务');
+  mcpItems.forEach((item, i) => {
+    const parts = item.split(/[：:—–-]\s*/);
+    mcpConnections.push({
+      id: `mcp_${i}`,
+      name: parts[0].trim().slice(0, 50) || `外部服务 ${i + 1}`,
+      transportType: undefined,
+      tools: [],
+      config: {},
+      enabled: true,
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { name: '服务名称', description: '描述' },
+    });
+  });
+
+  // 提取记忆
+  const memoryItems = extractListItems(text, '记忆|偏好|用户信息|知识');
+  memoryItems.forEach((item, i) => {
+    memories.push({
+      id: `memory_${i}`,
+      content: item,
+      type: 'fact',
+      tags: [],
+      sensitivityLevel: SensitivityLevel.SAFE,
+      originalFieldNames: { content: '记忆内容' },
+    });
+  });
+
+  // 提取设置
+  const modelMatch = text.match(/模型[：:：]?\s*([^\s，。,.！？\n]+)/i);
+  const tempMatch = text.match(/温度[：:：]?\s*([\d.]+)/i);
+
+  settings = {
+    model: modelMatch ? modelMatch[1].trim() : undefined,
+    temperature: tempMatch ? parseFloat(tempMatch[1]) : undefined,
+    customSettings: {},
+    sensitivityLevel: SensitivityLevel.SAFE,
+    originalFieldNames: { model: '模型', temperature: '温度' },
+  };
+
+  // 如果什么都没提取到
+  const totalItems = prompts.length + mcpConnections.length + memories.length + (settings ? 1 : 0);
+
+  if (totalItems === 0) {
+    return {
+      success: false,
+      errors: [
+        {
+          category: MigrationCategory.SETTINGS,
+          message: '未能从对话内容中识别出有效配置信息',
+          suggestion:
+            '请确保粘贴了AI的完整回复。如果AI回复内容较少，可以尝试追问更多细节后再粘贴。',
+        },
+      ],
+      warnings: [],
+    };
+  }
+
+  warnings.push({
+    category: MigrationCategory.SETTINGS,
+    field: 'all',
+    message: '本次解析基于自然语言对话内容，信息可能不完整，建议在迁移预览页面逐项核对',
+    sensitivityLevel: SensitivityLevel.SAFE,
+  });
+
+  const schema: UnifiedSchema = {
+    version: '1.0.0',
+    sourcePlatform,
+    exportTime: new Date().toISOString(),
+    configs: {
+      prompts: prompts.length > 0 ? prompts : undefined,
+      mcpConnections: mcpConnections.length > 0 ? mcpConnections : undefined,
+      memories: memories.length > 0 ? memories : undefined,
+      settings,
+    },
+    metadata: { totalItems, sensitiveItems, unsupportedItems: [] },
+  };
+
+  return { success: true, data: schema, errors, warnings };
+}
+
 export const kimiAdapter: PlatformAdapter = {
   id: 'kimi',
   name: 'Kimi',
@@ -53,87 +206,62 @@ export const kimiAdapter: PlatformAdapter = {
   ],
 
   generateExportPrompt(options: ExportOptions): ExportPromptResult {
-    const categories = options.categories.map((c) => {
-      const labels: Record<string, string> = {
-        skills: '自定义工具/插件',
-        automations: '自动化任务',
-        mcp_connections: 'MCP 服务器配置',
-        memories: 'Kimi+ 记忆和知识',
-        settings: '设置（模型偏好、语言等）',
-        prompts: '提示词和系统指令',
-        knowledge_bases: '知识库',
-      };
-      return labels[c] || c;
-    });
+    const categories = options.categories;
 
-    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
+    // 主提示词 — 对话式开头
+    const prompt = '你好！我想了解一下你的情况，方便我做个记录。能先简单介绍一下自己吗？';
 
-请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
+    // 根据选的类别生成追问
+    const followUpQuestions: string[] = [];
 
-\`\`\`json
-{
-  "prompts": [
-    {
-      "name": "提示词名称",
-      "content": "你的人设描述和回复规则",
-      "type": "system"
+    if (categories.includes(MigrationCategory.PROMPTS)) {
+      followUpQuestions.push('你有什么项目设定或角色描述吗？');
     }
-  ],
-  "mcp_servers": [
-    {
-      "name": "MCP服务器名称",
-      "transport_type": "stdio 或 sse 或 streamable-http",
-      "tools": ["可用工具列表"]
-    }
-  ],
-  "settings": {
-    "model": "默认模型名称（如 moonshot-v1-8k）",
-    "temperature": 0.7,
-    "language": "语言偏好",
-    "persona_description": "你的人设/角色描述（用你自己的话概括）"
-  },
-  "memories": [
-    {
-      "content": "记忆/知识内容",
-      "type": "fact 或 preference 或 instruction",
-      "tags": []
-    }
-  ]
-}
-\`\`\`
 
-说明：
-- 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
-- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息
-- 提示词用你的人设描述来概括即可，不需要完整原文`;
+    if (categories.includes(MigrationCategory.SKILLS)) {
+      followUpQuestions.push('你目前开启了哪些工具或功能？');
+    }
+
+    if (categories.includes(MigrationCategory.AUTOMATIONS)) {
+      followUpQuestions.push('你有什么自动化设定吗？');
+    }
+
+    if (categories.includes(MigrationCategory.MCP_CONNECTIONS)) {
+      followUpQuestions.push('你有连接什么外部服务吗？');
+    }
+
+    if (categories.includes(MigrationCategory.MEMORIES)) {
+      followUpQuestions.push('你记得关于用户的什么信息或偏好吗？');
+    }
+
+    if (categories.includes(MigrationCategory.SETTINGS)) {
+      followUpQuestions.push('你用的什么模型（默认 moonshot）？有没有什么特别的参数设置？');
+    }
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\\n2. 打开 Kimi 对话界面（kimi.moonshot.cn）\\n3. 在任意对话中粘贴提示词并发送\\n4. 复制 AI 返回的 JSON 结果\\n\\n💡 提示：MCP 配置也可以从 Kimi 的设置页面或配置文件中获取',
-      note: 'Kimi 的 MCP 配置通常存储在用户目录下。如果 AI 无法完整导出，建议用户手动检查配置文件。',
+      instructions: '1. 复制上方提示词\n2. 打开 Kimi 对话界面（kimi.moonshot.cn）\n3. 在任意对话中粘贴提示词并发送\n4. 等 AI 回复后，依次发送下方追问问题\n5. 把所有对话内容复制回来粘贴到解析框',
+      note: '每个问题单独发送，等 AI 回复后再发下一个。把所有回复拼在一起粘贴回来即可。',
+      followUpQuestions,
     };
   },
 
   parseExportResult(raw: string): ParseResult {
+    // 先尝试 JSON 解析（兼容旧版或万一 AI 输出了 JSON）
+    try {
+      const cleaned = preprocessRawInput(raw);
+      const json = JSON.parse(cleaned);
+      return this.parseExportResultJson(json);
+    } catch {
+      // JSON 解析失败，走自然语言解析
+      return parseNaturalLanguage(raw, 'kimi');
+    }
+  },
+
+  parseExportResultJson(json: Record<string, unknown>): ParseResult {
     const errors: ParseError[] = [];
     const warnings: ParseWarning[] = [];
     const sensitiveItems: SensitiveItem[] = [];
-
-    let json: Record<string, unknown>;
-    try {
-      const cleaned = preprocessRawInput(raw);
-      json = JSON.parse(cleaned);
-    } catch (e) {
-      return {
-        success: false,
-        errors: [{
-          category: MigrationCategory.SETTINGS,
-          message: '无法解析粘贴的内容，请确保是完整的 JSON 格式',
-          suggestion: '请确保粘贴的是完整的 JSON 结果。常见问题：被 markdown 代码块包裹、多余文字前缀。',
-        }],
-        warnings: [],
-      };
-    }
 
     const prompts: PromptConfig[] = [];
     const mcpConnections: MCPConfig[] = [];
@@ -185,11 +313,19 @@ export const kimiAdapter: PlatformAdapter = {
           config: configObj,
           enabled: true,
           sensitivityLevel: SensitivityLevel.MUST_REMOVE,
-          originalFieldNames: { name: '服务器名称', command: '启动命令', args: '参数', env: '环境变量', url: 'URL', transport_type: '传输方式', tools: '工具列表' },
+          originalFieldNames: {
+            name: '服务器名称',
+            command: '启动命令',
+            args: '参数',
+            env: '环境变量',
+            url: 'URL',
+            transport_type: '传输方式',
+            tools: '工具列表',
+          },
         };
 
-        if (m.env && Object.keys(m.env as object).length > 0) {
-          const envStr = JSON.stringify(m.env || {});
+        const envStr = JSON.stringify(m.env || {});
+        if (envStr !== '{}') {
           sensitiveItems.push({
             category: MigrationCategory.MCP_CONNECTIONS,
             field: `mcp_servers[${i}].env`,
@@ -244,20 +380,25 @@ export const kimiAdapter: PlatformAdapter = {
       });
     }
 
-    // 解析设置 - 兼容新版 persona_description 和旧版 system_prompt
+    // 解析设置
     const rawSettings = json.settings as Record<string, unknown> | undefined;
     if (rawSettings) {
       const sensitivity = detectSensitivity(rawSettings);
 
       settings = {
         model: rawSettings.model ? String(rawSettings.model) : undefined,
-        temperature: typeof rawSettings.temperature === 'number' ? rawSettings.temperature : undefined,
+        temperature:
+          typeof rawSettings.temperature === 'number' ? rawSettings.temperature : undefined,
         language: rawSettings.language ? String(rawSettings.language) : undefined,
         systemPrompt: undefined,
-        personaDescription: rawSettings.persona_description ? String(rawSettings.persona_description) : undefined,
         customSettings: (rawSettings.custom_settings as Record<string, unknown>) || {},
         sensitivityLevel: sensitivity,
-        originalFieldNames: { model: '模型', temperature: '温度', language: '语言', persona_description: '人设描述', custom_settings: '自定义设置' },
+        originalFieldNames: {
+          model: '模型',
+          temperature: '温度',
+          language: '语言',
+          custom_settings: '自定义设置',
+        },
       };
 
       if (sensitivity !== SensitivityLevel.SAFE) {
@@ -294,18 +435,14 @@ export const kimiAdapter: PlatformAdapter = {
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 Kimi 中：\\n');
-
-    // 人设描述（来自新版导出）
-    if (configs.settings?.personaDescription && options.categories.includes(MigrationCategory.SETTINGS)) {
-      parts.push('## 人设/角色设定');
-      parts.push('请按照以下人设描述设置你的角色：');
-      parts.push(configs.settings.personaDescription);
-      parts.push('');
-    }
+    parts.push('我整理了一份智能体配置信息，请帮我按照以下内容设置：\n');
 
     // 提示词
-    if (configs.prompts && configs.prompts.length > 0 && options.categories.includes(MigrationCategory.PROMPTS)) {
+    if (
+      configs.prompts &&
+      configs.prompts.length > 0 &&
+      options.categories.includes(MigrationCategory.PROMPTS)
+    ) {
       parts.push('## 提示词/系统指令');
       configs.prompts.forEach((p) => {
         if (p.sensitivityLevel === SensitivityLevel.MUST_REMOVE) return;
@@ -316,9 +453,13 @@ export const kimiAdapter: PlatformAdapter = {
     }
 
     // MCP 连接
-    if (configs.mcpConnections && configs.mcpConnections.length > 0 && options.categories.includes(MigrationCategory.MCP_CONNECTIONS)) {
+    if (
+      configs.mcpConnections &&
+      configs.mcpConnections.length > 0 &&
+      options.categories.includes(MigrationCategory.MCP_CONNECTIONS)
+    ) {
       parts.push('## MCP 服务器配置');
-      parts.push('请将以下配置添加到 Kimi 的 MCP 配置中：\\n');
+      parts.push('请将以下配置添加到 Kimi 的 MCP 配置中：\n');
       parts.push('```json');
       parts.push('{');
       parts.push('  "mcpServers": {');
@@ -335,17 +476,22 @@ export const kimiAdapter: PlatformAdapter = {
         if (m.config?.args) serverConfig.args = m.config.args;
         if (m.config?.env) serverConfig.env = '请手动填写环境变量';
         if (m.serverUrl) serverConfig.url = m.serverUrl;
-        parts.push(`    "${m.name}": ${JSON.stringify(serverConfig)}${i < configs.mcpConnections!.length - 1 ? ',' : ''}`);
+        parts.push(
+          `    "${m.name}": ${JSON.stringify(serverConfig)}${i < configs.mcpConnections!.length - 1 ? ',' : ''}`
+        );
       });
       parts.push('  }');
       parts.push('}');
       parts.push('```');
-      parts.push('⚠️ 注意：需要手动配置认证信息');
-      parts.push('\\n配置文件位置和具体配置方式请参考 Kimi 官方文档。\\n');
+      parts.push('\n配置文件位置和具体配置方式请参考 Kimi 官方文档。\n');
     }
 
     // 记忆
-    if (configs.memories && configs.memories.length > 0 && options.categories.includes(MigrationCategory.MEMORIES)) {
+    if (
+      configs.memories &&
+      configs.memories.length > 0 &&
+      options.categories.includes(MigrationCategory.MEMORIES)
+    ) {
       parts.push('## Kimi+ 记忆/知识');
       configs.memories.forEach((m) => {
         if (m.sensitivityLevel !== SensitivityLevel.MUST_REMOVE) {
@@ -373,8 +519,9 @@ export const kimiAdapter: PlatformAdapter = {
     }
 
     return {
-      prompt: parts.join('\\n'),
-      instructions: '1. 复制上方导入提示词\\n2. 打开 Kimi（kimi.moonshot.cn）\\n3. 按照提示完成配置\\n4. MCP 配置需要参考 Kimi 官方文档进行配置',
+      prompt: parts.join('\n'),
+      instructions:
+        '1. 复制上方导入提示词\n2. 打开 Kimi（kimi.moonshot.cn）\n3. 按照提示完成配置\n4. MCP 配置需要参考 Kimi 官方文档进行配置',
       warnings: importWarnings.length > 0 ? importWarnings : undefined,
     };
   },
@@ -384,28 +531,60 @@ export const kimiAdapter: PlatformAdapter = {
       prompts: {
         name: { unifiedField: 'name', displayName: '提示词名称', type: 'string', required: true },
         content: { unifiedField: 'content', displayName: '提示词内容', type: 'string', required: true },
-        type: { unifiedField: 'type', displayName: '提示词类型', type: 'string', required: true, description: 'system/character/template' },
+        type: {
+          unifiedField: 'type',
+          displayName: '提示词类型',
+          type: 'string',
+          required: true,
+          description: 'system/character/template',
+        },
       },
       mcp_connections: {
         name: { unifiedField: 'name', displayName: '服务器名称', type: 'string', required: true },
-        command: { unifiedField: 'config.command', displayName: '启动命令', type: 'string', required: false },
+        command: {
+          unifiedField: 'config.command',
+          displayName: '启动命令',
+          type: 'string',
+          required: false,
+        },
         args: { unifiedField: 'config.args', displayName: '参数', type: 'array', required: false },
-        env: { unifiedField: 'config.env', displayName: '环境变量', type: 'object', required: false, sensitivityLevel: SensitivityLevel.MUST_REMOVE },
+        env: {
+          unifiedField: 'config.env',
+          displayName: '环境变量',
+          type: 'object',
+          required: false,
+          sensitivityLevel: SensitivityLevel.MUST_REMOVE,
+        },
         url: { unifiedField: 'serverUrl', displayName: 'URL', type: 'string', required: false },
-        transport_type: { unifiedField: 'transportType', displayName: '传输方式', type: 'string', required: false },
+        transport_type: {
+          unifiedField: 'transportType',
+          displayName: '传输方式',
+          type: 'string',
+          required: false,
+        },
         tools: { unifiedField: 'tools', displayName: '工具列表', type: 'array', required: false },
       },
       memories: {
         content: { unifiedField: 'content', displayName: '记忆内容', type: 'string', required: true },
-        type: { unifiedField: 'type', displayName: '类型', type: 'string', required: true, description: 'fact/preference/instruction' },
+        type: {
+          unifiedField: 'type',
+          displayName: '类型',
+          type: 'string',
+          required: true,
+          description: 'fact/preference/instruction',
+        },
         tags: { unifiedField: 'tags', displayName: '标签', type: 'array', required: false },
       },
       settings: {
         model: { unifiedField: 'model', displayName: '模型', type: 'string', required: false },
         temperature: { unifiedField: 'temperature', displayName: '温度', type: 'number', required: false },
         language: { unifiedField: 'language', displayName: '语言', type: 'string', required: false },
-        persona_description: { unifiedField: 'personaDescription', displayName: '人设描述', type: 'string', required: false },
-        custom_settings: { unifiedField: 'customSettings', displayName: '自定义设置', type: 'object', required: false },
+        custom_settings: {
+          unifiedField: 'customSettings',
+          displayName: '自定义设置',
+          type: 'object',
+          required: false,
+        },
       },
     };
   },

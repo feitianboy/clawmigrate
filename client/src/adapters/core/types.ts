@@ -38,6 +38,7 @@ export interface ExportPromptResult {
   prompt: string;
   instructions: string;
   note?: string;
+  followUpQuestions?: string[];
 }
 
 export interface ParseError {
@@ -156,7 +157,6 @@ export interface MemoryConfig {
 }
 
 export interface SettingsConfig {
-  personaDescription?: string;
   language?: string;
   model?: string;
   temperature?: number;
