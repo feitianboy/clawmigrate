@@ -282,9 +282,15 @@ export const HomePage: React.FC = () => {
           安全、快速地迁移技能、自动化、记忆和设置。
         </p>
         <div className="cta-section" style={styles.ctaSection}>
-          <Link
-            to="/migrate"
+          <button
             style={styles.primaryBtn}
+            onClick={() => {
+              if (!isAuthenticated) {
+                navigate('/login');
+              } else {
+                navigate('/migrate');
+              }
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-2px)';
               e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
@@ -296,7 +302,7 @@ export const HomePage: React.FC = () => {
           >
             开始迁移
             <ArrowRight size={20} />
-          </Link>
+          </button>
         </div>
       </section>
 
