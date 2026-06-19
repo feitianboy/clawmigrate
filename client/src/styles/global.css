@@ -225,6 +225,10 @@ pre {
 /* viewport meta已在index.html中设置 */
 
 /* 移动端通用调整 */
+.mobile-menu-btn {
+  display: none;
+}
+
 @media (max-width: 768px) {
   /* 导航栏：隐藏桌面导航，显示汉堡按钮 */
   .desktop-nav {

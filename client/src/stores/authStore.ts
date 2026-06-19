@@ -165,8 +165,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return true;
     } catch (error) {
       console.error('Check auth error:', error);
-      set({ isAuthenticated: false, user: null, isLoading: false });
-      return false;
+      // 网络错误时不清除认证状态，保持已登录
+      const { isAuthenticated } = get();
+      set({ isLoading: false });
+      return isAuthenticated;
     }
   },
 

@@ -181,8 +181,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Check auth status on mount
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    if (!isAuthenticated) {
+      checkAuth();
+    }
+  }, [checkAuth, isAuthenticated]);
 
   const handleLogout = async () => {
     await logout();
