@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { count: paidUsers } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true })
-      .neq('tier', 'free');
+      .neq('membership_tier', 'free');
     
     // 获取本月收入
     const now = new Date();
@@ -176,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const { data, count } = await supabase
       .from('users')
-      .select('id, username, email, role, tier, created_at', { count: 'exact' })
+      .select('id, username, email, role, membership_tier, created_at', { count: 'exact' })
       .order('id')
       .range(offset, offset + limit - 1);
     
@@ -194,7 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const userId = req.query.userId as string;
     const { data } = await supabase
       .from('users')
-      .select('id, username, email, role, tier, created_at')
+      .select('id, username, email, role, membership_tier, created_at')
       .eq('id', userId)
       .single();
     

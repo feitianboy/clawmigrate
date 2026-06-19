@@ -92,7 +92,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
 
     // Set HttpOnly Cookie with token
-    res.setHeader('Set-Cookie', `auth_token=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${TOKEN_EXPIRY}`);
+    const isSecure = req.headers['x-forwarded-proto'] === 'https';
+    const cookieFlags = [
+      'HttpOnly',
+      'SameSite=Lax',
+      'Path=/',
+      `Max-Age=${TOKEN_EXPIRY}`,
+      isSecure ? 'Secure' : '',
+    ].filter(Boolean).join('; ');
+    res.setHeader('Set-Cookie', `auth_token=${token}; ${cookieFlags}`);
 
     return res.status(201).json({
       ok: true,

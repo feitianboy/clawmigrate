@@ -194,12 +194,14 @@ export const LoginPage: React.FC = () => {
     }
 
     try {
-      if (mode === 'login') {
-        await login(username, password);
+      const result = mode === 'login'
+        ? await login(username, password)
+        : await register(username, email, password);
+      if (result) {
+        navigate('/');
       } else {
-        await register(username, email, password);
+        setError(useAuthStore.getState().error || '操作失败，请重试');
       }
-      navigate('/');
     } catch (err: any) {
       setError(err.message || '操作失败，请稍后重试');
     }

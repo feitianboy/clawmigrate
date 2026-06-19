@@ -11,9 +11,10 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
   },
   header: {
+    width: '100%',
     background: 'var(--color-bg-secondary)',
     borderBottom: '1px solid var(--color-border)',
-    position: 'sticky',
+    position: 'fixed',
     top: 0,
     zIndex: 100,
   },
@@ -120,6 +121,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '0.875rem',
   },
   main: {
+    paddingTop: '64px',
     flex: 1,
     padding: 'var(--space-8) var(--space-6)',
     maxWidth: '1200px',
