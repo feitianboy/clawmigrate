@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { Home, ArrowRightLeft, LogOut, Menu, X, Zap, Settings, History } from 'lucide-react';
@@ -180,16 +180,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
-  // Check auth status on mount
+  // Dropdown click-outside ref
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside detection for dropdown
   useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
-      checkAuth();
-    }
-  }, [checkAuth, isAuthenticated, isLoading]);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Check auth status on mount - always call checkAuth to ensure planInfo is loaded
+  useEffect(() => {
+    checkAuth();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
     await logout();
     setDropdownOpen(false);
+    navigate('/');
   };
 
   const getInitials = (name: string) => {
@@ -272,7 +285,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             
             {/* 套餐状态提示 */}
             {isAuthenticated && planInfo && !isPro() && planInfo.usage && (
-              <span style={styles.usageTag} className="usage-tag">
+              <span style={styles.usageTag} className="usage-tag"
+              >
                 免费版 · 剩余 {getRemainingUsage()} 次
               </span>
             )}
@@ -291,35 +305,35 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>加载中...</span>
             ) : isAuthenticated ? (
               <>
-              <div style={{ position: 'relative' }}>
-                <button
-                  style={styles.userButton}
-                  onClick={() => setDropdownOpen(!dropdownOpen)}
-                  onBlur={() => setTimeout(() => setDropdownOpen(false), 200)}
-                >
-                  <div style={styles.avatar}>
-                    {user ? getInitials(user.username) : 'U'}
-                  </div>
-                  <span style={{ fontSize: '0.875rem' }}>{user?.username}</span>
-                </button>
-                {dropdownOpen && (
-                  <div style={styles.dropdown}>
-                    <button style={styles.dropdownItem} onClick={() => { navigate('/settings'); setDropdownOpen(false); }}>
-                      <Settings size={18} />
-                      个人设置
-                    </button>
-                    <button style={styles.dropdownItem} onClick={() => { navigate('/history'); setDropdownOpen(false); }}>
-                      <History size={18} />
-                      迁移历史
-                    </button>
-                    <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
-                    <button style={styles.dropdownItem} onClick={handleLogout}>
-                      <LogOut size={18} />
-                      退出登录
-                    </button>
-                  </div>
-                )}
-              </div>
+                {/* Fix 1: Use dropdownRef for click-outside detection */}
+                <div ref={dropdownRef} style={{ position: 'relative' }}>
+                  <button
+                    style={styles.userButton}
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                  >
+                    <div style={styles.avatar}>
+                      {user ? getInitials(user.username) : 'U'}
+                    </div>
+                    <span style={{ fontSize: '0.875rem' }}>{user?.username}</span>
+                  </button>
+                  {dropdownOpen && (
+                    <div style={styles.dropdown}>
+                      <button style={styles.dropdownItem} onClick={() => { navigate('/settings'); setDropdownOpen(false); }}>
+                        <Settings size={18} />
+                        个人设置
+                      </button>
+                      <button style={styles.dropdownItem} onClick={() => { navigate('/history'); setDropdownOpen(false); }}>
+                        <History size={18} />
+                        迁移历史
+                      </button>
+                      <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                      <button style={styles.dropdownItem} onClick={handleLogout}>
+                        <LogOut size={18} />
+                        退出登录
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <Link to="/login" className="btn btn-primary">
@@ -370,6 +384,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               );
             })}
+            {/* Fix 3: Add settings/history/logout for mobile menu when authenticated */}
+            {isAuthenticated && (
+              <>
+                <Link to="/settings" style={{ ...styles.navLink, borderTop: '1px solid var(--color-border)', marginTop: 'var(--space-2)', paddingTop: 'var(--space-3)' }} onClick={() => setMobileMenuOpen(false)}>
+                  <Settings size={18} />
+                  个人设置
+                </Link>
+                <Link to="/history" style={styles.navLink} onClick={() => setMobileMenuOpen(false)}>
+                  <History size={18} />
+                  迁移历史
+                </Link>
+                <button style={{ ...styles.navLink, background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }} onClick={() => { handleLogout(); setMobileMenuOpen(false); }}>
+                  <LogOut size={18} />
+                  退出登录
+                </button>
+              </>
+            )}
             {/* 套餐状态 - 移动端 */}
             {isAuthenticated && (
               <div style={{

@@ -476,7 +476,7 @@ const MigrationPage: React.FC = () => {
     reset,
   } = useMigrationStore();
 
-  const { isAuthenticated, isPro, fetchPlanInfo } = useAuthStore();
+  const { isAuthenticated, isPro, fetchPlanInfo, isLoading } = useAuthStore();
 
   // 页面挂载时强制重置步骤，防止 zustand persist 恢复旧状态导致步骤错位
   useEffect(() => {
@@ -537,6 +537,10 @@ const MigrationPage: React.FC = () => {
   useEffect(() => {
     const checkAccess = async () => {
       setAccessChecking(true);
+      // Wait for auth state to be restored
+      if (isLoading) {
+        return;
+      }
       // 未登录用户直接跳转登录页
       if (!isAuthenticated) {
         navigate('/login');
@@ -570,7 +574,7 @@ const MigrationPage: React.FC = () => {
       setAccessChecking(false);
     };
     checkAccess();
-  }, [isAuthenticated, isPro, fetchPlanInfo, navigate]);
+  }, [isAuthenticated, isPro, fetchPlanInfo, navigate, isLoading]);
 
   // 步骤指示器
   const renderStepIndicator = () => {
