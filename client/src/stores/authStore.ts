@@ -284,23 +284,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   canMigrate: async (): Promise<{ allowed: boolean; reason?: string }> => {
     const { isAuthenticated, isPro } = get();
 
-    // 未登录用户检查本地迁移次数
+    // 未登录用户直接拦截
     if (!isAuthenticated) {
-      const guestCount = (() => {
-        try {
-          const raw = localStorage.getItem('clawmigrate_guest_migrations');
-          return raw ? parseInt(raw, 10) || 0 : 0;
-        } catch {
-          return 0;
-        }
-      })();
-      if (guestCount >= 2) {
-        return { allowed: false, reason: '游客迁移次数已用完，注册后享更多次数' };
-      }
-      return { allowed: true };
+      return { allowed: false, reason: '请先登录' };
     }
 
-    // Pro/企业版直接通过
+    // Pro用户直接通过
     if (isPro()) {
       return { allowed: true };
     }

@@ -24,7 +24,7 @@ import {
   Zap,
   Crown,
 } from 'lucide-react';
-import { UsageGuard, incrementGuestMigrationCount, getGuestMigrationCount } from '../components/UsageGuard';
+import { UsageGuard } from '../components/UsageGuard';
 import { ItemLimitToast } from '../components/ItemLimitToast';
 import { UpgradeModal } from '../components/UpgradeModal';
 
@@ -520,8 +520,7 @@ const MigrationPage: React.FC = () => {
           }),
         }).catch(err => console.error('记录迁移失败:', err));
       } else {
-        // 未登录用户在真正完成迁移时递增计数
-        incrementGuestMigrationCount();
+        
       }
     }
   }, [currentStep, sourcePlatform, targetPlatform, parsedSchema, migrationRecorded, isAuthenticated, selectedCategories]);
@@ -529,15 +528,8 @@ const MigrationPage: React.FC = () => {
   // Bug 4: 入口权限检查 - 在页面挂载时检查用户是否有权限访问迁移页面
   useEffect(() => {
     const checkAccess = async () => {
-      // 未登录用户检查本地次数
-      if (!isAuthenticated) {
-        const guestCount = getGuestMigrationCount();
-        if (guestCount >= 2) {
-          setAccessDenied(true);
-          setDenyReason('guest-limit');
-          return;
-        }
-      }
+      // 未登录用户访问会被 UsageGuard 拦截到这里
+      // 此处不需要额外检查
       // 已登录的非Pro用户调用API检查
       if (isAuthenticated && !isPro()) {
         try {

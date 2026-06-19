@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Zap, Shield, Clock, BookOpen, MessageSquare, Database, Sparkles } from 'lucide-react';
 import { UpgradeModal } from '../components/UpgradeModal';
@@ -263,6 +264,8 @@ const steps = [
 ];
 
 export const HomePage: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
 
   return (
     <div>

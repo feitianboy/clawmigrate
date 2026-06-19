@@ -103,11 +103,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 获取会员分布
     const { data: tierData } = await supabase
       .from('users')
-      .select('tier');
+      .select('membership_tier');
     
     const tierCount: Record<string, number> = { free: 0, pro: 0 };
     tierData?.forEach(u => {
-      const tier = u.tier || 'free';
+      const tier = u.membership_tier || 'free';
       tierCount[tier] = (tierCount[tier] || 0) + 1;
     });
     
