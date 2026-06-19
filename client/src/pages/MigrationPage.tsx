@@ -476,7 +476,7 @@ const MigrationPage: React.FC = () => {
     reset,
   } = useMigrationStore();
 
-  const { isAuthenticated, isPro } = useAuthStore();
+  const { isAuthenticated, isPro, fetchPlanInfo } = useAuthStore();
 
   // 页面挂载时强制重置步骤，防止 zustand persist 恢复旧状态导致步骤错位
   useEffect(() => {
