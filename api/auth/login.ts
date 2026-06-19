@@ -28,21 +28,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, error: 'Username and password are required' });
     }
 
-    // Find user by username
+    // Find user by username or email
     const { data: user } = await supabase
       .from('users')
       .select('id, username, email, role, password_hash')
-      .eq('username', username)
+      .or(`username.eq.${username},email.eq.${username}`)
       .single();
 
     if (!user) {
-      return res.status(401).json({ ok: false, error: 'Invalid username or password' });
+      return res.status(401).json({ ok: false, error: '用户名或密码错误' });
     }
 
     // Verify password
     const isValidPassword = bcrypt.compareSync(password, user.password_hash);
     if (!isValidPassword) {
-      return res.status(401).json({ ok: false, error: 'Invalid username or password' });
+      return res.status(401).json({ ok: false, error: '用户名或密码错误' });
     }
 
     await logActivity(user.id, 'login', { username: user.username }, req.headers['x-forwarded-for'] || req.ip);

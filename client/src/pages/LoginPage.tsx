@@ -172,7 +172,9 @@ export const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,6 +192,23 @@ export const LoginPage: React.FC = () => {
 
     if (password.length < 6) {
       setError('密码至少需要6个字符');
+      return;
+    }
+
+    // 密码强度校验
+    if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(password)) {
+      setError('密码必须包含字母和数字');
+      return;
+    }
+
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('两次输入的密码不一致');
+      return;
+    }
+
+    // 确认密码校验
+    if (password !== confirmPassword) {
+      setError('两次输入的密码不一致');
       return;
     }
 
@@ -246,7 +265,7 @@ export const LoginPage: React.FC = () => {
               <User size={18} style={styles.inputIcon} />
               <input
                 type="text"
-                placeholder="用户名"
+                placeholder="用户名或邮箱"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 style={styles.input}
@@ -278,6 +297,19 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {error && <div style={styles.error}>{error}</div>}
+
+            {mode === 'register' && (
+              <div style={styles.inputGroup}>
+                <Lock size={18} style={styles.inputIcon} />
+                <input
+                  style={styles.input}
+                  type="password"
+                  placeholder="确认密码"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            )}
 
             <button
               type="submit"

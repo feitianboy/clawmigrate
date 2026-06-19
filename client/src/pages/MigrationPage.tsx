@@ -490,6 +490,7 @@ const MigrationPage: React.FC = () => {
   const [itemLimitToastData, setItemLimitToastData] = useState({ current: 0, limit: FREE_TIER_ITEM_LIMIT });
   // 入口权限检查状态
   const [accessDenied, setAccessDenied] = useState(false);
+  const [accessChecking, setAccessChecking] = useState(true);
   const [denyReason, setDenyReason] = useState<'guest-limit' | 'free-limit' | null>(null);
   // 导出步骤状态
   const [migrationRecorded, setMigrationRecorded] = useState(false);
@@ -535,8 +536,9 @@ const MigrationPage: React.FC = () => {
   // Bug 4: 入口权限检查 - 在页面挂载时检查用户是否有权限访问迁移页面
   useEffect(() => {
     const checkAccess = async () => {
+      setAccessChecking(true);
       // 未登录用户访问会被 UsageGuard 拦截到这里
-      // 此处不需要额外检查
+      setAccessChecking(false);
       // 已登录的非Pro用户调用API检查
       if (isAuthenticated && !isPro()) {
         try {
@@ -1335,8 +1337,32 @@ const MigrationPage: React.FC = () => {
         <p style={styles.subtitle}>按照引导完成跨平台配置迁移</p>
       </div>
 
+      {/* 加载中状态 */}
+      {accessChecking && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--space-12)',
+          color: 'var(--color-text-secondary)',
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid var(--color-border)',
+            borderTopColor: 'var(--color-primary)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            marginBottom: 'var(--space-4)',
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p>正在检查迁移权限...</p>
+        </div>
+      )}
+
       {/* Bug 4: 入口权限被拒绝时显示引导卡片 */}
-      {accessDenied && (
+      {!accessChecking && accessDenied && (
         <div style={{
           padding: 'var(--space-8)',
           background: 'var(--color-bg-secondary)',
@@ -1400,7 +1426,7 @@ const MigrationPage: React.FC = () => {
         </div>
       )}
 
-      {!accessDenied && (
+      {!accessChecking && !accessDenied && (
         <>
           {currentStep !== 'complete' && renderStepIndicator()}
           {renderContent()}

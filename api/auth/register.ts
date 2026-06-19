@@ -34,7 +34,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ ok: false, error: 'Password must be at least 6 characters' });
+      return res.status(400).json({ ok: false, error: '密码至少需要6个字符' });
+    }
+
+    // 密码强度校验：必须包含字母和数字
+    if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(password)) {
+      return res.status(400).json({ ok: false, error: '密码必须包含字母和数字' });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
