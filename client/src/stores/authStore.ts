@@ -197,7 +197,13 @@ export const useAuthStore = create<AuthState>()(
       set((state) => ({
         user: state.user ? { ...state.user, ...result.data } : null,
         isLoading: false,
-      }));
+      }),
+      {
+        name: 'clawmigrate-auth',
+        partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      }
+    )
+  );
       return true;
     } catch (error) {
       console.error('Update profile error:', error);
@@ -264,7 +270,13 @@ export const useAuthStore = create<AuthState>()(
             membershipTier: result.data.tier,
             membershipExpireAt: result.data.expireAt,
           } : null,
-        }));
+        }),
+      {
+        name: 'clawmigrate-auth',
+        partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      }
+    )
+  );
       }
     } catch (error) {
       console.error('获取套餐信息失败:', error);
@@ -324,4 +336,10 @@ export const useAuthStore = create<AuthState>()(
       return { allowed: true }; // 网络错误时允许继续
     }
   },
-}));
+}),
+      {
+        name: 'clawmigrate-auth',
+        partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      }
+    )
+  );

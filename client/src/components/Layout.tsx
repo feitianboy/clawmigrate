@@ -231,6 +231,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Link
                   key={item.path}
                   to={item.path}
+                  onClick={(e) => {
+                    if (item.requireAuth && !isAuthenticated) {
+                      e.preventDefault();
+                      navigate('/login');
+                    }
+                  }}
                   style={{
                     ...styles.navLink,
                     ...(isActive ? styles.navLinkActive : {}),
@@ -349,7 +355,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     ...styles.navLink,
                     ...(isActive ? styles.navLinkActive : {}),
                   }}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={(e) => {
+                    if (item.requireAuth && !isAuthenticated) {
+                      e.preventDefault();
+                      navigate('/login');
+                      setMobileMenuOpen(false);
+                    } else {
+                      setMobileMenuOpen(false);
+                    }
+                  }}
                 >
                   <Icon size={18} />
                   {item.label}
