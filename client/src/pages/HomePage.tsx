@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { ArrowRight, Zap, Shield, Clock, BookOpen, MessageSquare, Database, Sparkles } from 'lucide-react';
 import { UpgradeModal } from '../components/UpgradeModal';
 import { useState } from 'react';
