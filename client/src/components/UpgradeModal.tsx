@@ -21,6 +21,13 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const [selectedPlan, setSelectedPlan] = useState<'pro_monthly' | 'pro_yearly'>('pro_monthly');
   const [loading, setLoading] = useState(false);
   const [trialLoading, setTrialLoading] = useState(false);
+  const [selectedPayMethod, setSelectedPayMethod] = useState<'wechat' | 'alipay'>('alipay');
+  const [notification, setNotification] = useState<{type: 'success' | 'error'; message: string} | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 4000);
+  };
   const [isFirstPurchase, setIsFirstPurchase] = useState(false);
   const [discountPrice, setDiscountPrice] = useState<{ monthly: number; yearly: number } | null>(null);
   const { isAuthenticated } = useAuthStore();
@@ -58,7 +65,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         credentials: 'include',
         body: JSON.stringify({ 
           planId: selectedPlan,
-          payMethod: 'alipay' 
+          payMethod: selectedPayMethod 
         }),
       });
       
@@ -66,11 +73,11 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       
       if (result.ok) {
         const discountNote = result.data.isFirstDiscount ? `\n🎉 首单8折优惠已自动应用！` : '';
-        alert(`订单创建成功！订单号: ${result.data.orderId}\n应付金额: ¥${result.data.amount}${discountNote}\n请完成支付后刷新页面`);
+        showNotification('success', `订单创建成功！订单号: ${result.data.orderId}，应付金额: ¥${result.data.amount}${discountNote}，请完成支付后刷新页面`);
         onClose();
         window.location.reload();
       } else {
-        alert(result.error || '创建订单失败，请稍后重试');
+        showNotification('error', result.error || '创建订单失败，请稍后重试');
       }
     } catch (error) {
       console.error('升级失败:', error);
@@ -91,11 +98,11 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       const result = await response.json();
       
       if (result.ok) {
-        alert('🎉 7天Pro试用已开通！到期后可继续购买。');
+        showNotification('success', '🎉 7天Pro试用已开通！到期后可继续购买。');
         onClose();
         window.location.reload();
       } else {
-        alert(result.error || '开通试用失败');
+        showNotification('error', result.error || '开通试用失败');
       }
     } catch (error) {
       console.error('开通试用失败:', error);
@@ -319,6 +326,26 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
 
   return (
     <div style={styles.overlay} onClick={onClose}>
+        {/* 通知提示 */}
+        {notification && (
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            padding: '12px 24px',
+            borderRadius: '8px',
+            background: notification.type === 'success' ? '#10b981' : '#ef4444',
+            color: 'white',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            animation: 'fadeIn 0.3s ease',
+          }}>
+            {notification.message}
+          </div>
+        )}
       <div style={styles.modal} onClick={e => e.stopPropagation()}>
         <div style={styles.header}>
           <button 

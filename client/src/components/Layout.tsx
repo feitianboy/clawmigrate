@@ -134,7 +134,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '0.875rem',
   },
   mobileMenuBtn: {
-    display: 'none',
     background: 'transparent',
     border: 'none',
     color: 'var(--color-text)',

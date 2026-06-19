@@ -109,8 +109,8 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
         }
       } catch (error) {
         console.error('检查迁移权限失败:', error);
-        // 网络错误时允许继续
-        setCanUse(true);
+        // 网络错误时拒绝迁移，防止断网绕过次数限制
+        setCanUse(false);
       }
       
       setChecking(false);
@@ -145,8 +145,8 @@ export const UsageGuard: React.FC<UsageGuardProps> = ({
       setCanUse(true);
     } catch (error) {
       console.error('检查迁移次数失败:', error);
-      // 网络错误时允许继续
-      setCanUse(true);
+      // 网络错误时拒绝迁移，防止断网绕过次数限制
+      setCanUse(false);
     }
     
     setChecking(false);

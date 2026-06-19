@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../stores/adminStore';
 import {
@@ -753,25 +753,29 @@ const TierPieChart: React.FC<{
   );
 };
 
-// 迁移趋势折线图（模拟数据）
+// 迁移趋势折线图（真实数据）
 const MigrationTrendChart: React.FC = () => {
-  // 模拟最近7天的数据
-  const generateTrendData = () => {
-    const data = [];
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      data.push({
-        date: `${date.getMonth() + 1}/${date.getDate()}`,
-        migrations: Math.floor(Math.random() * 50) + 20,
-        success: Math.floor(Math.random() * 40) + 15,
-      });
-    }
-    return data;
-  };
+  const [data, setData] = useState<{date: string; migrations: number; success: number}[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const data = generateTrendData();
+  useEffect(() => {
+    const fetchTrend = async () => {
+      try {
+        const res = await fetch('/api/admin/trend?days=7', {
+          headers: { 'x-admin-password': localStorage.getItem('clawmigrate_admin_pwd') || '' }
+        });
+        const result = await res.json();
+        if (result.ok && result.data) {
+          setData(result.data);
+        }
+      } catch (err) {
+        console.error('获取趋势数据失败:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTrend();
+  }, []);
 
   return (
     <div style={{ ...styles.chartCard, gridColumn: '1 / -1' }}>
@@ -975,7 +979,7 @@ export const AdminPage: React.FC = () => {
         <div style={styles.headerLeft}>
           <div>
             <h1 style={styles.title}>数据看板</h1>
-            <p style={styles.subtitle}>实时监控业务数据</p>
+            <p style={styles.subtitle}>业务数据概览</p>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>

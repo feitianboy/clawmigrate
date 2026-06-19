@@ -72,3 +72,22 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* 响应式布局 */
+.desktop-nav {
+  display: flex;
+}
+
+.mobile-menu-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .desktop-nav {
+    display: none !important;
+  }
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+}

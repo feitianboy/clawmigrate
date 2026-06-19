@@ -7,12 +7,12 @@ interface User {
   phone?: string;
   role: 'user' | 'admin';
   avatar?: string;
-  membershipTier?: 'free' | 'pro' | 'enterprise';
+  membershipTier?: 'free' | 'pro';
   membershipExpireAt?: string | null;
 }
 
 interface PlanInfo {
-  tier: 'free' | 'pro' | 'enterprise';
+  tier: 'free' | 'pro';
   tierName: string;
   expireAt: string | null;
   isExpired: boolean;
@@ -270,7 +270,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     
     // 检查tier
     const tier = planInfo.tier || user.membershipTier;
-    if (tier !== 'pro' && tier !== 'enterprise') return false;
+    if (tier !== 'pro') return false;
     
     // 检查是否过期
     if (planInfo.expireAt) {

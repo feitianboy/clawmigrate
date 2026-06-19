@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Zap, Shield, Clock, BookOpen, MessageSquare, Database, Sparkles } from 'lucide-react';
-import { AuthModal } from '../components/AuthModal';
 import { UpgradeModal } from '../components/UpgradeModal';
 import { useState } from 'react';
 
@@ -264,7 +263,6 @@ const steps = [
 ];
 
 export const HomePage: React.FC = () => {
-  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   return (
     <div>

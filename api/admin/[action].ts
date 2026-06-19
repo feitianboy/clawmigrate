@@ -137,10 +137,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       platformDistribution,
       tierDistribution,
       monthlyRevenue,
-      todayPV: Math.floor(Math.random() * 500) + 100,
-      todayUV: Math.floor(Math.random() * 200) + 50,
+      todayPV: 0,
+      todayUV: 0,  // TODO: 接入PV/UV统计后替换
       conversionRate: ((paidUsers || 0) / (userCount || 1) * 100).toFixed(1),
     });
+  }
+
+
+  // Trend action - daily migration counts for last 7 days
+  if (action === 'trend' && req.method === 'GET') {
+    const days = parseInt(req.query.days as string) || 7;
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
+      const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).toISOString();
+      
+      const [{ count: totalCount }, { count: successCount }] = await Promise.all([
+        supabase.from('migrations').select('*', { count: 'exact', head: true }).gte('created_at', dayStart).lt('created_at', dayEnd),
+        supabase.from('migrations').select('*', { count: 'exact', head: true }).eq('status', 'success').gte('created_at', dayStart).lt('created_at', dayEnd),
+      ]);
+      
+      result.push({
+        date: `${date.getMonth() + 1}/${date.getDate()}`,
+        migrations: totalCount || 0,
+        success: successCount || 0,
+      });
+    }
+    return res.json({ ok: true, data: result });
   }
 
   // Users list action
