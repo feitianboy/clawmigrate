@@ -15,9 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   switch (action) {
     case 'me':
       return handleMe(req, res);
-    case 'trial':
-      return handleTrial(req, res);
-    case 'checkout':
+        case 'checkout':
       return handleCheckout(req, res);
     default:
       return res.status(404).json({ ok: false, error: '未知的操作' });
@@ -35,7 +33,6 @@ const TIER_BENEFITS: Record<string, string[]> = {
 };
 
 // 首单折扣比例
-const FIRST_ORDER_DISCOUNT = 0.8;
 
 // GET /api/plan/me — 获取当前用户套餐信息
 async function handleMe(req: VercelRequest, res: VercelResponse) {
@@ -77,7 +74,7 @@ async function handleMe(req: VercelRequest, res: VercelResponse) {
 
     // 计算折扣价
     const discountPrice = isFirstPurchase
-      ? { monthly: +(PLAN_PRICES.pro_monthly * FIRST_ORDER_DISCOUNT).toFixed(2), yearly: +(PLAN_PRICES.pro_yearly * FIRST_ORDER_DISCOUNT).toFixed(2) }
+      ? { monthly: +(PLAN_PRICES.pro_monthly * false).toFixed(2), yearly: +(PLAN_PRICES.pro_yearly * false).toFixed(2) }
       : null;
 
     // 推荐升级
@@ -115,63 +112,6 @@ async function handleMe(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// POST /api/plan/trial — 开启7天免费试用
-async function handleTrial(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: '方法不允许' });
-  }
-
-  const authResult = await requireAuth(req);
-  if (authResult.error) {
-    return res.status(authResult.error.status).json({ ok: false, error: authResult.error.message });
-  }
-
-  try {
-    const userId = authResult.user!.id;
-    const info = await getMembershipInfo(userId);
-
-    // 已经是Pro版
-    if (info.tier !== 'free') {
-      return res.status(400).json({ ok: false, error: '您已经是付费会员，无法使用试用' });
-    }
-
-    // 检查是否已使用过试用（通过活动日志记录）
-    const { count: trialUsedCount } = await supabase
-      .from('activity_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('action', 'trial_activated');
-
-    if (trialUsedCount && trialUsedCount > 0) {
-      return res.status(400).json({ ok: false, error: '您已使用过7天免费试用' });
-    }
-
-    // 开通7天试用
-    const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const { updateMembership } = await import('../../lib/membership');
-    const success = await updateMembership(userId, 'pro', trialEnd);
-
-    if (!success) {
-      return res.status(500).json({ ok: false, error: '开通试用失败' });
-    }
-
-    // 记录试用激活日志（防重复使用）
-    await supabase.from('activity_logs').insert({
-      user_id: userId,
-      action: 'trial_activated',
-      detail: JSON.stringify({ trialEnd: trialEnd.toISOString() }),
-    });
-
-    return res.status(200).json({
-      ok: true,
-      data: { trialEnd: trialEnd.toISOString() },
-    });
-  } catch (error) {
-    console.error('开通试用失败:', error);
-    return res.status(500).json({ ok: false, error: '服务器错误' });
-  }
-}
-
 // POST /api/plan/checkout — 支付接口
 async function handleCheckout(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -201,7 +141,7 @@ async function handleCheckout(req: VercelRequest, res: VercelResponse) {
 
     let amount = PLAN_PRICES[planId as keyof typeof PLAN_PRICES];
     if (isFirstPurchase) {
-      amount = +(amount * FIRST_ORDER_DISCOUNT).toFixed(2);
+      amount = +(amount * false).toFixed(2);
     }
 
     const { createOrder } = await import('../../lib/membership');

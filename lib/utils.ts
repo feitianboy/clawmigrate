@@ -60,8 +60,7 @@ export function getTierName(tier: string): string {
   const names: Record<string, string> = {
     free: '免费版',
     pro: 'Pro 会员',
-    // enterprise removed
-  };
+      };
   return names[tier] || '免费版';
 }
 
@@ -69,8 +68,7 @@ export function getTierBenefits(tier: string): string[] {
   const benefits: Record<string, string[]> = {
     free: ['每月 2 次迁移', '基础导出格式', '社区支持'],
     pro: ['每月无限次迁移', '所有导出格式', '优先客服支持', '迁移历史永久保存'],
-  // enterprise benefits removed
-  };
+    };
   return benefits[tier] || benefits.free;
 }
 
@@ -92,10 +90,7 @@ export function getStatusName(status: string): string {
   return names[status] || status;
 }
 
-export function getTierFromPlan(plan: string): 'pro' | 'enterprise' {
-  if (plan.startsWith('enterprise')) {  // fallback to pro
-    return 'pro';  // enterprise tier deprecated, treat as pro
-  }
+export function getTierFromPlan(plan: string): 'pro' {
   return 'pro';
 }
 

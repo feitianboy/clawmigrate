@@ -5,7 +5,7 @@ export interface User {
   username: string;
   email: string;
   role: 'user' | 'admin';
-  tier?: 'free' | 'pro' | 'enterprise';
+  tier?: 'free' | 'pro';
   created_at: string;
   migration_count?: number;
 }

@@ -70,8 +70,7 @@ const platformNames: Record<string, string> = {
 const tierNames: Record<string, string> = {
   free: '免费版',
   pro: '专业版',
-  // enterprise removed
-};
+  };
 
 // 样式定义
 const styles: Record<string, React.CSSProperties> = {
@@ -847,8 +846,7 @@ const TierBadge: React.FC<{ tier?: string }> = ({ tier }) => {
   const configs: Record<string, { label: string; style: React.CSSProperties }> = {
     free: { label: '免费', style: styles.tierFree },
     pro: { label: '专业', style: styles.tierPro },
-    // enterprise removed
-  };
+      };
   const config = configs[tier] || { label: tier, style: {} };
   
   return (

@@ -11,7 +11,7 @@ interface UpgradeModalProps {
 /**
  * 升级弹窗组件
  * 展示当前套餐信息、免费版限制、Pro版优势
- * 支持选择套餐（月度/年度）、7天试用、首单8折
+ * 支持选择套餐（月度/年度）、、首单8折
  */
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   isOpen,
