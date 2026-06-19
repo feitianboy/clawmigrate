@@ -174,7 +174,7 @@ const styles: Record<string, React.CSSProperties> = {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const { user, isAuthenticated, checkAuth, logout, planInfo, isPro, isLoading } = useAuthStore();
+  const { user, isAuthenticated, checkAuth, logout, planInfo, isPro, isLoading, fetchPlanInfo } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
@@ -194,9 +194,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Check auth status on mount - always call checkAuth to ensure planInfo is loaded
+  // Check auth status on mount - only check if not already authenticated (from persist or login)
   useEffect(() => {
-    checkAuth();
+    if (!isAuthenticated) {
+      checkAuth();
+    } else if (!planInfo) {
+      fetchPlanInfo();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
@@ -296,7 +300,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                 color: 'white',
                 fontWeight: 600,
-              }}>
+              }}
+              >
                 👑 Pro · 无限迁移
               </span>
             )}

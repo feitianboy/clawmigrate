@@ -154,7 +154,14 @@ export const useAuthStore = create<AuthState>()(
       const result = await response.json();
 
       if (!response.ok || !result.ok) {
-        set({ isAuthenticated: false, user: null, planInfo: null, isLoading: false });
+        // 如果当前有用户信息（来自persist或login），不要立即清除
+        // 让后续受保护页面的API调用（如 membership/check）来处理过期cookie
+        const currentState = get();
+        if (currentState.user) {
+          set({ isLoading: false });
+        } else {
+          set({ isAuthenticated: false, user: null, planInfo: null, isLoading: false });
+        }
         return false;
       }
 
