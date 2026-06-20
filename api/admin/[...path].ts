@@ -68,7 +68,7 @@ async function handleMembership(req: VercelRequest, res: VercelResponse) {
 // ---- Admin Migrations (list) ----
 async function handleAdminMigrations(req: VercelRequest, res: VercelResponse) {
   try {
-    const result = await requireAuth(req);
+    const result = await requireAdmin(req);
     if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
 
     const page = parseInt(req.query.page as string) || 1;
