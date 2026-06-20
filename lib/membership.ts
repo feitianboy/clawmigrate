@@ -37,11 +37,12 @@ export interface MembershipInfo {
 export async function getUserMembership(userId: number): Promise<UserMembership | null> {
   const { data } = await supabase
     .from('users')
-    .select('id, id as user_id, membership_tier, membership_expire_at')
+    .select('id, membership_tier, membership_expire_at')
     .eq('id', userId)
     .single();
   
-  return data as unknown as UserMembership | null;
+  if (!data) return null;
+  return { ...data, user_id: data.id } as unknown as UserMembership;
 }
 
 export async function isMembershipValid(userId: number): Promise<boolean> {

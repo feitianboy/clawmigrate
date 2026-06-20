@@ -41,13 +41,6 @@ async function handleInfo(req: VercelRequest, res: VercelResponse) {
     const result = await requireAuth(req);
     if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
 
-    // Debug: raw supabase query
-    const { data: rawUser, error: rawError } = await supabase
-      .from('users')
-      .select('id, username, membership_tier, membership_expire_at')
-      .eq('id', result.user!.id)
-      .single();
-
     const info = await getMembershipInfo(result.user!.id);
     return res.json({
       ok: true, data: {
@@ -55,8 +48,7 @@ async function handleInfo(req: VercelRequest, res: VercelResponse) {
         isExpired: info.isExpired,
         usage: { used: info.usage.used, limit: info.usage.limit, unlimited: info.usage.unlimited, remaining: info.usage.unlimited ? -1 : Math.max(0, info.usage.limit - info.usage.used) },
         benefits: getTierBenefits(info.tier)
-      },
-      debug: { rawUser, rawError, userId: result.user!.id }
+      }
     });
   } catch (error) {
     console.error('Get membership info error:', error);
