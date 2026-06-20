@@ -10,7 +10,7 @@ interface UpgradeModalProps {
 /**
  * 升级弹窗组件
  * 展示当前套餐信息、免费版限制、Pro版优势
- * 支持选择套餐（月度/年度）和支付方式（支付宝/微信）
+ * 支持选择套餐（月度/年度），支付方式为微信支付
  * 跳转ZPAY支付后轮询订单状态
  */
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({
@@ -19,7 +19,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   reason,
 }) => {
   const [selectedPlan, setSelectedPlan] = useState<'pro_monthly' | 'pro_yearly'>('pro_monthly');
-  const [selectedPayType, setSelectedPayType] = useState<'alipay' | 'wxpay'>('alipay');
+  const [selectedPayType, setSelectedPayType] = useState<'wxpay'>('wxpay');
   const [loading, setLoading] = useState(false);
   const [plans, setPlans] = useState<any[]>([]);
   
@@ -65,7 +65,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         credentials: 'include',
         body: JSON.stringify({
           plan: selectedPlan,
-          payType: selectedPayType,
+          payType: 'wxpay',
         }),
       });
 
@@ -290,7 +290,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     },
     payTypeGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(2, 1fr)',
+      gridTemplateColumns: '1fr',
       gap: 'var(--space-3)',
     },
     payTypeCard: {
@@ -310,18 +310,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     payTypeCardSelected: {
       borderColor: 'var(--color-primary)',
       background: 'var(--color-primary-light)',
-    },
-    alipayIcon: {
-      width: '24px',
-      height: '24px',
-      background: '#1677ff',
-      borderRadius: '4px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: 'white',
-      fontSize: '0.75rem',
-      fontWeight: 700,
     },
     wechatIcon: {
       width: '24px',
@@ -482,30 +470,12 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
               </div>
             </div>
 
-            {/* 支付方式选择 */}
+            {/* 支付方式 - 仅支持微信支付 */}
             <div style={styles.payTypeSection}>
               <h3 style={styles.sectionTitle}>支付方式</h3>
-              <div style={styles.payTypeGrid}>
-                <div
-                  style={{
-                    ...styles.payTypeCard,
-                    ...(selectedPayType === 'alipay' ? styles.payTypeCardSelected : {}),
-                  }}
-                  onClick={() => setSelectedPayType('alipay')}
-                >
-                  <div style={styles.alipayIcon}>支</div>
-                  支付宝
-                </div>
-                <div
-                  style={{
-                    ...styles.payTypeCard,
-                    ...(selectedPayType === 'wxpay' ? styles.payTypeCardSelected : {}),
-                  }}
-                  onClick={() => setSelectedPayType('wxpay')}
-                >
-                  <div style={styles.wechatIcon}>微</div>
-                  微信支付
-                </div>
+              <div style={{...styles.payTypeCard, ...styles.payTypeCardSelected, cursor: 'default'}}>
+                <div style={styles.wechatIcon}>微</div>
+                微信支付
               </div>
             </div>
 

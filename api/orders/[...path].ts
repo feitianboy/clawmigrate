@@ -82,8 +82,8 @@ async function handleCreateOrder(req: VercelRequest, res: VercelResponse) {
     const { plan, payType } = req.body;
     if (!plan || !PLAN_PRICES[plan as PlanType]) return res.status(400).json({ ok: false, error: 'Invalid plan' });
 
-    const validPayTypes = ['alipay', 'wxpay'];
-    if (!payType || !validPayTypes.includes(payType)) return res.status(400).json({ ok: false, error: 'Invalid payment type, must be alipay or wxpay' });
+    const validPayTypes = ['wxpay'];
+    if (!payType || !validPayTypes.includes(payType)) return res.status(400).json({ ok: false, error: 'Invalid payment type, must be wxpay' });
 
     if (!ZPAY_PID || !ZPAY_KEY) {
       console.error('ZPAY credentials not configured');
@@ -91,7 +91,7 @@ async function handleCreateOrder(req: VercelRequest, res: VercelResponse) {
     }
 
     const amount = PLAN_PRICES[plan as PlanType];
-    const payMethod = payType === 'wxpay' ? 'wechat' : 'alipay';
+    const payMethod = 'wechat';
 
     // Create order (no discount - MVP dropped first-order discount)
     const order = await createOrder(result.user!.id, plan as PlanType, amount, payMethod as 'wechat' | 'alipay');

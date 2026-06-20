@@ -48,7 +48,6 @@ const CHART_COLORS = {
 
 // 平台图标映射
 const platformIcons: Record<string, string> = {
-  coze: '🤖',
   claude: '🧠',
   kimi: '🌙',
   openclaw: '🦞',
@@ -58,7 +57,6 @@ const platformIcons: Record<string, string> = {
 
 // 平台名称映射
 const platformNames: Record<string, string> = {
-  coze: 'Coze',
   claude: 'Claude',
   kimi: 'Kimi',
   openclaw: 'OpenClaw',

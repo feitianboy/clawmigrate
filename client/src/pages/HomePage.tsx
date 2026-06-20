@@ -230,7 +230,6 @@ const features = [
 ];
 
 const platforms = [
-  { id: 'coze', name: '扣子 Coze', icon: '🤖', desc: '字节跳动 AI 开发平台' },
   { id: 'claude', name: 'Claude', icon: '🧠', desc: 'Anthropic 大模型助手' },
   { id: 'kimi', name: 'Kimi', icon: '🌙', desc: '月之暗面 AI 助手' },
   { id: 'openclaw', name: 'OpenClaw', icon: '🦞', desc: '开源 AI 助手平台' },

@@ -4,14 +4,12 @@ import { ArrowRightLeft, CheckCircle, XCircle, Clock, ExternalLink, Trash2 } fro
 import { useAuthStore, useHistoryStore, HistoryRecord } from '../stores';
 
 const platformIcons: Record<string, string> = {
-  coze: '🤖',
   claude: '🧠',
   kimi: '🌙',
   openclaw: '🐾',
 };
 
 const platformNames: Record<string, string> = {
-  coze: '扣子 Coze',
   claude: 'Claude',
   kimi: 'Kimi',
   openclaw: 'OpenClaw',
