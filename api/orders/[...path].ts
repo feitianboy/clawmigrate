@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from '../../lib/auth';
 import { findOrderByOrderId, updateOrderStatus, updateMembership, createOrder, PLAN_PRICES, PlanType, getOrdersByUserId } from '../../lib/membership';
 import { logActivity, getTierFromPlan, getExpireAt, getPlanName, getStatusName } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 import crypto from 'crypto';
 
 const ZPAY_PID = process.env.ZPAY_PID || '';
@@ -193,14 +194,20 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
 
     const tier = getTierFromPlan(order.plan);
     const expireAt = getExpireAt(order.plan);
-    const membershipResult = await updateMembership(order.user_id, tier, expireAt);
+
+    // Direct supabase update for debugging
+    const { data: updateData, error: updateError } = await supabase
+      .from('users')
+      .update({ membership_tier: tier, membership_expire_at: expireAt.toISOString() })
+      .eq('id', order.user_id)
+      .select('id, membership_tier, membership_expire_at');
 
     await logActivity(order.user_id, 'payment_success', {
       orderId, tradeNo: String(trade_no || ''), plan: order.plan, tier, amount: order.amount, payType: type, paidAt: paidAt.toISOString()
     }, (req.headers['x-forwarded-for'] as string) || '');
 
     console.log('ZPAY payment successful: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
-    return res.json({ debug: true, orderId, userId: order.user_id, tier, updateResult, membershipResult, expireAt: expireAt.toISOString() });
+    return res.json({ debug: true, orderId, userId: order.user_id, tier, updateResult, rawUpdateData: updateData, rawUpdateError: updateError, expireAt: expireAt.toISOString() });
   } catch (error) {
     console.error('ZPAY callback error:', error);
     return res.send('success');
