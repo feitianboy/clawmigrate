@@ -33,10 +33,10 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     }
   }, [isOpen]);
 
-  // 支付返回后轮询订单状态
+  // 支付返回后轮询订单状态 (ZPAY return_url携带out_trade_no参数)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const orderId = params.get('order_id');
+    const orderId = params.get('order_id') || params.get('out_trade_no');
     if (orderId && isOpen) {
       pollOrderStatus(orderId);
     }
@@ -89,8 +89,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const pollOrderStatus = async (orderId: string) => {
     setPolling(true);
     let attempts = 0;
-    const maxAttempts = 30;
-    const interval = 2000; // 2秒一次
+    const maxAttempts = 90;
+    const interval = 3000; // 3秒一次, 共约4.5分钟
 
     const poll = async () => {
       try {
@@ -100,12 +100,14 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         const result = await response.json();
 
         if (result.ok && result.data.status === 'paid') {
-          // 支付成功
+          // 支付成功 - 刷新套餐信息
           setPolling(false);
-          alert('支付成功！Pro会员已激活');
           // 清除URL参数
           window.history.replaceState({}, '', window.location.pathname);
           onClose();
+          // 刷新会员状态后重新加载
+          const { fetchPlanInfo } = useAuthStore.getState();
+          await fetchPlanInfo();
           window.location.reload();
           return;
         }

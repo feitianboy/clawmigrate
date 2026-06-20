@@ -201,6 +201,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     } else if (!planInfo) {
       fetchPlanInfo();
     }
+    // Detect ZPAY payment return (out_trade_no in URL)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('out_trade_no') && isAuthenticated) {
+      setUpgradeModalOpen(true);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {

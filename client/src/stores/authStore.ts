@@ -152,9 +152,8 @@ export const useAuthStore = create<AuthState>()(
   checkAuth: async (): Promise<boolean> => {
     set({ isLoading: true });
     try {
-      const response = await fetch(`${API_BASE}/auth/me`, {
+      const response = await apiFetch(`${API_BASE}/auth/me`, {
         method: 'GET',
-        credentials: 'include', // 发送 cookies
       });
 
       const result = await response.json();

@@ -8,7 +8,7 @@ const ZPAY_PID = process.env.ZPAY_PID || '';
 const ZPAY_KEY = process.env.ZPAY_KEY || '';
 const ZPAY_BASE_URL = 'https://zpayz.cn/submit.php';
 const NOTIFY_URL = 'https://clawmigrate.xyz/api/orders/callback';
-const RETURN_URL = 'https://clawmigrate.xyz/pricing';
+const RETURN_URL = 'https://clawmigrate.xyz';
 
 // ZPAY MD5签名: 参数按ASCII排序拼接 + KEY, 再MD5
 function generateSign(params: Record<string, string>, key: string): string {
@@ -104,7 +104,7 @@ async function handleCreateOrder(req: VercelRequest, res: VercelResponse) {
       type: payType,
       out_trade_no: order.order_id,
       notify_url: NOTIFY_URL,
-      return_url: RETURN_URL + '?order_id=' + order.order_id,
+      return_url: RETURN_URL,
       name: planName,
       money: amount.toFixed(2),
     };
@@ -207,6 +207,23 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+
+// Query ZPAY order status (active polling backup for callback)
+async function queryZpayOrder(orderId: string): Promise<{ paid: boolean; tradeNo: string | null }> {
+  try {
+    const url = `https://zpayz.cn/api.php?act=order&pid=${ZPAY_PID}&key=${ZPAY_KEY}&out_trade_no=${orderId}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.code === 1) {
+      return { paid: data.status === 1, tradeNo: data.trade_no || null };
+    }
+    return { paid: false, tradeNo: null };
+  } catch (error) {
+    console.error('ZPAY query error:', error);
+    return { paid: false, tradeNo: null };
+  }
+}
+
 // ---- Get Single Order ----
 async function handleGetOrder(req: VercelRequest, res: VercelResponse, orderId: string) {
   try {
@@ -216,6 +233,30 @@ async function handleGetOrder(req: VercelRequest, res: VercelResponse, orderId: 
     const order = await findOrderByOrderId(orderId);
     if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
     if (order.user_id !== result.user!.id) return res.status(403).json({ ok: false, error: 'Access denied' });
+
+    // Active ZPAY polling: if order is pending, query ZPAY API
+    if (order.status === 'pending') {
+      const zpayResult = await queryZpayOrder(orderId);
+      if (zpayResult.paid) {
+        const paidAt = new Date();
+        await updateOrderStatus(orderId, 'paid', paidAt);
+        const tier = getTierFromPlan(order.plan);
+        const expireAt = getExpireAt(order.plan);
+        await updateMembership(order.user_id, tier, expireAt);
+        await logActivity(order.user_id, 'payment_success', {
+          orderId, tradeNo: zpayResult.tradeNo || '', plan: order.plan, tier,
+          amount: order.amount, paidAt: paidAt.toISOString()
+        }, (req.headers['x-forwarded-for'] as string) || '');
+        console.log('ZPAY active poll: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
+        return res.json({
+          ok: true, data: {
+            orderId: order.order_id, plan: order.plan, planName: getPlanName(order.plan),
+            amount: order.amount, payMethod: order.pay_method, status: 'paid',
+            statusName: '已支付', createdAt: order.created_at, paidAt: paidAt.toISOString()
+          }
+        });
+      }
+    }
 
     return res.json({
       ok: true, data: {
