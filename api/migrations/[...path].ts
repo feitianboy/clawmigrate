@@ -5,7 +5,7 @@ import { logActivity } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query['...path'] as string[]) || [];
+  const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
   // GET /api/migrations → list user's migrations

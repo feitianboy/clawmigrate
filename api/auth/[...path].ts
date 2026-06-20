@@ -8,7 +8,7 @@ import { requireAuth } from '../../lib/auth';
 const SALT_ROUNDS = 10;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query['...path'] as string[]) || [];
+  const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
   if (subPath === 'github' && req.method === 'GET') return handleGithub(req, res);

@@ -32,7 +32,7 @@ function verifySign(params: Record<string, string>, key: string, receivedSign: s
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query['...path'] as string[]) || [];
+  const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
   // GET /api/orders → list user's orders

@@ -5,7 +5,7 @@ import { getTierName, getTierBenefits, getTierFromPlan, getExpireAt, logActivity
 import { supabase } from '../../lib/supabase';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query['...path'] as string[]) || [];
+  const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
   if (subPath === 'check' && req.method === 'POST') return handleCheck(req, res);
