@@ -2,14 +2,6 @@
   "framework": "vite",
   "buildCommand": "npm install && cd client && npm install && npx vite build",
   "outputDirectory": "client/dist",
-  "functions": {
-    "api/health.ts": { "runtime": "@vercel/node@3" },
-    "api/admin/[...path].ts": { "runtime": "@vercel/node@3" },
-    "api/auth/[...path].ts": { "runtime": "@vercel/node@3" },
-    "api/membership/[...path].ts": { "runtime": "@vercel/node@3" },
-    "api/orders/[...path].ts": { "runtime": "@vercel/node@3" },
-    "api/migrations/[...path].ts": { "runtime": "@vercel/node@3" }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
