@@ -8,6 +8,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
+  if (subPath === 'verify' && req.method === 'POST') return handleVerify(req, res);
   if (subPath === 'activity-logs' && req.method === 'GET') return handleActivityLogs(req, res);
   if (subPath === 'membership' && req.method === 'PUT') return handleMembership(req, res);
   if (subPath === 'migrations' && req.method === 'GET') return handleAdminMigrations(req, res);
@@ -286,6 +287,30 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse, subPath
     return res.json({ ok: true, data: { message: 'User deleted successfully' } });
   } catch (error) {
     console.error('Delete user error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+// ---- Verify Admin Password ----
+async function handleVerify(req: VercelRequest, res: VercelResponse) {
+  try {
+    const { password } = req.body || {};
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    
+    if (!adminPassword) {
+      return res.status(500).json({ ok: false, error: 'Admin password not configured' });
+    }
+    
+    if (password !== adminPassword) {
+      return res.status(401).json({ ok: false, error: '密码错误' });
+    }
+    
+    // Generate a simple token (base64 of password + timestamp, for MVP)
+    const token = Buffer.from(`${adminPassword}:${Date.now()}`).toString('base64');
+    
+    return res.json({ ok: true, token });
+  } catch (error) {
+    console.error('Verify admin error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 }

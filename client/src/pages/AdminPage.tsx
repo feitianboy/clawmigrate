@@ -759,7 +759,7 @@ const MigrationTrendChart: React.FC = () => {
     const fetchTrend = async () => {
       try {
         const res = await fetch('/api/admin/trend?days=7', {
-          headers: { 'x-admin-password': localStorage.getItem('clawmigrate_admin_pwd') || '' }
+          headers: { 'X-Admin-Token': localStorage.getItem('admin_token') || '' }
         });
         const result = await res.json();
         if (result.ok && result.data) {

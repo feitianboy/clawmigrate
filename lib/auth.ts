@@ -120,6 +120,34 @@ export async function requireAuth(req: VercelRequest): Promise<{ user: AuthUser;
 }
 
 export async function requireAdmin(req: VercelRequest): Promise<{ user: AuthUser; error?: undefined } | { user?: undefined; error: { status: number; message: string } }> {
+  // 支持两种鉴权方式：
+  // 1. X-Admin-Token: 管理后台密码验证后的token（MVP独立密码机制）
+  // 2. 用户JWT token + admin角色
+
+  // 方式1: 检查 X-Admin-Token
+  const adminToken = req.headers['x-admin-token'] as string | undefined;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  
+  if (adminToken && adminPassword) {
+    try {
+      const decoded = Buffer.from(adminToken, 'base64').toString();
+      const [pwd] = decoded.split(':');
+      if (pwd === adminPassword) {
+        // Token验证通过，返回一个虚拟admin用户
+        return { user: { id: 0, username: 'admin', email: 'admin@system', role: 'admin' } };
+      }
+    } catch {
+      // Token解析失败，继续尝试方式2
+    }
+  }
+
+  // 方式2: 检查 x-admin-password（兼容旧调用）
+  const adminPwd = req.headers['x-admin-password'] as string | undefined;
+  if (adminPwd && adminPassword && adminPwd === adminPassword) {
+    return { user: { id: 0, username: 'admin', email: 'admin@system', role: 'admin' } };
+  }
+
+  // 方式3: 用户JWT token + admin角色
   const result = await requireAuth(req);
   
   if (result.error) {

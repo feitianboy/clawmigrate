@@ -204,7 +204,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         throw new Error(errorData.error || `请求失败: ${response.status}`);
       }
       
-      const data: UsersResponse = await response.json();
+      const result: UsersResponse = await response.json();
+      const data = result.data || result;
       set({
         users: data.users || [],
         usersTotal: data.total || 0,
