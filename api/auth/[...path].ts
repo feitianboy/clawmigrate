@@ -87,6 +87,7 @@ async function handleLogin(req: VercelRequest, res: VercelResponse) {
   await logActivity(user.id, 'login', { username: user.username }, req.headers['x-forwarded-for'] as string || (req as any).ip);
   const secret = process.env.JWT_SECRET || 'default_secret';
   const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, secret, { expiresIn: '7d' });
+  res.setHeader('Set-Cookie', `token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
   return res.json({ ok: true, data: { token, user: { id: user.id, username: user.username, email: user.email, role: user.role } } });
 }
 
@@ -111,6 +112,7 @@ async function handleRegister(req: VercelRequest, res: VercelResponse) {
   await logActivity(newUser.id, 'register', { username: newUser.username }, req.headers['x-forwarded-for'] as string || (req as any).ip);
   const secret = process.env.JWT_SECRET || 'default_secret';
   const token = jwt.sign({ userId: newUser.id, username: newUser.username, role: newUser.role }, secret, { expiresIn: '7d' });
+  res.setHeader('Set-Cookie', `token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
   return res.status(201).json({ ok: true, data: { token, user: { id: newUser.id, username: newUser.username, email: newUser.email, role: newUser.role } } });
 }
 

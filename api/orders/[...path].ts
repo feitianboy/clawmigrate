@@ -2,7 +2,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from '../../lib/auth';
 import { findOrderByOrderId, updateOrderStatus, updateMembership, createOrder, PLAN_PRICES, PlanType, getOrdersByUserId } from '../../lib/membership';
 import { logActivity, getTierFromPlan, getExpireAt, getPlanName, getStatusName } from '../../lib/utils';
-import { supabase } from '../../lib/supabase';
 import crypto from 'crypto';
 
 const ZPAY_PID = process.env.ZPAY_PID || '';
@@ -190,31 +189,18 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
     }
 
     const paidAt = new Date();
-    const updateResult = await updateOrderStatus(orderId, 'paid', paidAt);
+    await updateOrderStatus(orderId, 'paid', paidAt);
 
     const tier = getTierFromPlan(order.plan);
     const expireAt = getExpireAt(order.plan);
-
-    // Direct supabase update for debugging
-    const { data: updateData, error: updateError } = await supabase
-      .from('users')
-      .update({ membership_tier: tier, membership_expire_at: expireAt.toISOString() })
-      .eq('id', order.user_id)
-      .select('id, membership_tier, membership_expire_at');
-
-    // Read back immediately
-    const { data: readBack } = await supabase
-      .from('users')
-      .select('id, membership_tier, membership_expire_at')
-      .eq('id', order.user_id)
-      .single();
+    await updateMembership(order.user_id, tier, expireAt);
 
     await logActivity(order.user_id, 'payment_success', {
       orderId, tradeNo: String(trade_no || ''), plan: order.plan, tier, amount: order.amount, payType: type, paidAt: paidAt.toISOString()
     }, (req.headers['x-forwarded-for'] as string) || '');
 
     console.log('ZPAY payment successful: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
-    return res.json({ debug: true, orderId, userId: order.user_id, tier, updateResult, rawUpdateData: updateData, rawUpdateError: updateError, readBack, expireAt: expireAt.toISOString() });
+    return res.send('success');
   } catch (error) {
     console.error('ZPAY callback error:', error);
     return res.send('success');
