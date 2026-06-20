@@ -59,8 +59,8 @@ async function handleInfo(req: VercelRequest, res: VercelResponse) {
 async function handlePlans(req: VercelRequest, res: VercelResponse) {
   try {
     const plans = [
-      { id: 'pro_monthly', name: 'Pro 月度', price: PLAN_PRICES.pro_monthly, priceUnit: '元/月', features: ['无限次迁移', '优先客服支持', '高级导出格式'] },
-      { id: 'pro_yearly', name: 'Pro 年度', price: PLAN_PRICES.pro_yearly, priceUnit: '元/年', originalPrice: PLAN_PRICES.pro_monthly * 12, features: ['无限次迁移', '优先客服支持', '高级导出格式', '年付节省 17%'] }
+      { id: 'pro_monthly', name: 'Pro 月度', price: PLAN_PRICES.pro_monthly, priceUnit: '元/月', features: ['无限次迁移', '迁移历史永久保存'] },
+      { id: 'pro_yearly', name: 'Pro 年度', price: PLAN_PRICES.pro_yearly, priceUnit: '元/年', originalPrice: PLAN_PRICES.pro_monthly * 12, features: ['无限次迁移', '迁移历史永久保存', '年付节省 17%'] }
     ];
     return res.json({ ok: true, data: plans });
   } catch (error) {

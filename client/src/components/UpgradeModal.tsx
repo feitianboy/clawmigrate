@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Crown, Check, Zap, Shield, Clock, Star, CreditCard } from 'lucide-react';
+import { X, Crown, Check, Zap, Clock, CreditCard } from 'lucide-react';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -384,8 +384,6 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const benefits = [
     { icon: Zap, text: '无限次迁移' },
     { icon: Clock, text: '迁移历史永久保存' },
-    { icon: Star, text: '所有导出格式' },
-    { icon: Shield, text: '优先客服支持' },
   ];
 
   const monthlyPrice = proMonthly?.price || 19;

@@ -118,7 +118,7 @@ async function handleCreateOrder(req: VercelRequest, res: VercelResponse) {
       .join('&');
     const payUrl = ZPAY_BASE_URL + '?' + queryString;
 
-    await logActivity(result.user!.id, 'create_order', { orderId: order.order_id, plan, amount, payType }, req.headers['x-forwarded-for'] || req.ip);
+    await logActivity(result.user!.id, 'create_order', { orderId: order.order_id, plan, amount, payType }, (req.headers['x-forwarded-for'] as string) || '');
 
     return res.status(201).json({
       ok: true,
@@ -196,7 +196,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
 
     await logActivity(order.user_id, 'payment_success', {
       orderId, tradeNo: String(trade_no || ''), plan: order.plan, tier, amount: order.amount, payType: type, paidAt: paidAt.toISOString()
-    }, req.headers['x-forwarded-for'] || req.ip);
+    }, (req.headers['x-forwarded-for'] as string) || '');
 
     console.log('ZPAY payment successful: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
     return res.send('success');
@@ -243,7 +243,7 @@ async function handleCancelOrder(req: VercelRequest, res: VercelResponse, orderI
     const updated = await updateOrderStatus(orderId, 'cancelled');
     if (!updated) return res.status(500).json({ ok: false, error: 'Failed to cancel order' });
 
-    await logActivity(result.user!.id, 'cancel_order', { orderId }, req.headers['x-forwarded-for'] || req.ip);
+    await logActivity(result.user!.id, 'cancel_order', { orderId }, (req.headers['x-forwarded-for'] as string) || '');
     return res.json({ ok: true, data: { message: 'Order cancelled successfully' } });
   } catch (error) {
     console.error('Cancel order error:', error);
