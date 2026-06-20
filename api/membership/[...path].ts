@@ -5,7 +5,7 @@ import { getTierName, getTierBenefits, getTierFromPlan, getExpireAt, logActivity
 import { supabase } from '../../lib/supabase';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query.path as string[]) || [];
+  const segments = (req.query['...path'] as string[]) || [];
   const subPath = segments.join('/');
 
   if (subPath === 'check' && req.method === 'POST') return handleCheck(req, res);
@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (subPath === 'plan/me' && req.method === 'GET') return handlePlanMe(req, res);
   if (subPath === 'plan/checkout' && req.method === 'POST') return handlePlanCheckout(req, res);
 
-  return res.status(404).json({ ok: false, error: 'Membership route not found', debug: { subPath: subPath, segments: segments, query: req.query, method: req.method } });
+  return res.status(404).json({ ok: false, error: 'Membership route not found' });
 }
 
 async function handleCheck(req: VercelRequest, res: VercelResponse) {

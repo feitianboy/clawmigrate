@@ -8,7 +8,7 @@ import { requireAuth } from '../../lib/auth';
 const SALT_ROUNDS = 10;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query.path as string[]) || [];
+  const segments = (req.query['...path'] as string[]) || [];
   const subPath = segments.join('/');
 
   if (subPath === 'github' && req.method === 'GET') return handleGithub(req, res);
@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (subPath === 'me' && req.method === 'GET') return handleMe(req, res);
   if (subPath === 'logout' && req.method === 'POST') return handleLogout(req, res);
 
-  return res.status(404).json({ ok: false, error: 'Auth route not found', debug: { subPath: subPath, segments: segments, query: req.query, method: req.method } });
+  return res.status(404).json({ ok: false, error: 'Auth route not found' });
 }
 
 async function handleGithub(req: VercelRequest, res: VercelResponse) {

@@ -5,7 +5,7 @@ import { logActivity, getPlanName, getStatusName, getTierFromPlan, getExpireAt, 
 import { updateMembership, MembershipTier, getOrdersByUserId, findOrderByOrderId, updateOrderStatus, getOrderStats } from '../../lib/membership';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const segments = (req.query.path as string[]) || [];
+  const segments = (req.query['...path'] as string[]) || [];
   const subPath = segments.join('/');
 
   if (subPath === 'activity-logs' && req.method === 'GET') return handleActivityLogs(req, res);
