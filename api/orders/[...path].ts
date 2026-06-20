@@ -149,6 +149,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
 
     const params: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.query)) {
+      if (key === '...path') continue;
       if (typeof value === 'string') {
         params[key] = value;
       } else if (Array.isArray(value)) {
