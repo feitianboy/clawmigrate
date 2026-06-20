@@ -255,13 +255,17 @@ export const useAuthStore = create<AuthState>()(
       return;
     }
     try {
-      const response = await apiFetch(`${API_BASE}/membership/plan/me`, {
+      const response = await apiFetch(`${API_BASE}/membership/info`, {
         method: 'GET',
       });
 
       const result = await response.json();
 
       if (result.ok) {
+        if (!result.data.suggestedPlan) {
+          result.data.suggestedPlan = result.data.tier === 'free' ? 'pro_monthly' : 'pro_yearly';
+          result.data.suggestedPlanPrice = result.data.tier === 'free' ? 19 : 149;
+        }
         set({ planInfo: result.data });
         // 同步更新user的会员信息
         set((state) => ({
