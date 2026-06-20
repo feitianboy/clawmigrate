@@ -1,6 +1,5 @@
-import { useAuthStore } from '../stores/authStore';
-import React, { useState } from 'react';
-import { X, Crown, Check, Zap, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Crown, Check, Zap, Shield, Clock, Star, CreditCard } from 'lucide-react';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -9,51 +8,133 @@ interface UpgradeModalProps {
 }
 
 /**
- * 升级弹窗组件 - 精简版
- * 只展示 Pro 套餐：¥19/月 和 ¥149/年
+ * 升级弹窗组件
+ * 展示当前套餐信息、免费版限制、Pro版优势
+ * 支持选择套餐（月度/年度）和支付方式（支付宝/微信）
+ * 跳转ZPAY支付后轮询订单状态
  */
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   isOpen,
   onClose,
   reason,
 }) => {
-  const [selectedPlan, setSelectedPlan] = useState<'pro_monthly' | 'pro_yearly'>('pro_yearly');
+  const [selectedPlan, setSelectedPlan] = useState<'pro_monthly' | 'pro_yearly'>('pro_monthly');
+  const [selectedPayType, setSelectedPayType] = useState<'alipay' | 'wxpay'>('alipay');
   const [loading, setLoading] = useState(false);
-  const [notification, setNotification] = useState<{type: 'success' | 'error'; message: string} | null>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+  
+  const [polling, setPolling] = useState(false);
 
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 4000);
+  // 获取套餐列表
+  useEffect(() => {
+    if (isOpen) {
+      fetchPlans();
+    }
+  }, [isOpen]);
+
+  // 支付返回后轮询订单状态
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('order_id');
+    if (orderId && isOpen) {
+      pollOrderStatus(orderId);
+    }
+  }, [isOpen]);
+
+  const fetchPlans = async () => {
+    try {
+      const response = await fetch('/api/membership/plans');
+      const result = await response.json();
+      if (result.ok) {
+        setPlans(result.data.filter((p: any) => p.id.includes('pro')));
+      }
+    } catch (error) {
+      console.error('获取套餐失败:', error);
+    }
   };
+
+
 
   const handleUpgrade = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/plan/checkout', {
+      // 调用创建订单API
+      const response = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ planId: selectedPlan }),
+        body: JSON.stringify({
+          plan: selectedPlan,
+          payType: selectedPayType,
+        }),
       });
-      
+
       const result = await response.json();
-      
-      if (result.ok) {
-        showNotification('success', `订单创建成功！订单号: ${result.data.orderId}，应付金额: ¥${result.data.amount}，请完成支付后刷新页面`);
-        onClose();
-        window.location.reload();
+
+      if (result.ok && result.data.payUrl) {
+        // 跳转到ZPAY支付页面
+        window.location.href = result.data.payUrl;
       } else {
-        showNotification('error', result.error || '创建订单失败');
+        alert(result.error || '创建订单失败，请稍后重试');
       }
     } catch (error) {
       console.error('升级失败:', error);
-      showNotification('error', '网络错误，请稍后重试');
+      alert('网络错误，请稍后重试');
     } finally {
       setLoading(false);
     }
   };
 
+  // 轮询订单状态（支付返回后）
+  const pollOrderStatus = async (orderId: string) => {
+    setPolling(true);
+    let attempts = 0;
+    const maxAttempts = 30;
+    const interval = 2000; // 2秒一次
+
+    const poll = async () => {
+      try {
+        const response = await fetch('/api/orders/' + orderId, {
+          credentials: 'include',
+        });
+        const result = await response.json();
+
+        if (result.ok && result.data.status === 'paid') {
+          // 支付成功
+          setPolling(false);
+          alert('支付成功！Pro会员已激活');
+          // 清除URL参数
+          window.history.replaceState({}, '', window.location.pathname);
+          onClose();
+          window.location.reload();
+          return;
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, interval);
+        } else {
+          setPolling(false);
+          alert('支付结果确认中，请稍后刷新页面查看会员状态');
+        }
+      } catch (error) {
+        console.error('轮询订单状态失败:', error);
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, interval);
+        } else {
+          setPolling(false);
+        }
+      }
+    };
+
+    poll();
+  };
+
   if (!isOpen) return null;
+
+  const proMonthly = plans.find(p => p.id === 'pro_monthly');
+  const proYearly = plans.find(p => p.id === 'pro_yearly');
 
   const styles: Record<string, React.CSSProperties> = {
     overlay: {
@@ -69,7 +150,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     modal: {
       background: 'var(--color-bg-secondary)',
       borderRadius: 'var(--radius-xl)',
-      maxWidth: '480px',
+      maxWidth: '600px',
       width: '100%',
       maxHeight: '90vh',
       overflow: 'auto',
@@ -91,6 +172,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       cursor: 'pointer',
       padding: 'var(--space-2)',
       borderRadius: 'var(--radius-md)',
+      transition: 'all 0.2s',
     },
     crownIcon: {
       width: '64px',
@@ -110,6 +192,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       background: 'linear-gradient(135deg, #f59e0b, #d97706)',
       WebkitBackgroundClip: 'text',
       WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
     },
     subtitle: {
       color: 'var(--color-text-secondary)',
@@ -118,9 +201,15 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     body: {
       padding: 'var(--space-6)',
     },
+    sectionTitle: {
+      fontSize: '1rem',
+      fontWeight: 600,
+      marginBottom: 'var(--space-4)',
+      color: 'var(--color-text)',
+    },
     benefitsList: {
-      display: 'flex',
-      flexDirection: 'column',
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, 1fr)',
       gap: 'var(--space-3)',
       marginBottom: 'var(--space-6)',
     },
@@ -143,7 +232,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       flexShrink: 0,
     },
     benefitText: {
-      fontSize: '0.875rem',
+      fontSize: '0.8125rem',
       color: 'var(--color-text)',
     },
     planGrid: {
@@ -160,10 +249,11 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       cursor: 'pointer',
       transition: 'all 0.2s',
       textAlign: 'center',
+      position: 'relative',
     },
     planCardSelected: {
       borderColor: 'var(--color-primary)',
-      background: 'rgba(249, 115, 22, 0.1)',
+      background: 'var(--color-primary-light)',
     },
     planBadge: {
       display: 'inline-block',
@@ -184,10 +274,66 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       fontSize: '1.75rem',
       fontWeight: 700,
       color: 'var(--color-primary)',
+      marginBottom: 'var(--space-1)',
     },
     planUnit: {
       fontSize: '0.75rem',
       color: 'var(--color-text-secondary)',
+    },
+    planOriginal: {
+      fontSize: '0.75rem',
+      color: 'var(--color-text-muted)',
+      textDecoration: 'line-through',
+    },
+    payTypeSection: {
+      marginBottom: 'var(--space-6)',
+    },
+    payTypeGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: 'var(--space-3)',
+    },
+    payTypeCard: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 'var(--space-2)',
+      padding: 'var(--space-3)',
+      background: 'var(--color-bg)',
+      border: '2px solid var(--color-border)',
+      borderRadius: 'var(--radius-lg)',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      fontSize: '0.875rem',
+      fontWeight: 500,
+    },
+    payTypeCardSelected: {
+      borderColor: 'var(--color-primary)',
+      background: 'var(--color-primary-light)',
+    },
+    alipayIcon: {
+      width: '24px',
+      height: '24px',
+      background: '#1677ff',
+      borderRadius: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      fontSize: '0.75rem',
+      fontWeight: 700,
+    },
+    wechatIcon: {
+      width: '24px',
+      height: '24px',
+      background: '#07c160',
+      borderRadius: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      fontSize: '0.75rem',
+      fontWeight: 700,
     },
     upgradeBtn: {
       width: '100%',
@@ -212,115 +358,195 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
       color: 'var(--color-text-muted)',
       fontSize: '0.75rem',
     },
+    pollingOverlay: {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2000,
+    },
+    pollingBox: {
+      background: 'var(--color-bg-secondary)',
+      padding: 'var(--space-8)',
+      borderRadius: 'var(--radius-xl)',
+      textAlign: 'center',
+      maxWidth: '360px',
+    },
+    pollingText: {
+      fontSize: '1rem',
+      color: 'var(--color-text)',
+      marginBottom: 'var(--space-4)',
+    },
   };
 
   const benefits = [
-    { icon: Zap, text: '每月无限次迁移' },
+    { icon: Zap, text: '无限次迁移' },
     { icon: Clock, text: '迁移历史永久保存' },
+    { icon: Star, text: '所有导出格式' },
+    { icon: Shield, text: '优先客服支持' },
   ];
 
+  const monthlyPrice = proMonthly?.price || 19;
+  const yearlyPrice = proYearly?.price || 149;
+    
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      {notification && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 10000,
-          padding: '12px 24px',
-          borderRadius: '8px',
-          background: notification.type === 'success' ? '#10b981' : '#ef4444',
-          color: 'white',
-          fontSize: '0.875rem',
-          fontWeight: 500,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        }}>
-          {notification.message}
+    <>
+      {/* 轮询状态提示 */}
+      {polling && (
+        <div style={styles.pollingOverlay}>
+          <div style={styles.pollingBox}>
+            <div style={styles.pollingText}>正在确认支付结果，请稍候...</div>
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
+              支付成功后将自动刷新
+            </div>
+          </div>
         </div>
       )}
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
-        <div style={styles.header}>
-          <button style={styles.closeBtn} onClick={onClose}>
-            <X size={20} />
-          </button>
-          <div style={styles.crownIcon}>
-            <Crown size={32} color="white" />
-          </div>
-          <h2 style={styles.title}>升级到 Pro 版本</h2>
-          <p style={styles.subtitle}>
-            {reason === 'migration-limit' ? '本月迁移次数已用完，解锁无限迁移' : '解锁更多高级功能'}
-          </p>
-        </div>
 
-        <div style={styles.body}>
-          <div style={styles.benefitsList}>
-            {benefits.map((benefit, index) => {
-              const Icon = benefit.icon;
-              return (
-                <div key={index} style={styles.benefitItem}>
-                  <div style={styles.benefitIcon}>
-                    <Icon size={16} color="#22c55e" />
+      <div style={styles.overlay} onClick={onClose}>
+        <div style={styles.modal} onClick={e => e.stopPropagation()}>
+          <div style={styles.header}>
+            <button
+              style={styles.closeBtn}
+              onClick={onClose}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--color-bg-tertiary)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={styles.crownIcon}>
+              <Crown size={32} color="white" />
+            </div>
+            <h2 style={styles.title}>升级到 Pro 版本</h2>
+            <p style={styles.subtitle}>
+              {reason === 'migration-limit'
+                ? '免费迁移次数已用完，解锁无限迁移'
+                : '解锁更多高级功能'}
+            </p>
+          </div>
+
+          <div style={styles.body}>
+
+            <h3 style={styles.sectionTitle}>Pro 用户专享</h3>
+            <div style={styles.benefitsList}>
+              {benefits.map((benefit, index) => {
+                const Icon = benefit.icon;
+                return (
+                  <div key={index} style={styles.benefitItem}>
+                    <div style={styles.benefitIcon}>
+                      <Icon size={16} color="#22c55e" />
+                    </div>
+                    <span style={styles.benefitText}>{benefit.text}</span>
                   </div>
-                  <span style={styles.benefitText}>{benefit.text}</span>
+                );
+              })}
+            </div>
+
+            <h3 style={styles.sectionTitle}>
+              选择套餐
+                          </h3>
+            <div style={styles.planGrid}>
+              <div
+                style={{
+                  ...styles.planCard,
+                  ...(selectedPlan === 'pro_monthly' ? styles.planCardSelected : {}),
+                }}
+                onClick={() => setSelectedPlan('pro_monthly')}
+              >
+                <div style={styles.planBadge}>月度</div>
+                <div style={styles.planName}>Pro 月度</div>
+                <div style={styles.planPrice}>
+                  ¥{monthlyPrice}
                 </div>
-              );
-            })}
-          </div>
-
-          <div style={styles.planGrid}>
-            <div 
-              style={{
-                ...styles.planCard,
-                ...(selectedPlan === 'pro_monthly' ? styles.planCardSelected : {}),
-              }}
-              onClick={() => setSelectedPlan('pro_monthly')}
-            >
-              <div style={styles.planBadge}>月度</div>
-              <div style={styles.planName}>Pro 月度</div>
-              <div style={styles.planPrice}>¥19</div>
-              <div style={styles.planUnit}>每月</div>
-            </div>
-            
-            <div 
-              style={{
-                ...styles.planCard,
-                ...(selectedPlan === 'pro_yearly' ? styles.planCardSelected : {}),
-              }}
-              onClick={() => setSelectedPlan('pro_yearly')}
-            >
-              <div style={{...styles.planBadge, background: 'var(--color-success)'}}>
-                年度特惠
+                
+                <div style={styles.planUnit}>每月</div>
               </div>
-              <div style={styles.planName}>Pro 年度</div>
-              <div style={styles.planPrice}>¥149</div>
-              <div style={styles.planUnit}>每年</div>
+
+              <div
+                style={{
+                  ...styles.planCard,
+                  ...(selectedPlan === 'pro_yearly' ? styles.planCardSelected : {}),
+                }}
+                onClick={() => setSelectedPlan('pro_yearly')}
+              >
+                <div style={{...styles.planBadge, background: 'var(--color-success)'}}>
+                  年度特惠
+                </div>
+                <div style={styles.planName}>Pro 年度</div>
+                <div style={styles.planPrice}>
+                  ¥{yearlyPrice}
+                </div>
+                
+                <div style={styles.planUnit}>每年</div>
+              </div>
             </div>
+
+            {/* 支付方式选择 */}
+            <div style={styles.payTypeSection}>
+              <h3 style={styles.sectionTitle}>支付方式</h3>
+              <div style={styles.payTypeGrid}>
+                <div
+                  style={{
+                    ...styles.payTypeCard,
+                    ...(selectedPayType === 'alipay' ? styles.payTypeCardSelected : {}),
+                  }}
+                  onClick={() => setSelectedPayType('alipay')}
+                >
+                  <div style={styles.alipayIcon}>支</div>
+                  支付宝
+                </div>
+                <div
+                  style={{
+                    ...styles.payTypeCard,
+                    ...(selectedPayType === 'wxpay' ? styles.payTypeCardSelected : {}),
+                  }}
+                  onClick={() => setSelectedPayType('wxpay')}
+                >
+                  <div style={styles.wechatIcon}>微</div>
+                  微信支付
+                </div>
+              </div>
+            </div>
+
+            <button
+              style={{
+                ...styles.upgradeBtn,
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? 'wait' : 'pointer',
+              }}
+              onClick={handleUpgrade}
+              disabled={loading}
+              onMouseEnter={e => {
+                if (!loading) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.4)';
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              {loading ? (
+                '处理中...'
+              ) : (
+                <>
+                  <CreditCard size={20} />
+                  立即支付
+                </>
+              )}
+            </button>
           </div>
 
-          <button
-            style={{
-              ...styles.upgradeBtn,
-              opacity: loading ? 0.7 : 1,
-              cursor: loading ? 'wait' : 'pointer',
-            }}
-            onClick={handleUpgrade}
-            disabled={loading}
-          >
-            {loading ? '处理中...' : (
-              <>
-                <Crown size={20} />
-                立即升级 Pro
-              </>
-            )}
-          </button>
-        </div>
-
-        <div style={styles.footer}>
-          支付安全由支付宝保障 · 7天内无条件退款
+          <div style={styles.footer}>
+            支付安全由ZPAY保障
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

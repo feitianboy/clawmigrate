@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMigrationStore } from '../stores/migrationStore';
 import { useAuthStore } from '../stores/authStore';
@@ -25,7 +25,6 @@ import {
   Crown,
 } from 'lucide-react';
 import { UsageGuard } from '../components/UsageGuard';
-import { ItemLimitToast } from '../components/ItemLimitToast';
 import { UpgradeModal } from '../components/UpgradeModal';
 
 const styles: Record<string, React.CSSProperties> = {
@@ -454,8 +453,6 @@ const STEPS = [
   { id: 'complete', label: '完成' },
 ];
 
-// 免费版配置项限制
-const FREE_TIER_ITEM_LIMIT = 10;
 
 const MigrationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -476,7 +473,7 @@ const MigrationPage: React.FC = () => {
     reset,
   } = useMigrationStore();
 
-  const { isAuthenticated, isPro, fetchPlanInfo, isLoading } = useAuthStore();
+  const { isAuthenticated, isPro } = useAuthStore();
 
   // 页面挂载时强制重置步骤，防止 zustand persist 恢复旧状态导致步骤错位
   useEffect(() => {
@@ -484,16 +481,57 @@ const MigrationPage: React.FC = () => {
     setStep('select-source');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 迁移记录创建：用户进入import步骤时创建in_progress记录，扣减迁移次数
+  const migrationRecordedRef = useRef(false);
+  useEffect(() => {
+    if (currentStep === 'import' && !migrationRecordedRef.current && sourcePlatform && targetPlatform && isAuthenticated) {
+      migrationRecordedRef.current = true;
+      fetch('/api/migrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          sourcePlatform: sourcePlatform.id,
+          targetPlatform: targetPlatform.id,
+          itemsCount: parsedSchema?.metadata?.totalItems || 0,
+          categories: selectedCategories,
+        }),
+      }).then(res => res.json()).then(result => {
+        if (result.ok && result.data?.id) {
+          setMigrationId(result.data.id);
+        }
+      }).catch(err => {
+        console.error('Failed to create migration record:', err);
+        migrationRecordedRef.current = false; // Allow retry on failure
+      });
+    }
+  }, [currentStep, sourcePlatform, targetPlatform, parsedSchema, selectedCategories, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 完成迁移：更新迁移记录状态为completed
+  const handleCompleteMigration = async () => {
+    setCompleting(true);
+    try {
+      if (migrationId && isAuthenticated) {
+        await fetch(`/api/migrations/${migrationId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ status: 'completed' }),
+        });
+      }
+    } catch (err) {
+      console.error('Failed to update migration status:', err);
+    } finally {
+      setCompleting(false);
+      goNext();
+    }
+  };
+
   // 额外的状态（从render函数中提升到顶层，修复Rules of Hooks违规）
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showItemLimitToast, setShowItemLimitToast] = useState(false);
-  const [itemLimitToastData, setItemLimitToastData] = useState({ current: 0, limit: FREE_TIER_ITEM_LIMIT });
-  // 入口权限检查状态
-  const [accessDenied, setAccessDenied] = useState(false);
-  const [accessChecking, setAccessChecking] = useState(true);
-  const [denyReason, setDenyReason] = useState<'free-limit' | null>(null);
+  const [migrationId, setMigrationId] = useState<number | null>(null);
+  const [completing, setCompleting] = useState(false);
   // 导出步骤状态
-  const [migrationRecorded, setMigrationRecorded] = useState(false);
   const [exportCopied, setExportCopied] = useState(false);
   // 解析步骤状态
   const [jsonData, setJsonData] = useState('');
@@ -502,86 +540,12 @@ const MigrationPage: React.FC = () => {
   // 导入步骤状态
   const [importCopied, setImportCopied] = useState(false);
 
-  // 迁移完成时记录到后端
-  useEffect(() => {
-    if (currentStep === 'complete' && sourcePlatform && targetPlatform && parsedSchema && !migrationRecorded) {
-      setMigrationRecorded(true);
-      if (isAuthenticated) {
-        // 已登录用户记录到后端
-        fetch('/api/migrations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            sourcePlatform: sourcePlatform.id,
-            targetPlatform: targetPlatform.id,
-            itemsCount: parsedSchema.metadata?.totalItems || 0,
-            categories: selectedCategories,
-            status: 'completed',
-          }),
-        }).catch(err => console.error('记录迁移失败:', err));
-      } else {
-        
-      }
-    }
-  }, [currentStep, sourcePlatform, targetPlatform, parsedSchema, migrationRecorded, isAuthenticated, selectedCategories]);
-
-  // Bug修复：迁移完成后刷新导航栏剩余次数
-  useEffect(() => {
-    if (currentStep === 'complete' && isAuthenticated) {
-      fetchPlanInfo();
-    }
-  }, [currentStep, isAuthenticated, fetchPlanInfo]);
-
-  // 入口权限检查 - 在页面挂载时检查用户是否有权限访问迁移页面
-  useEffect(() => {
-    const checkAccess = async () => {
-      setAccessChecking(true);
-      // Wait for auth state to be restored
-      if (isLoading) {
-        return;
-      }
-      // 未登录用户直接跳转登录页
-      if (!isAuthenticated) {
-        navigate('/login');
-        setAccessChecking(false);
-        return;
-      }
-      if (!isPro()) {
-        try {
-          const response = await fetch('/api/membership/check', {
-            method: 'POST',
-            credentials: 'include',
-          });
-          const result = await response.json();
-          if (result.ok && result.data?.allowed === false) {
-            // 只有API明确返回allowed=false才是次数用完
-            setAccessDenied(true);
-            setDenyReason('free-limit');
-          } else if (!result.ok && (result.error?.includes('token') || result.error?.includes('No token') || response.status === 401)) {
-            // 认证失败，跳转登录
-            navigate('/login');
-            setAccessChecking(false);
-            return;
-          }
-          // 无论是否通过，都刷新导航栏的剩余次数
-          fetchPlanInfo();
-        } catch (err) {
-          console.error('检查迁移权限失败:', err);
-          // 网络错误时允许继续
-        }
-      }
-      setAccessChecking(false);
-    };
-    checkAccess();
-  }, [isAuthenticated, isPro, fetchPlanInfo, navigate, isLoading]);
-
   // 步骤指示器
   const renderStepIndicator = () => {
     const currentIndex = STEPS.findIndex(s => s.id === currentStep);
 
     return (
-      <div style={styles.stepsIndicator} className="step-indicator">
+      <div style={styles.stepsIndicator}>
         {STEPS.map((step, index) => {
           const isActive = step.id === currentStep;
           const isCompleted = index < currentIndex;
@@ -643,61 +607,7 @@ const MigrationPage: React.FC = () => {
       // select-target → import 时生成导入提示词
       if (currentStep === 'select-target' && nextStep === 'import' && targetPlatform && parsedSchema) {
         try {
-          // Bug 5: 对非Pro用户，生成导入提示词时只包含前10项配置
-          let schemaToUse = parsedSchema;
-          if (!isPro()) {
-            const configs = parsedSchema.configs || {};
-            const allItems: any[] = [];
-            const categoryMap = {
-              [MigrationCategory.SKILLS]: configs.skills || [],
-              [MigrationCategory.AUTOMATIONS]: configs.automations || [],
-              [MigrationCategory.MCP_CONNECTIONS]: configs.mcpConnections || [],
-              [MigrationCategory.MEMORIES]: configs.memories || [],
-              [MigrationCategory.SETTINGS]: configs.settings ? [configs.settings] : [],
-              [MigrationCategory.PROMPTS]: configs.prompts || [],
-              [MigrationCategory.KNOWLEDGE_BASES]: configs.knowledgeBases || [],
-            };
-            
-            Object.entries(categoryMap).forEach(([category, items]) => {
-              if (items && items.length > 0) {
-                items.forEach((config: any) => {
-                  allItems.push({ ...config, _category: category });
-                });
-              }
-            });
-            
-            // 只取前10项
-            const limitedItems = allItems.slice(0, FREE_TIER_ITEM_LIMIT);
-            
-            // 重新构建schema
-            const limitedConfigs: any = {};
-            limitedItems.forEach((item) => {
-              const cat = item._category;
-              delete item._category;
-              if (!limitedConfigs[cat]) {
-                limitedConfigs[cat] = [];
-              }
-              limitedConfigs[cat].push(item);
-            });
-            
-            // 处理settings（应该是单个对象而不是数组）
-            if (limitedConfigs[MigrationCategory.SETTINGS]?.length === 1) {
-              limitedConfigs[MigrationCategory.SETTINGS] = limitedConfigs[MigrationCategory.SETTINGS][0];
-            } else if (limitedConfigs[MigrationCategory.SETTINGS]?.length > 1) {
-              limitedConfigs[MigrationCategory.SETTINGS] = limitedConfigs[MigrationCategory.SETTINGS][0];
-            }
-            
-            schemaToUse = {
-              ...parsedSchema,
-              configs: limitedConfigs,
-              metadata: {
-                ...parsedSchema.metadata,
-                totalItems: limitedItems.length,
-              },
-            };
-          }
-          
-          const importResult = targetPlatform.generateImportPrompt(schemaToUse, {
+          const importResult = targetPlatform.generateImportPrompt(parsedSchema, {
             categories: selectedCategories,
           });
           setImportPrompt(importResult.prompt, importResult.instructions);
@@ -734,7 +644,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择你当前使用的 AI 助手平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid} className="platform-grid">
+          <div style={styles.platformGrid}>
             {sourceAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -751,7 +661,7 @@ const MigrationPage: React.FC = () => {
             ))}
           </div>
 
-          <div style={styles.actions} className="actions-bar">
+          <div style={styles.actions}>
             <div />
             <button
               style={{
@@ -822,7 +732,7 @@ const MigrationPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={styles.actions} className="actions-bar">
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -864,11 +774,6 @@ const MigrationPage: React.FC = () => {
 
         // 检查配置项数量是否超过限制
         const totalItems = result.schema.metadata?.totalItems || 0;
-        if (totalItems > FREE_TIER_ITEM_LIMIT) {
-          setItemLimitToastData({ current: totalItems, limit: FREE_TIER_ITEM_LIMIT });
-          setShowItemLimitToast(true);
-        }
-
         goNext();
       } catch (err: any) {
         setParseError(err.message || '解析失败，请检查 JSON 格式');
@@ -898,7 +803,7 @@ const MigrationPage: React.FC = () => {
             </div>
           )}
 
-          <div style={styles.actions} className="actions-bar">
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -935,12 +840,7 @@ const MigrationPage: React.FC = () => {
     if (!parsedSchema) return null;
 
     const configs = parsedSchema.configs || {};
-    const userIsPro = isPro();
-    
-    // Bug 5: 对非Pro用户，限制配置项显示数量
-    // 收集所有配置项并添加索引
-    const allItems: { category: MigrationCategory; label: string; data: any; index: number }[] = [];
-    const categoryMap = {
+    const categories = Object.entries({
       [MigrationCategory.SKILLS]: { data: configs.skills, label: CATEGORY_LABELS[MigrationCategory.SKILLS] },
       [MigrationCategory.AUTOMATIONS]: { data: configs.automations, label: CATEGORY_LABELS[MigrationCategory.AUTOMATIONS] },
       [MigrationCategory.MCP_CONNECTIONS]: { data: configs.mcpConnections, label: CATEGORY_LABELS[MigrationCategory.MCP_CONNECTIONS] },
@@ -948,36 +848,7 @@ const MigrationPage: React.FC = () => {
       [MigrationCategory.SETTINGS]: { data: configs.settings ? [configs.settings] : [], label: CATEGORY_LABELS[MigrationCategory.SETTINGS] },
       [MigrationCategory.PROMPTS]: { data: configs.prompts, label: CATEGORY_LABELS[MigrationCategory.PROMPTS] },
       [MigrationCategory.KNOWLEDGE_BASES]: { data: configs.knowledgeBases, label: CATEGORY_LABELS[MigrationCategory.KNOWLEDGE_BASES] },
-    };
-    
-    let globalIndex = 0;
-    Object.entries(categoryMap).forEach(([category, item]) => {
-      if (item.data && item.data.length > 0) {
-        item.data.forEach((config: any) => {
-          allItems.push({
-            category: category as MigrationCategory,
-            label: item.label,
-            data: config,
-            index: globalIndex++,
-          });
-        });
-      }
-    });
-    
-    const totalItems = allItems.length;
-    const displayItems = !userIsPro && totalItems > FREE_TIER_ITEM_LIMIT
-      ? allItems.slice(0, FREE_TIER_ITEM_LIMIT)
-      : allItems;
-    const hiddenItemsCount = totalItems - FREE_TIER_ITEM_LIMIT;
-    
-    // 按分类分组显示
-    const displayedCategories = displayItems.reduce((acc, item) => {
-      if (!acc[item.category]) {
-        acc[item.category] = { label: item.label, items: [] };
-      }
-      acc[item.category].items.push(item.data);
-      return acc;
-    }, {} as Record<MigrationCategory, { label: string; items: any[] }>);
+    }).filter(([, item]) => item.data && item.data.length > 0);
 
     return (
       <div style={styles.card}>
@@ -1005,43 +876,17 @@ const MigrationPage: React.FC = () => {
               <span>共 {parsedSchema.metadata.totalItems} 个配置项</span>
               <span style={styles.previewBadge}>来自 {sourcePlatform?.name}</span>
             </div>
-            {/* Bug 5: 非Pro用户配置项超限提示 */}
-            {!userIsPro && hiddenItemsCount > 0 && (
-              <div style={{
-                padding: 'var(--space-4)',
-                background: 'rgba(245, 158, 11, 0.1)',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-                borderRadius: 'var(--radius-md)',
-                marginBottom: 'var(--space-4)',
-                textAlign: 'center',
-              }}>
-                <span style={{ color: '#fbbf24', fontSize: '0.875rem' }}>
-                  还有 {hiddenItemsCount} 项配置，<button
-                    onClick={() => setShowUpgradeModal(true)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-primary)',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      fontSize: 'inherit',
-                      padding: 0,
-                    }}
-                  >升级 Pro</button> 查看全部
-                </span>
-              </div>
-            )}
           </div>
 
-          {Object.entries(displayedCategories).map(([category, item]) => (
+          {categories.map(([category, item]) => (
             <div key={category} style={styles.previewSection}>
               <h3 style={styles.previewSectionTitle}>
-                {getCategoryIcon(category as MigrationCategory)} {item.label}
-                <span style={styles.previewBadge}>{item.items.length} 项</span>
+                {getCategoryIcon(category)} {item.label}
+                <span style={styles.previewBadge}>{item.data.length} 项</span>
               </h3>
-              {item.items.map((config: any, index: number) => (
+              {item.data.map((config: any, index: number) => (
                 <div key={index} style={styles.previewItem}>
-                  <div style={styles.previewItemHeader} className="preview-item-header">
+                  <div style={styles.previewItemHeader}>
                     <span style={styles.previewItemName}>{config.name || config.id}</span>
                     {config.sensitivityLevel !== SensitivityLevel.SAFE && (
                       <span style={styles.sensitiveTag}>
@@ -1061,7 +906,7 @@ const MigrationPage: React.FC = () => {
             </div>
           ))}
 
-          <div style={styles.actions} className="actions-bar">
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               重新解析
@@ -1087,7 +932,7 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>选择要迁移到的目标平台</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.platformGrid} className="platform-grid">
+          <div style={styles.platformGrid}>
             {targetAdapters.map((adapter) => (
               <div
                 key={adapter.id}
@@ -1105,7 +950,7 @@ const MigrationPage: React.FC = () => {
             ))}
           </div>
 
-          <div style={styles.actions} className="actions-bar">
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               上一步
@@ -1182,13 +1027,13 @@ const MigrationPage: React.FC = () => {
             </ol>
           </div>
 
-          <div style={styles.actions} className="actions-bar">
+          <div style={styles.actions}>
             <button style={styles.btnSecondary} onClick={goBack}>
               <ChevronLeft size={18} />
               返回
             </button>
-            <button style={styles.btnPrimary} onClick={goNext}>
-              完成迁移
+            <button style={{ ...styles.btnPrimary, opacity: completing ? 0.7 : 1, cursor: completing ? 'wait' : 'pointer' }} onClick={handleCompleteMigration} disabled={completing}>
+              {completing ? '保存中...' : '完成迁移'}
               <CheckCircle size={18} />
             </button>
           </div>
@@ -1213,7 +1058,7 @@ const MigrationPage: React.FC = () => {
           请在目标平台确认所有配置是否正确。
         </p>
 
-        <div style={styles.statsGrid} className="complete-stats">
+        <div style={styles.statsGrid}>
           <div style={styles.statItem}>
             <div style={styles.statValue}>{parsedSchema.metadata.totalItems}</div>
             <div style={styles.statLabel}>配置项</div>
@@ -1353,96 +1198,10 @@ const MigrationPage: React.FC = () => {
         <p style={styles.subtitle}>按照引导完成跨平台配置迁移</p>
       </div>
 
-      {/* 加载中状态 */}
-      {accessChecking && (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'var(--space-12)',
-          color: 'var(--color-text-secondary)',
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid var(--color-border)',
-            borderTopColor: 'var(--color-primary)',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            marginBottom: 'var(--space-4)',
-          }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          <p>正在检查迁移权限...</p>
-        </div>
-      )}
+      {currentStep !== 'complete' && renderStepIndicator()}
+      {renderContent()}
 
-      {/* Bug 4: 入口权限被拒绝时显示引导卡片 */}
-      {!accessChecking && accessDenied && (
-        <div style={{
-          padding: 'var(--space-8)',
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-lg)',
-          textAlign: 'center',
-        }}>
-          <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>
-            '💎'
-          </div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
-            '免费迁移次数已用完'
-          </h2>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)', maxWidth: '400px', margin: '0 auto var(--space-6)' }}>
-            '您的免费迁移次数已用完。升级Pro解锁无限迁移'
-          </p>
-          <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center', flexWrap: 'wrap' }}>
 
-            <button
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-                padding: 'var(--space-3) var(--space-6)',
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-              onClick={() => setShowUpgradeModal(true)}
-            >
-              <Crown size={18} />
-              升级 Pro 解锁
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!accessChecking && !accessDenied && (
-        <>
-          {currentStep !== 'complete' && renderStepIndicator()}
-          {renderContent()}
-        </>
-      )}
-
-      {/* 配置项超限提示条 */}
-      {showItemLimitToast && (
-        <ItemLimitToast
-          current={itemLimitToastData.current}
-          limit={itemLimitToastData.limit}
-          onUpgrade={() => setShowUpgradeModal(true)}
-          autoHideDuration={5000}
-        />
-      )}
-
-      {/* 升级弹窗 */}
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        reason="complete-upgrade"
-      />
     </div>
   );
 };

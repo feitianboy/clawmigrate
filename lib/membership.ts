@@ -1,17 +1,18 @@
 import { supabase } from './supabase';
 
-export type MembershipTier = 'free' | 'pro' ;
+export type MembershipTier = 'free' | 'pro';
 export type PlanType = 'pro_monthly' | 'pro_yearly';
 
-export const USAGE_LIMITS = {
+export const USAGE_LIMITS: Record<MembershipTier, number> = {
   free: 2,
-  pro: Infinity,
+  pro: -1
 };
 
-export const PLAN_PRICES = {
+export const PLAN_PRICES: Record<PlanType, number> = {
   pro_monthly: 19,
-  pro_yearly: 149,
+  pro_yearly: 149
 };
+
 
 export interface UserMembership {
   id: number;
@@ -40,7 +41,7 @@ export async function getUserMembership(userId: number): Promise<UserMembership 
     .eq('id', userId)
     .single();
   
-  return data as unknown as UserMembership | null;
+  return data as UserMembership | null;
 }
 
 export async function isMembershipValid(userId: number): Promise<boolean> {
@@ -78,7 +79,7 @@ export async function getUsage(userId: number): Promise<MembershipUsage> {
   return {
     used,
     limit,
-    unlimited: limit === -1
+    unlimited: limit === Infinity || limit === -1
   };
 }
 
@@ -143,15 +144,16 @@ export async function createOrder(
   amount: number,
   payMethod?: 'wechat' | 'alipay' | 'stripe'
 ): Promise<{ order_id: string } | null> {
-  const orderId = `CM${Date.now()}${Math.random().toString(36).substring(2, 10)}`.toUpperCase();
+  const orderId = 'CM' + Date.now() + Math.random().toString(36).substring(2, 10).toUpperCase();
   
+
   const { data, error } = await supabase
     .from('orders')
     .insert({
       user_id: userId,
       order_id: orderId,
       plan,
-      amount,
+      amount: amount,
       pay_method: payMethod || null,
       status: 'pending'
     })
@@ -273,20 +275,4 @@ export async function getOrderStats() {
     byPlan,
     byStatus
   };
-}
-
-export function getTierFromPlan(plan: string): 'pro'  {
-  if (plan.startsWith('invalid')) {
-  }
-  return 'pro';
-}
-
-export function getExpireAt(plan: string): Date {
-  const now = new Date();
-  if (plan.includes('yearly')) {
-    now.setFullYear(now.getFullYear() + 1);
-  } else {
-    now.setMonth(now.getMonth() + 1);
-  }
-  return now;
 }
