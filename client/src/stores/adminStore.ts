@@ -183,10 +183,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : '获取数据失败',
-        isLoading: false,
-      });
+      const errorMsg = error instanceof Error ? error.message : '获取数据失败';
+      if (errorMsg === 'Admin access required' || errorMsg === 'No token provided') {
+        localStorage.removeItem('admin_token');
+        set({ adminToken: null });
+      }
+      set({ error: errorMsg, isLoading: false });
     }
   },
 
@@ -215,10 +217,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : '获取用户列表失败',
-        isLoading: false,
-      });
+      const errorMsg = error instanceof Error ? error.message : '获取用户列表失败';
+      if (errorMsg === 'Admin access required' || errorMsg === 'No token provided') {
+        localStorage.removeItem('admin_token');
+        set({ adminToken: null });
+      }
+      set({ error: errorMsg, isLoading: false });
     }
   },
 
@@ -244,10 +248,12 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : '获取迁移记录失败',
-        isLoading: false,
-      });
+      const errorMsg = error instanceof Error ? error.message : '获取迁移记录失败';
+      if (errorMsg === 'Admin access required' || errorMsg === 'No token provided') {
+        localStorage.removeItem('admin_token');
+        set({ adminToken: null });
+      }
+      set({ error: errorMsg, isLoading: false });
     }
   },
 

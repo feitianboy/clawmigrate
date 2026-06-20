@@ -885,6 +885,13 @@ export const AdminPage: React.FC = () => {
     }
   }, []);
 
+  // 当 admin token 被清理时（API返回401/403），退回密码页
+  useEffect(() => {
+    if (isAuthenticated && !adminToken && !localStorage.getItem('admin_token')) {
+      setIsAuthenticated(false);
+    }
+  }, [isAuthenticated, adminToken]);
+
   // 加载数据
   const loadData = useCallback(() => {
     if (isAuthenticated) {
