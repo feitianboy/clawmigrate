@@ -158,7 +158,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         throw new Error(errorData.error || `请求失败: ${response.status}`);
       }
       
-      const data = await response.json();
+      const raw = await response.json();
+      const data = raw.data || raw;
       set({
         stats: {
           totalUsers: data.totalUsers || 0,
@@ -236,7 +237,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         throw new Error(errorData.error || `请求失败: ${response.status}`);
       }
       
-      const data = await response.json();
+      const raw = await response.json();
+      const data = raw.data || raw;
       set({
         migrationRecords: data.migrations || [],
         isLoading: false,
