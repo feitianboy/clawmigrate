@@ -189,18 +189,18 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
     }
 
     const paidAt = new Date();
-    await updateOrderStatus(orderId, 'paid', paidAt);
+    const updateResult = await updateOrderStatus(orderId, 'paid', paidAt);
 
     const tier = getTierFromPlan(order.plan);
     const expireAt = getExpireAt(order.plan);
-    await updateMembership(order.user_id, tier, expireAt);
+    const membershipResult = await updateMembership(order.user_id, tier, expireAt);
 
     await logActivity(order.user_id, 'payment_success', {
       orderId, tradeNo: String(trade_no || ''), plan: order.plan, tier, amount: order.amount, payType: type, paidAt: paidAt.toISOString()
     }, (req.headers['x-forwarded-for'] as string) || '');
 
     console.log('ZPAY payment successful: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
-    return res.send('success');
+    return res.json({ debug: true, orderId, userId: order.user_id, tier, updateResult, membershipResult, expireAt: expireAt.toISOString() });
   } catch (error) {
     console.error('ZPAY callback error:', error);
     return res.send('success');
