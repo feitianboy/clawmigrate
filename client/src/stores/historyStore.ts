@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { apiFetch } from '../utils/apiFetch';
 import { HistoryRecord } from './migrationStore';
 
 interface HistoryState {
@@ -19,9 +20,8 @@ export const useHistoryStore = create<HistoryState>((set) => ({
   fetchHistory: async (): Promise<boolean> => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`${API_BASE}/migrations`, {
+      const response = await apiFetch(`${API_BASE}/migrations`, {
         method: 'GET',
-        credentials: 'include', // 发送 cookies
       });
 
       const result = await response.json();

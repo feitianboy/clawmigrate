@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { apiFetch } from '../utils/apiFetch';
 import { persist } from 'zustand/middleware';
 
 interface User {
@@ -34,6 +35,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   planInfo: PlanInfo | null;
+  token: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   register: (username: string, email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -57,6 +59,7 @@ export const useAuthStore = create<AuthState>()(
   isLoading: false,
   error: null,
   planInfo: null,
+  token: null,
 
   login: async (username: string, password: string): Promise<boolean> => {
     set({ isLoading: true, error: null });
@@ -81,6 +84,7 @@ export const useAuthStore = create<AuthState>()(
         user: result.data.user,
         isAuthenticated: true,
         isLoading: false,
+        token: result.data.token || null,
       });
       // 登录成功后获取套餐信息
       get().fetchPlanInfo();
@@ -115,6 +119,7 @@ export const useAuthStore = create<AuthState>()(
         user: result.data.user,
         isAuthenticated: true,
         isLoading: false,
+        token: result.data.token || null,
       });
       // 注册成功后获取套餐信息
       get().fetchPlanInfo();
@@ -139,6 +144,7 @@ export const useAuthStore = create<AuthState>()(
         user: null,
         isAuthenticated: false,
         planInfo: null,
+        token: null,
       });
     }
   },
@@ -154,14 +160,8 @@ export const useAuthStore = create<AuthState>()(
       const result = await response.json();
 
       if (!response.ok || !result.ok) {
-        // 如果当前有用户信息（来自persist或login），不要立即清除
-        // 让后续受保护页面的API调用（如 membership/check）来处理过期cookie
-        const currentState = get();
-        if (currentState.user) {
-          set({ isLoading: false });
-        } else {
-          set({ isAuthenticated: false, user: null, planInfo: null, isLoading: false });
-        }
+        // cookie无效或过期，清除登录状态
+        set({ isAuthenticated: false, user: null, planInfo: null, token: null, isLoading: false });
         return false;
       }
 
@@ -255,9 +255,8 @@ export const useAuthStore = create<AuthState>()(
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/plan/me`, {
+      const response = await apiFetch(`${API_BASE}/membership/plan/me`, {
         method: 'GET',
-        credentials: 'include',
       });
 
       const result = await response.json();
@@ -311,9 +310,8 @@ export const useAuthStore = create<AuthState>()(
 
     // 免费用户调用API检查
     try {
-      const response = await fetch(`${API_BASE}/membership/check`, {
+      const response = await apiFetch(`${API_BASE}/membership/check`, {
         method: 'POST',
-        credentials: 'include',
       });
 
       const result = await response.json();
@@ -334,7 +332,7 @@ export const useAuthStore = create<AuthState>()(
 }),
       {
         name: 'clawmigrate-auth',
-        partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+        partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated, token: state.token }),
       }
     )
   );

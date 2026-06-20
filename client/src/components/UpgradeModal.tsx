@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Crown, Check, Zap, Clock, CreditCard } from 'lucide-react';
+import { apiFetch } from '../utils/apiFetch';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -59,10 +60,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     setLoading(true);
     try {
       // 调用创建订单API
-      const response = await fetch('/api/orders/create', {
+      const response = await apiFetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           plan: selectedPlan,
           payType: 'wxpay',
@@ -94,8 +94,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
 
     const poll = async () => {
       try {
-        const response = await fetch('/api/orders/' + orderId, {
-          credentials: 'include',
+        const response = await apiFetch('/api/orders/' + orderId, {
+          method: 'GET',
         });
         const result = await response.json();
 

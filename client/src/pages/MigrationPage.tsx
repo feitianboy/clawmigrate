@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiFetch';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMigrationStore } from '../stores/migrationStore';
@@ -486,10 +487,9 @@ const MigrationPage: React.FC = () => {
   useEffect(() => {
     if (currentStep === 'import' && !migrationRecordedRef.current && sourcePlatform && targetPlatform && isAuthenticated) {
       migrationRecordedRef.current = true;
-      fetch('/api/migrations', {
+      apiFetch('/api/migrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           sourcePlatform: sourcePlatform.id,
           targetPlatform: targetPlatform.id,
@@ -512,10 +512,9 @@ const MigrationPage: React.FC = () => {
     setCompleting(true);
     try {
       if (migrationId && isAuthenticated) {
-        await fetch(`/api/migrations/${migrationId}`, {
+        await apiFetch(`/api/migrations/${migrationId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({ status: 'completed' }),
         });
       }
