@@ -169,8 +169,27 @@ export const useAdminStore = create<AdminState>((set, get) => ({
           inProgressMigrations: data.inProgressMigrations || 0,
           todayPV: data.todayPV || 0,
           todayUV: data.todayUV || 0,
-          platformDistribution: data.platformDistribution || [],
-          tierDistribution: data.tierDistribution || [],
+          platformDistribution: (() => {
+            const pd = data.platformDistribution;
+            if (Array.isArray(pd)) return pd;
+            if (pd && typeof pd === 'object') {
+              return Object.entries(pd).map(([platform, targets]) => ({
+                platform,
+                count: typeof targets === 'object' && targets !== null
+                  ? Object.values(targets).reduce((a: number, b: any) => a + Number(b), 0)
+                  : Number(targets) || 0,
+              }));
+            }
+            return [];
+          })(),
+          tierDistribution: (() => {
+            const td = data.tierDistribution;
+            if (Array.isArray(td)) return td;
+            if (td && typeof td === 'object') {
+              return Object.entries(td).map(([tier, count]) => ({ tier, count: Number(count) || 0 }));
+            }
+            return [];
+          })(),
           conversionRate: data.conversionRate || 0,
           paidUsers: data.paidUsers || 0,
           totalOrders: data.totalOrders || 0,
