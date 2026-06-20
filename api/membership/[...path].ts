@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (subPath === 'plan/me' && req.method === 'GET') return handlePlanMe(req, res);
   if (subPath === 'plan/checkout' && req.method === 'POST') return handlePlanCheckout(req, res);
 
-  return res.status(404).json({ ok: false, error: 'Membership route not found' });
+  return res.status(404).json({ ok: false, error: 'Membership route not found', debug: { subPath: subPath, segments: segments, query: req.query, method: req.method } });
 }
 
 async function handleCheck(req: VercelRequest, res: VercelResponse) {

@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (subPath === 'me' && req.method === 'GET') return handleMe(req, res);
   if (subPath === 'logout' && req.method === 'POST') return handleLogout(req, res);
 
-  return res.status(404).json({ ok: false, error: 'Auth route not found' });
+  return res.status(404).json({ ok: false, error: 'Auth route not found', debug: { subPath: subPath, segments: segments, query: req.query, method: req.method } });
 }
 
 async function handleGithub(req: VercelRequest, res: VercelResponse) {
