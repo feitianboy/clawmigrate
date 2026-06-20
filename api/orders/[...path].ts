@@ -202,12 +202,19 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
       .eq('id', order.user_id)
       .select('id, membership_tier, membership_expire_at');
 
+    // Read back immediately
+    const { data: readBack } = await supabase
+      .from('users')
+      .select('id, membership_tier, membership_expire_at')
+      .eq('id', order.user_id)
+      .single();
+
     await logActivity(order.user_id, 'payment_success', {
       orderId, tradeNo: String(trade_no || ''), plan: order.plan, tier, amount: order.amount, payType: type, paidAt: paidAt.toISOString()
     }, (req.headers['x-forwarded-for'] as string) || '');
 
     console.log('ZPAY payment successful: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
-    return res.json({ debug: true, orderId, userId: order.user_id, tier, updateResult, rawUpdateData: updateData, rawUpdateError: updateError, expireAt: expireAt.toISOString() });
+    return res.json({ debug: true, orderId, userId: order.user_id, tier, updateResult, rawUpdateData: updateData, rawUpdateError: updateError, readBack, expireAt: expireAt.toISOString() });
   } catch (error) {
     console.error('ZPAY callback error:', error);
     return res.send('success');
