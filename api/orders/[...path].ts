@@ -8,7 +8,7 @@ const ZPAY_PID = process.env.ZPAY_PID || '';
 const ZPAY_KEY = process.env.ZPAY_KEY || '';
 const ZPAY_BASE_URL = 'https://zpayz.cn/submit.php';
 const NOTIFY_URL = 'https://clawmigrate.xyz/api/orders/callback';
-const RETURN_URL = 'https://clawmigrate.xyz';
+const RETURN_URL_BASE = 'https://clawmigrate.xyz';
 
 // ZPAY MD5签名: 参数按ASCII排序拼接 + KEY, 再MD5
 function generateSign(params: Record<string, string>, key: string): string {
@@ -104,7 +104,7 @@ async function handleCreateOrder(req: VercelRequest, res: VercelResponse) {
       type: payType,
       out_trade_no: order.order_id,
       notify_url: NOTIFY_URL,
-      return_url: RETURN_URL,
+      return_url: RETURN_URL_BASE + '?out_trade_no=' + order.order_id,
       name: planName,
       money: amount.toFixed(2),
     };
@@ -130,21 +130,64 @@ async function handleCreateOrder(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// ---- Process payment asynchronously (extracted from callback) ----
+async function processPayment(orderId: string, tradeNo: string, type: string, money: string, clientIp: string) {
+  try {
+    const order = await findOrderByOrderId(orderId);
+    if (!order) {
+      console.error('ZPAY callback order not found:', orderId);
+      return;
+    }
+    if (order.status === 'paid') {
+      console.log('ZPAY callback order already paid:', orderId);
+      return;
+    }
+
+    const callbackAmount = parseFloat(money);
+    const orderAmount = parseFloat(String(order.amount));
+    if (Math.abs(callbackAmount - orderAmount) > 0.01) {
+      console.error('ZPAY callback amount mismatch:', { callbackAmount, orderAmount, orderId });
+      return;
+    }
+
+    const paidAt = new Date();
+    await updateOrderStatus(orderId, 'paid', paidAt);
+
+    const tier = getTierFromPlan(order.plan);
+    const expireAt = getExpireAt(order.plan);
+    await updateMembership(order.user_id, tier, expireAt);
+
+    await logActivity(order.user_id, 'payment_success', {
+      orderId, tradeNo, plan: order.plan, tier, amount: order.amount, payType: type, paidAt: paidAt.toISOString()
+    }, clientIp);
+
+    console.log('ZPAY payment successful: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
+  } catch (error) {
+    console.error('processPayment error:', error);
+  }
+}
+
 // ---- ZPAY Payment Callback (GET) ----
 async function handleCallback(req: VercelRequest, res: VercelResponse) {
+  // Return success immediately to prevent ZPAY timeout retries
+  // Then process payment asynchronously
   try {
-    const { pid, trade_no, out_trade_no, type, name, money, trade_status, sign, sign_type } = req.query;
+    const { out_trade_no, trade_no, type, money, trade_status, sign } = req.query;
 
     console.log('ZPAY callback received:', JSON.stringify(req.query));
 
+    // Respond success immediately - ZPAY requires fast response
+    res.send('success');
+
+    // Validate and process asynchronously
     if (!out_trade_no || !trade_status || !sign) {
       console.error('ZPAY callback missing required params');
-      return res.send('success');
+      return;
     }
 
     if (!ZPAY_KEY) {
       console.error('ZPAY_KEY not configured');
-      return res.send('success');
+      return;
     }
 
     const params: Record<string, string> = {};
@@ -160,50 +203,21 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
     const receivedSign = String(sign);
     if (!verifySign(params, ZPAY_KEY, receivedSign)) {
       console.error('ZPAY callback signature verification failed');
-      return res.send('success');
+      return;
     }
 
     const orderId = String(out_trade_no);
 
     if (trade_status !== 'TRADE_SUCCESS') {
       console.log('ZPAY callback trade_status not SUCCESS:', trade_status);
-      return res.send('success');
+      return;
     }
 
-    const order = await findOrderByOrderId(orderId);
-    if (!order) {
-      console.error('ZPAY callback order not found:', orderId);
-      return res.send('success');
-    }
-
-    if (order.status === 'paid') {
-      console.log('ZPAY callback order already paid:', orderId);
-      return res.send('success');
-    }
-
-    const callbackAmount = parseFloat(String(money));
-    const orderAmount = parseFloat(String(order.amount));
-    if (Math.abs(callbackAmount - orderAmount) > 0.01) {
-      console.error('ZPAY callback amount mismatch:', { callbackAmount, orderAmount, orderId });
-      return res.send('success');
-    }
-
-    const paidAt = new Date();
-    await updateOrderStatus(orderId, 'paid', paidAt);
-
-    const tier = getTierFromPlan(order.plan);
-    const expireAt = getExpireAt(order.plan);
-    await updateMembership(order.user_id, tier, expireAt);
-
-    await logActivity(order.user_id, 'payment_success', {
-      orderId, tradeNo: String(trade_no || ''), plan: order.plan, tier, amount: order.amount, payType: type, paidAt: paidAt.toISOString()
-    }, (req.headers['x-forwarded-for'] as string) || '');
-
-    console.log('ZPAY payment successful: order=' + orderId + ' user=' + order.user_id + ' tier=' + tier);
-    return res.send('success');
+    // Process payment asynchronously (don't block response)
+    const clientIp = (req.headers['x-forwarded-for'] as string) || '';
+    processPayment(orderId, String(trade_no || ''), String(type || ''), String(money || ''), clientIp);
   } catch (error) {
     console.error('ZPAY callback error:', error);
-    return res.send('success');
   }
 }
 
