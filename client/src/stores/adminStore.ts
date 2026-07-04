@@ -93,6 +93,7 @@ export interface AdminStats {
 
 interface AdminState {
   adminToken: string | null;
+  adminUser: { id: number; username: string; email: string; role: string } | null;
   users: User[];
   usersTotal: number;
   usersPage: number;
@@ -108,7 +109,9 @@ interface AdminState {
   isLoading: boolean;
   error: string | null;
 
-  verifyAdmin: (password: string) => Promise<{ success: boolean; error?: string }>;
+  verifyAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  setupAdmin: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  checkSetupStatus: () => Promise<{ hasAdmin: boolean }>;
   clearAdminToken: () => void;
   fetchDashboard: () => Promise<void>;
   fetchUsers: (page?: number, limit?: number, search?: string) => Promise<void>;
@@ -135,6 +138,7 @@ function getAdminHeaders(): Record<string, string> {
 
 export const useAdminStore = create<AdminState>((set, get) => ({
   adminToken: null,
+  adminUser: null,
   users: [],
   usersTotal: 0,
   usersPage: 1,
@@ -150,32 +154,68 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  verifyAdmin: async (password) => {
+  verifyAdmin: async (username, password) => {
     set({ isLoading: true, error: null });
     try {
       const response = await fetch('/api/admin/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await response.json();
       if (response.ok && data.ok) {
         localStorage.setItem('admin_token', data.token);
-        set({ adminToken: data.token, isLoading: false });
+        if (data.user) localStorage.setItem('admin_user', JSON.stringify(data.user));
+        set({ adminToken: data.token, adminUser: data.user || null, isLoading: false });
         return { success: true };
       }
-      set({ error: data.error || '密码验证失败', isLoading: false });
-      return { success: false, error: data.error || '密码验证失败' };
+      set({ error: data.error || '登录失败', isLoading: false });
+      return { success: false, error: data.error || '登录失败' };
     } catch (error) {
-      const msg = error instanceof Error ? error.message : '验证请求失败';
+      const msg = error instanceof Error ? error.message : '登录请求失败';
       set({ error: msg, isLoading: false });
       return { success: false, error: msg };
     }
   },
 
+  setupAdmin: async (username, email, password) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('/api/admin/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, email, password }),
+      });
+      const data = await response.json();
+      if (response.ok && data.ok) {
+        localStorage.setItem('admin_token', data.token);
+        if (data.user) localStorage.setItem('admin_user', JSON.stringify(data.user));
+        set({ adminToken: data.token, adminUser: data.user || null, isLoading: false });
+        return { success: true };
+      }
+      set({ error: data.error || '初始化失败', isLoading: false });
+      return { success: false, error: data.error || '初始化失败' };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '初始化请求失败';
+      set({ error: msg, isLoading: false });
+      return { success: false, error: msg };
+    }
+  },
+
+  checkSetupStatus: async () => {
+    try {
+      const response = await fetch('/api/admin/setup-status');
+      const data = await response.json();
+      return { hasAdmin: data.hasAdmin || false };
+    } catch {
+      return { hasAdmin: true }; // 出错时默认已有管理员，走登录流程
+    }
+  },
+
   clearAdminToken: () => {
     localStorage.removeItem('admin_token');
-    set({ adminToken: null });
+    localStorage.removeItem('admin_user');
+    set({ adminToken: null, adminUser: null });
   },
 
   fetchDashboard: async () => {

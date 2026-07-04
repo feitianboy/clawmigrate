@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, ArrowRightLeft, ShoppingCart, TrendingUp,
   Trash2, RefreshCw, CheckCircle, XCircle, Clock, Shield, Lock,
   ChevronLeft, ChevronRight, DollarSign, UserCheck, Eye, Activity,
-  PieChart as PieChartIcon, Search, ArrowLeft, Crown, CreditCard,
+  PieChart as PieChartIcon, Search, ArrowLeft, Crown, CreditCard, UserPlus,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, LineChart, Line, BarChart, Bar,
@@ -139,34 +139,85 @@ const EmptyData: React.FC = () => (
 );
 
 // ---- 密码页 ----
-const PasswordPage: React.FC<{ onSuccess: () => void; verifyAdmin: (p: string) => Promise<{ success: boolean; error?: string }>; isLoading: boolean }> = ({ onSuccess, verifyAdmin, isLoading }) => {
+const PasswordPage: React.FC<{
+  onSuccess: () => void;
+  verifyAdmin: (u: string, p: string) => Promise<{ success: boolean; error?: string }>;
+  setupAdmin: (u: string, e: string, p: string) => Promise<{ success: boolean; error?: string }>;
+  checkSetupStatus: () => Promise<{ hasAdmin: boolean }>;
+  isLoading: boolean;
+}> = ({ onSuccess, verifyAdmin, setupAdmin, checkSetupStatus, isLoading }) => {
+  const [mode, setMode] = useState<'login' | 'setup' | 'loading'>('loading');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    checkSetupStatus().then(({ hasAdmin }) => {
+      setMode(hasAdmin ? 'login' : 'setup');
+    });
+  }, [checkSetupStatus]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password.trim()) { setError('请输入管理密码'); return; }
+    if (!username.trim() || !password.trim()) { setError('请输入账号和密码'); return; }
     setError('');
-    const result = await verifyAdmin(password);
+    const result = await verifyAdmin(username, password);
     if (result.success) onSuccess();
-    else setError(result.error || '密码验证失败');
+    else setError(result.error || '登录失败');
   };
+
+  const handleSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !email.trim() || !password.trim()) { setError('请填写所有字段'); return; }
+    setError('');
+    const result = await setupAdmin(username, email, password);
+    if (result.success) onSuccess();
+    else setError(result.error || '初始化失败');
+  };
+
+  if (mode === 'loading') {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+        <RefreshCw size={32} className="animate-spin" style={{ color: 'var(--color-primary)' }} />
+      </div>
+    );
+  }
+
+  const isSetup = mode === 'setup';
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)', background: 'var(--color-bg)' }}>
       <div style={{ width: '100%', maxWidth: '400px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xl)', padding: 'var(--space-8)', textAlign: 'center' }}>
         <div style={{ width: '64px', height: '64px', margin: '0 auto var(--space-5)', background: 'rgba(249,115,22,0.15)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
-          <Lock size={32} />
+          {isSetup ? <UserPlus size={32} /> : <Shield size={32} />}
         </div>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-2)' }}>管理后台</h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9375rem', marginBottom: 'var(--space-6)' }}>请输入管理密码以继续</p>
-        <form onSubmit={handleSubmit}>
-          <input type="password" placeholder="输入管理密码" value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading}
-            style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem', textAlign: 'center', marginBottom: 'var(--space-4)' }} />
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-2)' }}>{isSetup ? '初始化管理员' : '管理后台'}</h1>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9375rem', marginBottom: 'var(--space-6)' }}>
+          {isSetup ? '首次使用，请创建管理员账号' : '请输入管理员账号和密码登录'}
+        </p>
+        <form onSubmit={isSetup ? handleSetup : handleLogin}>
+          <div style={{ marginBottom: 'var(--space-3)', textAlign: 'left' }}>
+            <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>管理员账号</label>
+            <input type="text" placeholder="输入管理员用户名" value={username} onChange={e => setUsername(e.target.value)} disabled={isLoading} autoFocus
+              style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem' }} />
+          </div>
+          {isSetup && (
+            <div style={{ marginBottom: 'var(--space-3)', textAlign: 'left' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>邮箱</label>
+              <input type="email" placeholder="输入邮箱地址" value={email} onChange={e => setEmail(e.target.value)} disabled={isLoading}
+                style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem' }} />
+            </div>
+          )}
+          <div style={{ marginBottom: 'var(--space-4)', textAlign: 'left' }}>
+            <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>密码</label>
+            <input type="password" placeholder={isSetup ? '设置密码（至少6位）' : '输入密码'} value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading}
+              style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem' }} />
+          </div>
           <button type="submit" disabled={isLoading}
             style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', opacity: isLoading ? 0.7 : 1 }}>
-            {isLoading ? <><RefreshCw size={18} className="animate-spin" />验证中...</> : <><Shield size={18} />进入后台</>}
+            {isLoading ? <><RefreshCw size={18} className="animate-spin" />{isSetup ? '创建中...' : '登录中...'}</> : <>{isSetup ? <><UserPlus size={18} />创建管理员</> : <><Lock size={18} />登录后台</>}</>}
           </button>
         </form>
         {error && <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', fontSize: '0.875rem' }}>{error}</div>}
@@ -521,10 +572,20 @@ export const AdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const navigate = useNavigate();
-  const { adminToken, verifyAdmin, isLoading, error, fetchDashboard, clearError, clearAdminToken } = useAdminStore();
+  const { adminToken, adminUser, verifyAdmin, setupAdmin, checkSetupStatus, isLoading, error, fetchDashboard, clearError, clearAdminToken } = useAdminStore();
 
   useEffect(() => {
-    if (localStorage.getItem('admin_token')) setIsAuthenticated(true);
+    const token = localStorage.getItem('admin_token');
+    const userStr = localStorage.getItem('admin_user');
+    if (token) {
+      setIsAuthenticated(true);
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          useAdminStore.setState({ adminToken: token, adminUser: user });
+        } catch { /* ignore */ }
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -536,11 +597,10 @@ export const AdminPage: React.FC = () => {
   }, [isAuthenticated, fetchDashboard]);
 
   const handleRefresh = () => { fetchDashboard(); };
-
   const handleLogout = () => { clearAdminToken(); setIsAuthenticated(false); };
 
   if (!isAuthenticated) {
-    return <PasswordPage onSuccess={() => setIsAuthenticated(true)} verifyAdmin={verifyAdmin} isLoading={isLoading} />;
+    return <PasswordPage onSuccess={() => setIsAuthenticated(true)} verifyAdmin={verifyAdmin} setupAdmin={setupAdmin} checkSetupStatus={checkSetupStatus} isLoading={isLoading} />;
   }
 
   const navItems: { key: Page; label: string; icon: React.ReactNode }[] = [
@@ -566,9 +626,22 @@ export const AdminPage: React.FC = () => {
             </button>
           ))}
         </nav>
+        {/* 底部管理员信息 */}
         <div style={{ padding: 'var(--space-4) var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', marginBottom: 'var(--space-2)' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.8125rem', flexShrink: 0 }}>
+              {adminUser ? getInitials(adminUser.username) : 'A'}
+            </div>
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{adminUser?.username || '管理员'}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{adminUser?.email || ''}</div>
+            </div>
+          </div>
           <button style={{ ...S.navItem, color: 'var(--color-text-secondary)' }} onClick={() => navigate('/')}>
             <ArrowLeft size={18} />返回前台
+          </button>
+          <button style={{ ...S.navItem, color: 'var(--color-text-secondary)' }} onClick={handleLogout}>
+            <Lock size={18} />退出登录
           </button>
         </div>
       </div>
@@ -581,7 +654,6 @@ export const AdminPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <span style={{ ...S.badge, background: 'rgba(249,115,22,0.15)', color: 'var(--color-primary)' }}><Shield size={12} />管理员</span>
             <button style={S.btn} onClick={handleRefresh} disabled={isLoading}><RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />刷新</button>
-            <button style={S.btn} onClick={handleLogout}>退出</button>
           </div>
         </div>
 

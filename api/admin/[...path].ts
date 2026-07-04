@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAdmin, requireAuth, generateAdminToken, checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '../../lib/auth';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { requireAdmin, requireAuth, checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { logActivity, getPlanName, getStatusName, getTierFromPlan, getExpireAt, getActivityLogs, getActivityStats } from '../../lib/utils';
 import { updateMembership, MembershipTier, getOrdersByUserId, findOrderByOrderId, updateOrderStatus, getOrderStats } from '../../lib/membership';
@@ -13,6 +15,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const subPath = segments.join('/');
 
   if (subPath === 'verify' && req.method === 'POST') return handleVerify(req, res);
+  if (subPath === 'setup' && req.method === 'POST') return handleSetup(req, res);
+  if (subPath === 'setup-status' && req.method === 'GET') return handleSetupStatus(req, res);
   if (subPath === 'activity-logs' && req.method === 'GET') return handleActivityLogs(req, res);
   if (subPath === 'membership' && req.method === 'PUT') return handleMembership(req, res);
   if (subPath === 'migrations' && req.method === 'GET') return handleAdminMigrations(req, res);
@@ -487,7 +491,7 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse, subPath
   }
 }
 
-// ---- Verify Admin Password ----
+// ---- Verify Admin (账号+密码登录) ----
 async function handleVerify(req: VercelRequest, res: VercelResponse) {
   try {
     // 速率限制
@@ -497,25 +501,127 @@ async function handleVerify(req: VercelRequest, res: VercelResponse) {
       return res.status(429).json({ ok: false, error: `尝试过于频繁，请 ${rateLimit.retryAfter} 秒后再试` });
     }
 
-    const { password } = req.body || {};
-    const adminPassword = process.env.ADMIN_PASSWORD;
-
-    if (!adminPassword) {
-      return res.status(500).json({ ok: false, error: 'Admin password not configured' });
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ ok: false, error: '请输入账号和密码' });
     }
 
-    if (password !== adminPassword) {
+    // 查询用户，验证 admin 角色 + 密码
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, username, email, role, password_hash')
+      .eq('username', username)
+      .single();
+
+    if (!user || !user.password_hash) {
       recordFailedAttempt(rateLimitKey);
-      return res.status(401).json({ ok: false, error: '密码错误' });
+      return res.status(401).json({ ok: false, error: '账号或密码错误' });
+    }
+
+    if (user.role !== 'admin') {
+      recordFailedAttempt(rateLimitKey);
+      return res.status(403).json({ ok: false, error: '无管理员权限' });
+    }
+
+    if (!bcrypt.compareSync(password, user.password_hash)) {
+      recordFailedAttempt(rateLimitKey);
+      return res.status(401).json({ ok: false, error: '账号或密码错误' });
     }
 
     clearRateLimit(rateLimitKey);
-    // 使用统一的 Token 生成函数（含时间戳，24h 过期）
-    const token = generateAdminToken(adminPassword);
 
-    return res.json({ ok: true, token });
+    // 生成 JWT token（24h 有效）
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
+    const token = jwt.sign(
+      { userId: user.id, username: user.username, role: user.role },
+      secret,
+      { expiresIn: '24h' }
+    );
+
+    await logActivity(user.id, 'admin_login', { username: user.username }, getClientIp(req));
+
+    return res.json({ ok: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
   } catch (error) {
     console.error('Verify admin error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+// ---- Setup Status (检查是否已有管理员) ----
+async function handleSetupStatus(req: VercelRequest, res: VercelResponse) {
+  try {
+    const { count } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'admin');
+
+    return res.json({ ok: true, hasAdmin: (count || 0) > 0 });
+  } catch (error) {
+    console.error('Setup status error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+// ---- Setup (初始化管理员账号，仅在没有管理员时可用) ----
+async function handleSetup(req: VercelRequest, res: VercelResponse) {
+  try {
+    // 安全检查：如果已有管理员，禁止再次创建
+    const { count: adminCount } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'admin');
+
+    if ((adminCount || 0) > 0) {
+      return res.status(403).json({ ok: false, error: '管理员账号已存在，如需新增请登录后台操作' });
+    }
+
+    const { username, email, password } = req.body || {};
+
+    // 参数校验
+    if (!username || !email || !password) {
+      return res.status(400).json({ ok: false, error: '用户名、邮箱、密码均为必填' });
+    }
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ ok: false, error: '用户名长度需 3-20 个字符' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ ok: false, error: '密码长度至少 6 位' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ ok: false, error: '邮箱格式不正确' });
+    }
+
+    // 检查用户名和邮箱是否已存在
+    const { data: existingUser } = await supabase.from('users').select('id').eq('username', username).single();
+    if (existingUser) return res.status(400).json({ ok: false, error: '用户名已存在' });
+    const { data: existingEmail } = await supabase.from('users').select('id').eq('email', email).single();
+    if (existingEmail) return res.status(400).json({ ok: false, error: '邮箱已被注册' });
+
+    // 创建管理员账号
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const { data: newAdmin, error } = await supabase.from('users').insert({
+      username, email, password_hash: passwordHash, role: 'admin'
+    }).select('id, username, email, role').single();
+
+    if (error || !newAdmin) {
+      return res.status(500).json({ ok: false, error: '创建管理员账号失败' });
+    }
+
+    // 生成 JWT token
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
+    const token = jwt.sign(
+      { userId: newAdmin.id, username: newAdmin.username, role: newAdmin.role },
+      secret,
+      { expiresIn: '24h' }
+    );
+
+    await logActivity(newAdmin.id, 'admin_setup', { username: newAdmin.username }, getClientIp(req));
+
+    return res.json({ ok: true, token, user: newAdmin });
+  } catch (error) {
+    console.error('Setup admin error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 }

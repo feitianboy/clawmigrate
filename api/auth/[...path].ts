@@ -174,8 +174,8 @@ async function handleRegister(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleAdminLogin(req: VercelRequest, res: VercelResponse) {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ ok: false, error: 'Password is required' });
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ ok: false, error: '账号和密码为必填' });
 
   // 速率限制
   const rateLimitKey = `admin:${getClientIp(req)}`;
@@ -184,18 +184,24 @@ async function handleAdminLogin(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ ok: false, error: `尝试过于频繁，请 ${rateLimit.retryAfter} 秒后再试` });
   }
 
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  if (!adminPassword) return res.status(500).json({ ok: false, error: 'Admin login not configured' });
-  if (password !== adminPassword) {
+  // 查询用户，验证 admin 角色 + 密码
+  const { data: user } = await supabase.from('users').select('id, username, email, role, password_hash').eq('username', username).single();
+  if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
     recordFailedAttempt(rateLimitKey);
-    return res.status(401).json({ ok: false, error: '管理密码错误' });
+    return res.status(401).json({ ok: false, error: '账号或密码错误' });
+  }
+
+  if (user.role !== 'admin') {
+    recordFailedAttempt(rateLimitKey);
+    return res.status(403).json({ ok: false, error: '无管理员权限' });
   }
 
   clearRateLimit(rateLimitKey);
+  await logActivity(user.id, 'admin_login', { username: user.username }, getClientIp(req));
   const secret = process.env.JWT_SECRET;
   if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
-  const token = jwt.sign({ role: 'admin', isAdmin: true }, secret, { expiresIn: '24h' });
-  return res.json({ ok: true, data: { token } });
+  const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, secret, { expiresIn: '24h' });
+  return res.json({ ok: true, data: { token, user: { id: user.id, username: user.username, email: user.email, role: user.role } } });
 }
 
 async function handleCheck(req: VercelRequest, res: VercelResponse) {

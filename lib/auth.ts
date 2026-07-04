@@ -187,51 +187,58 @@ export async function requireAuth(req: VercelRequest): Promise<{ user: AuthUser;
 }
 
 export async function requireAdmin(req: VercelRequest): Promise<{ user: AuthUser; error?: undefined } | { user?: undefined; error: { status: number; message: string } }> {
-  // 支持两种鉴权方式：
-  // 1. X-Admin-Token: 管理后台密码验证后的token（含时间戳，校验过期）
-  // 2. 用户JWT token + admin角色
-
-  // 方式1: 检查 X-Admin-Token
+  // 管理员鉴权：使用 JWT token + admin 角色
+  // 支持 X-Admin-Token（管理后台）和 Authorization Bearer（前台用户）两种传递方式
   const adminToken = req.headers['x-admin-token'] as string | undefined;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  const authHeader = req.headers.authorization as string | undefined;
 
-  if (adminToken && adminPassword) {
-    try {
-      const decoded = Buffer.from(adminToken, 'base64').toString();
-      const parts = decoded.split(':');
-      const pwd = parts[0];
-      const timestamp = parseInt(parts[1] || '0', 10);
+  let token: string | null = null;
+  if (adminToken) {
+    token = adminToken;
+  } else if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  }
 
-      if (pwd === adminPassword) {
-        // 校验时间戳，Token 最多 24 小时有效
-        if (!timestamp || Date.now() - timestamp > ADMIN_TOKEN_MAX_AGE) {
-          return { error: { status: 401, message: 'Admin token expired, please re-login' } };
-        }
-        return { user: { id: 0, username: 'admin', email: 'admin@system', role: 'admin' } };
-      }
-    } catch {
-      // Token解析失败，继续尝试方式2
+  if (!token) {
+    return { error: { status: 401, message: 'No token provided' } };
+  }
+
+  let secret: string;
+  try {
+    secret = getJwtSecret();
+  } catch {
+    return { error: { status: 500, message: 'Server authentication not configured' } };
+  }
+
+  try {
+    const decoded = jwt.verify(token, secret) as JwtPayload;
+
+    // 从数据库验证用户仍然存在且是 admin
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, username, email, role')
+      .eq('id', decoded.userId)
+      .single();
+
+    if (!user) {
+      return { error: { status: 401, message: 'User not found' } };
     }
+
+    if (user.role !== 'admin') {
+      return { error: { status: 403, message: 'Admin access required' } };
+    }
+
+    return {
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    };
+  } catch (error) {
+    return { error: { status: 401, message: 'Invalid or expired token' } };
   }
-
-  // 方式2: 检查 x-admin-password（兼容旧调用）
-  const adminPwd = req.headers['x-admin-password'] as string | undefined;
-  if (adminPwd && adminPassword && adminPwd === adminPassword) {
-    return { user: { id: 0, username: 'admin', email: 'admin@system', role: 'admin' } };
-  }
-
-  // 方式3: 用户JWT token + admin角色
-  const result = await requireAuth(req);
-
-  if (result.error) {
-    return result;
-  }
-
-  if (result.user!.role !== 'admin') {
-    return { error: { status: 403, message: 'Admin access required' } };
-  }
-
-  return result;
 }
 
 // 生成管理员 Token（含时间戳，24h 后过期）
