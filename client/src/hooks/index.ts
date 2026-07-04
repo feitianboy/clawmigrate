@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 /**
  * 复制文本到剪贴板
@@ -54,13 +54,13 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
 export function formatDate(date: string | Date, format: 'full' | 'date' | 'time' = 'full') {
   const d = typeof date === 'string' ? new Date(date) : date;
   
-  const options: Intl.DateTimeFormatOptions = {
+  const options: Record<'full' | 'date' | 'time', Intl.DateTimeFormatOptions> = {
     full: { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' },
     date: { year: 'numeric', month: '2-digit', day: '2-digit' },
     time: { hour: '2-digit', minute: '2-digit' },
-  }[format];
+  };
 
-  return d.toLocaleDateString('zh-CN', options);
+  return d.toLocaleDateString('zh-CN', options[format]);
 }
 
 /**
@@ -69,7 +69,7 @@ export function formatDate(date: string | Date, format: 'full' | 'date' | 'time'
 export function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
-  useState(() => {
+  useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);

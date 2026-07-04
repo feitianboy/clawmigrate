@@ -172,7 +172,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
+export const Layout: React.FC = () => {
   const location = useLocation();
   const { user, isAuthenticated, checkAuth, logout, planInfo, isPro, isLoading, fetchPlanInfo } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

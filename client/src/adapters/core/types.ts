@@ -162,6 +162,7 @@ export interface SettingsConfig {
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
+  personaDescription?: string;
   customSettings: Record<string, unknown>;
   sensitivityLevel: SensitivityLevel;
   originalFieldNames: Record<string, string>;

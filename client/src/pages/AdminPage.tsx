@@ -19,6 +19,7 @@ import {
   DollarSign,
   ShoppingCart,
   Activity,
+  PieChart as PieChartIcon,
 } from 'lucide-react';
 import {
   PieChart,
@@ -629,7 +630,7 @@ const PlatformPieChart: React.FC<{
     return (
       <div style={{ ...styles.chartCard, height: '100%' }}>
         <h3 style={styles.chartTitle}>
-          <PieChart size={18} />
+          <PieChartIcon size={18} />
           平台分布
         </h3>
         <div style={{ ...styles.chartContainer, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -642,7 +643,7 @@ const PlatformPieChart: React.FC<{
   return (
     <div style={styles.chartCard}>
       <h3 style={styles.chartTitle}>
-        <PieChart size={18} />
+        <PieChartIcon size={18} />
         平台分布
       </h3>
       <div style={styles.chartContainer}>

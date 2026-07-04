@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Crown, Check, Zap, Clock, CreditCard } from 'lucide-react';
 import { apiFetch } from '../utils/apiFetch';
+import { useAuthStore } from '../stores/authStore';
 
 interface UpgradeModalProps {
   isOpen: boolean;

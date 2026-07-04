@@ -639,8 +639,8 @@ const MigrationPage: React.FC = () => {
   const getSensitivityLabel = (level: SensitivityLevel): string => {
     const labels: Record<SensitivityLevel, string> = {
       [SensitivityLevel.SAFE]: '安全',
-      [SensitivityLevel.SENSITIVE]: '敏感',
-      [SensitivityLevel.CRITICAL]: '高危',
+      [SensitivityLevel.REVIEW_SUGGESTED]: '敏感',
+      [SensitivityLevel.MUST_REMOVE]: '高危',
     };
     return labels[level] || '未知';
   };

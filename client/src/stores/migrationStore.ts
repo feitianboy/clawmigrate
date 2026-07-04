@@ -17,6 +17,16 @@ export type MigrationStep =
   | 'import'
   | 'complete';
 
+export interface HistoryRecord {
+  id: string;
+  sourcePlatform: string;
+  targetPlatform: string;
+  status: 'success' | 'failed' | 'pending';
+  itemsCount: number;
+  categories: string[];
+  createdAt: string;
+}
+
 interface MigrationState {
   // 当前步骤
   currentStep: MigrationStep;
