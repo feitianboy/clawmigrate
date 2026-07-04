@@ -3,8 +3,12 @@ import { requireAuth } from '../../lib/auth';
 import { canMigrate, getMembershipInfo, getUsage, createOrder, PLAN_PRICES, updateMembership, MembershipTier } from '../../lib/membership';
 import { getTierName, getTierBenefits, getTierFromPlan, getExpireAt, logActivity } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
+import { setCorsHeaders, handlePreflight } from '../../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(req, res);
+  if (handlePreflight(req, res)) return;
+
   const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 

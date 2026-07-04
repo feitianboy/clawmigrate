@@ -1,13 +1,52 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { supabase } from '../../lib/supabase';
 import { logActivity } from '../../lib/utils';
-import { requireAuth } from '../../lib/auth';
+import { requireAuth, checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '../../lib/auth';
+import { setCorsHeaders, handlePreflight } from '../../lib/cors';
 
 const SALT_ROUNDS = 10;
 
+// 获取应用基础 URL（统一环境变量名）
+function getAppUrl(): string {
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
+}
+
+// 生成 GitHub OAuth state（HMAC 签名，防 CSRF）
+function generateOAuthState(): string {
+  const secret = process.env.JWT_SECRET || 'oauth_state_secret';
+  const timestamp = Date.now();
+  const random = crypto.randomBytes(8).toString('hex');
+  const payload = `${timestamp}:${random}`;
+  const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return Buffer.from(`${payload}:${hmac}`).toString('base64');
+}
+
+// 验证 GitHub OAuth state（有效期 10 分钟）
+function verifyOAuthState(state: string): boolean {
+  try {
+    const secret = process.env.JWT_SECRET || 'oauth_state_secret';
+    const decoded = Buffer.from(state, 'base64').toString();
+    const parts = decoded.split(':');
+    if (parts.length !== 3) return false;
+    const timestamp = parseInt(parts[0], 10);
+    const random = parts[1];
+    const receivedHmac = parts[2];
+    // 10 分钟有效期
+    if (Date.now() - timestamp > 10 * 60 * 1000) return false;
+    const expectedHmac = crypto.createHmac('sha256', secret).update(`${timestamp}:${random}`).digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(receivedHmac), Buffer.from(expectedHmac));
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(req, res);
+  if (handlePreflight(req, res)) return;
+
   const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
@@ -26,14 +65,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function handleGithub(req: VercelRequest, res: VercelResponse) {
   const clientId = process.env.GITHUB_CLIENT_ID;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/github/callback`;
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user,user:email`;
+  if (!clientId) return res.status(500).json({ ok: false, error: 'GitHub OAuth not configured' });
+  const redirectUri = `${getAppUrl()}/api/auth/github/callback`;
+  const state = generateOAuthState();
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read:user,user:email&state=${encodeURIComponent(state)}`;
   return res.json({ ok: true, data: { url: githubAuthUrl } });
 }
 
 async function handleGithubCallback(req: VercelRequest, res: VercelResponse) {
-  const { code } = req.query;
+  const { code, state } = req.query;
   if (!code) return res.status(400).json({ ok: false, error: 'No code provided' });
+  // 校验 state 防 CSRF
+  if (!state || !verifyOAuthState(String(state))) {
+    return res.status(400).json({ ok: false, error: 'Invalid OAuth state, possible CSRF attack' });
+  }
 
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
@@ -69,23 +114,34 @@ async function handleGithubCallback(req: VercelRequest, res: VercelResponse) {
     user = newUser;
   }
 
-  await logActivity(user.id, 'github_login', { username: user.username }, req.headers['x-forwarded-for'] as string || (req as any).ip);
-  const secret = process.env.JWT_SECRET || 'default_secret';
+  await logActivity(user.id, 'github_login', { username: user.username }, getClientIp(req));
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
   const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, secret, { expiresIn: '7d' });
-  const frontendUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173';
-  return res.redirect(302, `${frontendUrl}/auth/callback?token=${token}`);
+  return res.redirect(302, `${getAppUrl()}/auth/callback?token=${token}`);
 }
 
 async function handleLogin(req: VercelRequest, res: VercelResponse) {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ ok: false, error: 'Username and password are required' });
 
-  const { data: user } = await supabase.from('users').select('id, username, email, role, password_hash').eq('username', username).single();
-  if (!user) return res.status(401).json({ ok: false, error: 'Invalid username or password' });
-  if (!bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ ok: false, error: 'Invalid username or password' });
+  // 速率限制
+  const rateLimitKey = `login:${getClientIp(req)}`;
+  const rateLimit = checkRateLimit(rateLimitKey);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ ok: false, error: `尝试过于频繁，请 ${rateLimit.retryAfter} 秒后再试` });
+  }
 
-  await logActivity(user.id, 'login', { username: user.username }, req.headers['x-forwarded-for'] as string || (req as any).ip);
-  const secret = process.env.JWT_SECRET || 'default_secret';
+  const { data: user } = await supabase.from('users').select('id, username, email, role, password_hash').eq('username', username).single();
+  if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
+    recordFailedAttempt(rateLimitKey);
+    return res.status(401).json({ ok: false, error: '用户名或密码错误' });
+  }
+
+  clearRateLimit(rateLimitKey);
+  await logActivity(user.id, 'login', { username: user.username }, getClientIp(req));
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
   const token = jwt.sign({ userId: user.id, username: user.username, role: user.role }, secret, { expiresIn: '7d' });
   res.setHeader('Set-Cookie', `token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
   return res.json({ ok: true, data: { token, user: { id: user.id, username: user.username, email: user.email, role: user.role } } });
@@ -109,8 +165,9 @@ async function handleRegister(req: VercelRequest, res: VercelResponse) {
   }).select('id, username, email, role').single();
   if (error || !newUser) return res.status(500).json({ ok: false, error: 'Failed to create user' });
 
-  await logActivity(newUser.id, 'register', { username: newUser.username }, req.headers['x-forwarded-for'] as string || (req as any).ip);
-  const secret = process.env.JWT_SECRET || 'default_secret';
+  await logActivity(newUser.id, 'register', { username: newUser.username }, getClientIp(req));
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
   const token = jwt.sign({ userId: newUser.id, username: newUser.username, role: newUser.role }, secret, { expiresIn: '7d' });
   res.setHeader('Set-Cookie', `token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
   return res.status(201).json({ ok: true, data: { token, user: { id: newUser.id, username: newUser.username, email: newUser.email, role: newUser.role } } });
@@ -120,11 +177,23 @@ async function handleAdminLogin(req: VercelRequest, res: VercelResponse) {
   const { password } = req.body;
   if (!password) return res.status(400).json({ ok: false, error: 'Password is required' });
 
+  // 速率限制
+  const rateLimitKey = `admin:${getClientIp(req)}`;
+  const rateLimit = checkRateLimit(rateLimitKey);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ ok: false, error: `尝试过于频繁，请 ${rateLimit.retryAfter} 秒后再试` });
+  }
+
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminPassword) return res.status(500).json({ ok: false, error: 'Admin login not configured' });
-  if (password !== adminPassword) return res.status(401).json({ ok: false, error: 'Invalid admin password' });
+  if (password !== adminPassword) {
+    recordFailedAttempt(rateLimitKey);
+    return res.status(401).json({ ok: false, error: '管理密码错误' });
+  }
 
-  const secret = process.env.JWT_SECRET || 'default_secret';
+  clearRateLimit(rateLimitKey);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
   const token = jwt.sign({ role: 'admin', isAdmin: true }, secret, { expiresIn: '24h' });
   return res.json({ ok: true, data: { token } });
 }
@@ -134,7 +203,8 @@ async function handleCheck(req: VercelRequest, res: VercelResponse) {
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.json({ ok: true, data: { authenticated: false } });
 
-    const secret = process.env.JWT_SECRET || 'default_secret';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return res.json({ ok: true, data: { authenticated: false } });
     const decoded = jwt.verify(token, secret) as any;
     return res.json({ ok: true, data: { authenticated: true, userId: decoded.userId, username: decoded.username, role: decoded.role } });
   } catch {

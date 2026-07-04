@@ -1,4 +1,4 @@
-import { VercelRequest } from '@vercel/node';
+import { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import { supabase } from './supabase';
 
@@ -13,6 +13,63 @@ export interface AuthUser {
   username: string;
   email: string;
   role: string;
+}
+
+// 管理员 Token 有效期：24 小时（毫秒）
+const ADMIN_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000;
+
+// 获取 JWT 密钥，未配置则直接抛错（禁止使用默认密钥）
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
+}
+
+// 简易内存速率限制：记录 IP + action 的失败次数
+interface RateLimitEntry { count: number; firstAttempt: number; lockedUntil: number; }
+const rateLimitMap = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 分钟窗口
+const RATE_LIMIT_MAX_FAILURES = 10; // 最多 10 次失败
+const RATE_LIMIT_LOCK_DURATION = 15 * 60 * 1000; // 锁定 15 分钟
+
+export function checkRateLimit(key: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry) return { allowed: true };
+  if (entry.lockedUntil > now) {
+    return { allowed: false, retryAfter: Math.ceil((entry.lockedUntil - now) / 1000) };
+  }
+  return { allowed: true };
+}
+
+export function recordFailedAttempt(key: string): void {
+  const now = Date.now();
+  let entry = rateLimitMap.get(key);
+  if (!entry) {
+    entry = { count: 0, firstAttempt: now, lockedUntil: 0 };
+    rateLimitMap.set(key, entry);
+  }
+  // 重置过期的窗口
+  if (now - entry.firstAttempt > RATE_LIMIT_WINDOW) {
+    entry.count = 0;
+    entry.firstAttempt = now;
+    entry.lockedUntil = 0;
+  }
+  entry.count++;
+  if (entry.count >= RATE_LIMIT_MAX_FAILURES) {
+    entry.lockedUntil = now + RATE_LIMIT_LOCK_DURATION;
+  }
+}
+
+export function clearRateLimit(key: string): void {
+  rateLimitMap.delete(key);
+}
+
+// 获取客户端 IP
+export function getClientIp(req: VercelRequest): string {
+  return (req.headers['x-forwarded-for'] as string) || (req as any).ip || 'unknown';
 }
 
 // Helper function to extract token from cookies
@@ -57,18 +114,23 @@ export async function verifyAuth(req: VercelRequest): Promise<AuthUser | null> {
     return null;
   }
 
-  const secret = process.env.JWT_SECRET || 'default_secret';
+  let secret: string;
+  try {
+    secret = getJwtSecret();
+  } catch {
+    return null;
+  }
 
   try {
     const decoded = jwt.verify(token, secret) as JwtPayload;
-    
+
     // 从数据库验证用户仍然存在
     const { data: user } = await supabase
       .from('users')
       .select('id, username, email, role')
       .eq('id', decoded.userId)
       .single();
-    
+
     if (!user) {
       return null;
     }
@@ -91,17 +153,22 @@ export async function requireAuth(req: VercelRequest): Promise<{ user: AuthUser;
     return { error: { status: 401, message: 'No token provided' } };
   }
 
-  const secret = process.env.JWT_SECRET || 'default_secret';
+  let secret: string;
+  try {
+    secret = getJwtSecret();
+  } catch {
+    return { error: { status: 500, message: 'Server authentication not configured' } };
+  }
 
   try {
     const decoded = jwt.verify(token, secret) as JwtPayload;
-    
+
     const { data: user } = await supabase
       .from('users')
       .select('id, username, email, role')
       .eq('id', decoded.userId)
       .single();
-    
+
     if (!user) {
       return { error: { status: 401, message: 'User not found' } };
     }
@@ -121,19 +188,25 @@ export async function requireAuth(req: VercelRequest): Promise<{ user: AuthUser;
 
 export async function requireAdmin(req: VercelRequest): Promise<{ user: AuthUser; error?: undefined } | { user?: undefined; error: { status: number; message: string } }> {
   // 支持两种鉴权方式：
-  // 1. X-Admin-Token: 管理后台密码验证后的token（MVP独立密码机制）
+  // 1. X-Admin-Token: 管理后台密码验证后的token（含时间戳，校验过期）
   // 2. 用户JWT token + admin角色
 
   // 方式1: 检查 X-Admin-Token
   const adminToken = req.headers['x-admin-token'] as string | undefined;
   const adminPassword = process.env.ADMIN_PASSWORD;
-  
+
   if (adminToken && adminPassword) {
     try {
       const decoded = Buffer.from(adminToken, 'base64').toString();
-      const [pwd] = decoded.split(':');
+      const parts = decoded.split(':');
+      const pwd = parts[0];
+      const timestamp = parseInt(parts[1] || '0', 10);
+
       if (pwd === adminPassword) {
-        // Token验证通过，返回一个虚拟admin用户
+        // 校验时间戳，Token 最多 24 小时有效
+        if (!timestamp || Date.now() - timestamp > ADMIN_TOKEN_MAX_AGE) {
+          return { error: { status: 401, message: 'Admin token expired, please re-login' } };
+        }
         return { user: { id: 0, username: 'admin', email: 'admin@system', role: 'admin' } };
       }
     } catch {
@@ -149,7 +222,7 @@ export async function requireAdmin(req: VercelRequest): Promise<{ user: AuthUser
 
   // 方式3: 用户JWT token + admin角色
   const result = await requireAuth(req);
-  
+
   if (result.error) {
     return result;
   }
@@ -161,8 +234,14 @@ export async function requireAdmin(req: VercelRequest): Promise<{ user: AuthUser
   return result;
 }
 
+// 生成管理员 Token（含时间戳，24h 后过期）
+export function generateAdminToken(adminPassword: string): string {
+  const payload = `${adminPassword}:${Date.now()}`;
+  return Buffer.from(payload).toString('base64');
+}
+
 export function generateToken(user: AuthUser): string {
-  const secret = process.env.JWT_SECRET || 'default_secret';
+  const secret = getJwtSecret();
   return jwt.sign(
     { userId: user.id, username: user.username, role: user.role },
     secret,

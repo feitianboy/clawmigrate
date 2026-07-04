@@ -48,20 +48,14 @@ const CHART_COLORS = {
 
 // 平台图标映射
 const platformIcons: Record<string, string> = {
-  claude: '🧠',
-  kimi: '🌙',
-  openclaw: '🦞',
-  cursor: '📝',
-  wind: '🌬️',
+  claude: '🧠', kimi: '🌙', openclaw: '🦞', qclaw: '🤖', workbuddy: '💼',
+  maxclaw: '🚀', duclaw: '🎭', autoclw: '⚡', arkclaw: '🦅', claw360: '🌐', easyclaw: '✨',
 };
 
 // 平台名称映射
 const platformNames: Record<string, string> = {
-  claude: 'Claude',
-  kimi: 'Kimi',
-  openclaw: 'OpenClaw',
-  cursor: 'Cursor',
-  wind: 'Wind',
+  claude: 'Claude', kimi: 'Kimi', openclaw: 'OpenClaw', qclaw: 'QClaw', workbuddy: 'WorkBuddy',
+  maxclaw: 'MaxClaw', duclaw: 'DuClaw', autoclw: 'AutoClaw', arkclaw: 'ArkClaw', claw360: 'Claw360', easyclaw: 'EasyClaw',
 };
 
 // 会员等级名称映射
@@ -857,7 +851,8 @@ const TierBadge: React.FC<{ tier?: string }> = ({ tier }) => {
 // 主组件
 export const AdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'migrations'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'migrations' | 'orders'>('users');
+  const [orders, setOrders] = useState<any[]>([]);
   
   const {
     adminToken,
@@ -898,6 +893,10 @@ export const AdminPage: React.FC = () => {
       fetchDashboard();
       fetchUsers(usersPage, usersLimit);
       fetchMigrationRecords();
+      fetch('/api/admin/orders', { headers: { 'X-Admin-Token': localStorage.getItem('admin_token') || '' } })
+        .then(res => res.json())
+        .then(result => { if (result.ok) setOrders(result.data || []); })
+        .catch(err => console.error('获取订单失败:', err));
     }
   }, [isAuthenticated, fetchDashboard, fetchUsers, fetchMigrationRecords, usersPage, usersLimit]);
 
@@ -1035,21 +1034,21 @@ export const AdminPage: React.FC = () => {
           icon={<Eye size={22} />}
           iconBg="rgba(96, 165, 250, 0.15)"
           iconColor={CHART_COLORS.info}
-          value={stats.todayPV}
+          value={stats.todayPV || '-'}
           label="今日 PV"
         />
         <StatCard
           icon={<Activity size={22} />}
           iconBg="rgba(251, 191, 36, 0.15)"
           iconColor={CHART_COLORS.secondary}
-          value={stats.todayUV}
+          value={stats.todayUV || '-'}
           label="今日 UV"
         />
         <StatCard
           icon={<TrendingUp size={22} />}
           iconBg="rgba(34, 197, 94, 0.15)"
           iconColor={CHART_COLORS.success}
-          value={`${stats.conversionRate}%`}
+          value={stats.conversionRate ? `${stats.conversionRate}%` : '-'}
           label="转化率"
         />
         <StatCard
@@ -1083,6 +1082,13 @@ export const AdminPage: React.FC = () => {
         >
           <ArrowRightLeft size={16} />
           迁移记录
+        </button>
+        <button
+          style={{ ...styles.tab, ...(activeTab === 'orders' ? styles.tabActive : {}) }}
+          onClick={() => setActiveTab('orders')}
+        >
+          <ShoppingCart size={16} />
+          订单管理
         </button>
       </div>
 
@@ -1231,6 +1237,56 @@ export const AdminPage: React.FC = () => {
                     </td>
                     <td style={{ ...styles.td, ...styles.dateCell }}>
                       {formatDate(record.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* 订单管理表格 */}
+      {activeTab === 'orders' && (
+        <div style={styles.card}>
+          <div className="card-header" style={styles.cardHeader}>
+            <h2 style={styles.cardTitle}>订单列表</h2>
+            <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
+              共 {orders.length} 条订单
+            </span>
+          </div>
+          {orders.length === 0 && !isLoading ? (
+            <div style={styles.emptyState}>暂无订单数据</div>
+          ) : (
+            <table style={styles.table}>
+              <thead style={styles.tableHeader}>
+                <tr>
+                  <th style={styles.th}>订单号</th>
+                  <th style={styles.th}>用户</th>
+                  <th style={styles.th}>套餐</th>
+                  <th style={styles.th}>金额</th>
+                  <th style={styles.th}>状态</th>
+                  <th style={styles.th}>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order: any) => (
+                  <tr key={order.order_id}>
+                    <td style={{ ...styles.td, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
+                      {order.order_id}
+                    </td>
+                    <td style={styles.td}>{order.username || `用户${order.user_id}`}</td>
+                    <td style={styles.td}>
+                      <span style={styles.tierBadge}>
+                        {order.plan === 'pro_monthly' ? 'Pro月费' : order.plan === 'pro_yearly' ? 'Pro年费' : order.plan}
+                      </span>
+                    </td>
+                    <td style={styles.td}>¥{order.amount}</td>
+                    <td style={styles.td}>
+                      <StatusBadge status={order.status === 'paid' ? 'success' : order.status === 'cancelled' ? 'failed' : 'pending'} />
+                    </td>
+                    <td style={{ ...styles.td, ...styles.dateCell }}>
+                      {formatDate(order.created_at)}
                     </td>
                   </tr>
                 ))}

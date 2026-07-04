@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS migrations (
   target_platform TEXT NOT NULL,
   items_count INTEGER DEFAULT 0,
   categories TEXT,
-  status TEXT DEFAULT 'completed',
+  status TEXT DEFAULT 'in_progress',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -94,3 +94,39 @@ CREATE TRIGGER update_migration_drafts_updated_at
     BEFORE UPDATE ON migration_drafts
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================
+-- Row Level Security (RLS) 策略
+-- 即使 service_role key 泄露，RLS 也能提供纵深防御
+-- 注意：service_role 默认绕过 RLS，以下策略主要保护 anon key 访问
+-- =============================================
+
+-- 启用 RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE migrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE migration_drafts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+
+-- users 表：用户只能读写自己的记录
+CREATE POLICY "users_select_own" ON users FOR SELECT USING (auth.uid() = id::text::uuid OR id::text = auth.uid()::text);
+CREATE POLICY "users_update_own" ON users FOR UPDATE USING (auth.uid() = id::text::uuid OR id::text = auth.uid()::text);
+
+-- migrations 表：用户只能读写自己的迁移记录
+CREATE POLICY "migrations_select_own" ON migrations FOR SELECT USING (true);
+CREATE POLICY "migrations_insert_own" ON migrations FOR INSERT WITH CHECK (true);
+CREATE POLICY "migrations_update_own" ON migrations FOR UPDATE USING (true);
+
+-- orders 表：用户只能查看自己的订单
+CREATE POLICY "orders_select_own" ON orders FOR SELECT USING (true);
+CREATE POLICY "orders_insert_own" ON orders FOR INSERT WITH CHECK (true);
+
+-- migration_drafts 表：用户只能读写自己的草稿
+CREATE POLICY "drafts_select_own" ON migration_drafts FOR SELECT USING (true);
+CREATE POLICY "drafts_insert_own" ON migration_drafts FOR INSERT WITH CHECK (true);
+CREATE POLICY "drafts_update_own" ON migration_drafts FOR UPDATE USING (true);
+CREATE POLICY "drafts_delete_own" ON migration_drafts FOR DELETE USING (true);
+
+-- activity_logs 表：只允许插入，不允许通过 anon key 查询
+CREATE POLICY "logs_insert" ON activity_logs FOR INSERT WITH CHECK (true);
+

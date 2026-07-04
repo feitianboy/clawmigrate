@@ -64,10 +64,12 @@ export async function getEffectiveTier(userId: number): Promise<MembershipTier> 
 }
 
 export async function getTotalUsage(userId: number): Promise<number> {
+  // 只统计已完成的迁移记录，不把 in_progress/failed 算进免费额度
   const { count } = await supabase
     .from('migrations')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .in('status', ['completed']);
   
   return count || 0;
 }

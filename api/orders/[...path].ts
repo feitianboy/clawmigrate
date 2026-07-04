@@ -2,13 +2,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from '../../lib/auth';
 import { findOrderByOrderId, updateOrderStatus, updateMembership, createOrder, PLAN_PRICES, PlanType, getOrdersByUserId } from '../../lib/membership';
 import { logActivity, getTierFromPlan, getExpireAt, getPlanName, getStatusName } from '../../lib/utils';
+import { setCorsHeaders, handlePreflight } from '../../lib/cors';
 import crypto from 'crypto';
 
 const ZPAY_PID = process.env.ZPAY_PID || '';
 const ZPAY_KEY = process.env.ZPAY_KEY || '';
 const ZPAY_BASE_URL = 'https://zpayz.cn/submit.php';
-const NOTIFY_URL = 'https://clawmigrate.xyz/api/orders/callback';
-const RETURN_URL_BASE = 'https://clawmigrate.xyz';
+const NOTIFY_URL = `${process.env.APP_URL || 'https://clawmigrate.xyz'}/api/orders/callback`;
+const RETURN_URL_BASE = process.env.APP_URL || 'https://clawmigrate.xyz';
 
 // ZPAY MD5签名: 参数按ASCII排序拼接 + KEY, 再MD5
 function generateSign(params: Record<string, string>, key: string): string {
@@ -32,6 +33,9 @@ function verifySign(params: Record<string, string>, key: string, receivedSign: s
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(req, res);
+  if (handlePreflight(req, res)) return;
+
   const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
@@ -169,27 +173,25 @@ async function processPayment(orderId: string, tradeNo: string, type: string, mo
 
 // ---- ZPAY Payment Callback (GET) ----
 async function handleCallback(req: VercelRequest, res: VercelResponse) {
-  // Return success immediately to prevent ZPAY timeout retries
-  // Then process payment asynchronously
   try {
     const { out_trade_no, trade_no, type, money, trade_status, sign } = req.query;
 
     console.log('ZPAY callback received:', JSON.stringify(req.query));
 
-    // Respond success immediately - ZPAY requires fast response
-    res.send('success');
-
-    // Validate and process asynchronously
+    // 先校验必要参数
     if (!out_trade_no || !trade_status || !sign) {
       console.error('ZPAY callback missing required params');
+      res.send('fail');
       return;
     }
 
     if (!ZPAY_KEY) {
       console.error('ZPAY_KEY not configured');
+      res.send('fail');
       return;
     }
 
+    // 组装参数并验签（必须在返回 success 之前完成）
     const params: Record<string, string> = {};
     for (const [key, value] of Object.entries(req.query)) {
       if (key === '...path') continue;
@@ -203,21 +205,26 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
     const receivedSign = String(sign);
     if (!verifySign(params, ZPAY_KEY, receivedSign)) {
       console.error('ZPAY callback signature verification failed');
+      res.send('fail');
       return;
     }
-
-    const orderId = String(out_trade_no);
 
     if (trade_status !== 'TRADE_SUCCESS') {
       console.log('ZPAY callback trade_status not SUCCESS:', trade_status);
+      res.send('success'); // 非成功状态也告知 ZPAY 已收到
       return;
     }
 
-    // Process payment asynchronously (don't block response)
+    // 验签通过后立即返回 success，再异步处理支付
+    res.send('success');
+
+    const orderId = String(out_trade_no);
     const clientIp = (req.headers['x-forwarded-for'] as string) || '';
     processPayment(orderId, String(trade_no || ''), String(type || ''), String(money || ''), clientIp);
   } catch (error) {
     console.error('ZPAY callback error:', error);
+    // 异常时返回 fail，让 ZPAY 重试
+    try { res.send('fail'); } catch { /* already sent */ }
   }
 }
 

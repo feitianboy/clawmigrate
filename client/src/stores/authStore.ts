@@ -75,6 +75,11 @@ export const useAuthStore = create<AuthState>()(
 
       const result = await response.json();
 
+      if (response.status === 429) {
+        set({ error: result.error || '尝试过于频繁，请稍后再试', isLoading: false });
+        return false;
+      }
+
       if (!response.ok || !result.ok) {
         set({ error: result.error || '登录失败', isLoading: false });
         return false;

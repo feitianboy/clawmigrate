@@ -1,10 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAdmin, requireAuth } from '../../lib/auth';
+import { requireAdmin, requireAuth, generateAdminToken, checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { logActivity, getPlanName, getStatusName, getTierFromPlan, getExpireAt, getActivityLogs, getActivityStats } from '../../lib/utils';
 import { updateMembership, MembershipTier, getOrdersByUserId, findOrderByOrderId, updateOrderStatus, getOrderStats } from '../../lib/membership';
+import { setCorsHeaders, handlePreflight } from '../../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(req, res);
+  if (handlePreflight(req, res)) return;
+
   const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
@@ -294,20 +298,29 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse, subPath
 // ---- Verify Admin Password ----
 async function handleVerify(req: VercelRequest, res: VercelResponse) {
   try {
+    // 速率限制
+    const rateLimitKey = `admin-verify:${getClientIp(req)}`;
+    const rateLimit = checkRateLimit(rateLimitKey);
+    if (!rateLimit.allowed) {
+      return res.status(429).json({ ok: false, error: `尝试过于频繁，请 ${rateLimit.retryAfter} 秒后再试` });
+    }
+
     const { password } = req.body || {};
     const adminPassword = process.env.ADMIN_PASSWORD;
-    
+
     if (!adminPassword) {
       return res.status(500).json({ ok: false, error: 'Admin password not configured' });
     }
-    
+
     if (password !== adminPassword) {
+      recordFailedAttempt(rateLimitKey);
       return res.status(401).json({ ok: false, error: '密码错误' });
     }
-    
-    // Generate a simple token (base64 of password + timestamp, for MVP)
-    const token = Buffer.from(`${adminPassword}:${Date.now()}`).toString('base64');
-    
+
+    clearRateLimit(rateLimitKey);
+    // 使用统一的 Token 生成函数（含时间戳，24h 过期）
+    const token = generateAdminToken(adminPassword);
+
     return res.json({ ok: true, token });
   } catch (error) {
     console.error('Verify admin error:', error);

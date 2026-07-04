@@ -472,9 +472,20 @@ const MigrationPage: React.FC = () => {
     importInstructions,
     setImportPrompt,
     reset,
+    toggleCategory,
+    saveDraft,
+    loadDraft,
+    clearDraft,
   } = useMigrationStore();
 
   const { isAuthenticated, isPro } = useAuthStore();
+
+  // 强制登录检查：未登录时重定向到登录页
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
 
   // 页面挂载时强制重置步骤，防止 zustand persist 恢复旧状态导致步骤错位
   useEffect(() => {
@@ -538,6 +549,43 @@ const MigrationPage: React.FC = () => {
   const [parseLoading, setParseLoading] = useState(false);
   // 导入步骤状态
   const [importCopied, setImportCopied] = useState(false);
+
+  // 草稿恢复：页面加载时检查是否有未完成的草稿
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  useEffect(() => {
+    // 延迟检查草稿，避免和 reset 冲突
+    const timer = setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('clawmigrate-draft');
+        if (saved) {
+          try {
+            const draft = JSON.parse(saved);
+            if (draft.currentStep && draft.currentStep !== 'select-source' && draft.currentStep !== 'complete') {
+              setShowDraftPrompt(true);
+            }
+          } catch {}
+        }
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 自动保存草稿（步骤变化时）
+  useEffect(() => {
+    if (currentStep !== 'select-source' && currentStep !== 'complete' && sourcePlatform) {
+      saveDraft();
+    }
+  }, [currentStep, sourcePlatform, targetPlatform, parsedSchema]);
+
+  // 未登录时显示登录提示，阻止后续渲染
+  if (!isAuthenticated) {
+    return (
+      <div style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+        <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>请先登录后再进行迁移操作</p>
+        <button onClick={() => navigate('/login')} style={styles.btnPrimary}>前往登录</button>
+      </div>
+    );
+  }
 
   // 步骤指示器
   const renderStepIndicator = () => {
@@ -765,10 +813,31 @@ const MigrationPage: React.FC = () => {
           return;
         }
 
+        // 对敏感信息进行脱敏处理
+        if (result.schema?.configs) {
+          const configs = result.schema.configs as any;
+          // 遍历所有配置类别
+          for (const category of Object.keys(configs)) {
+            const items = configs[category];
+            if (Array.isArray(items)) {
+              items.forEach((item: any) => {
+                if (item.sensitivityLevel === 'critical') {
+                  // 高危信息替换为 *** 占位符
+                  if (item.content) item.content = '***';
+                  if (item.value) item.value = '***';
+                  if (item.token) item.token = '***';
+                  if (item.apiKey) item.apiKey = '***';
+                  if (item.password) item.password = '***';
+                }
+              });
+            }
+          }
+        }
+
         // 存储解析结果
-        useMigrationStore.setState({ 
+        useMigrationStore.setState({
           parsedSchema: result.schema,
-          parseResult: result 
+          parseResult: result
         });
 
         // 检查配置项数量是否超过限制
@@ -874,6 +943,36 @@ const MigrationPage: React.FC = () => {
             <div style={{ ...styles.previewSectionTitle, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
               <span>共 {parsedSchema.metadata.totalItems} 个配置项</span>
               <span style={styles.previewBadge}>来自 {sourcePlatform?.name}</span>
+            </div>
+          </div>
+
+          {/* 分类选择区域 */}
+          <div style={{ marginBottom: 'var(--space-6)' }}>
+            <h3 style={{ ...styles.previewSectionTitle, color: 'var(--color-text-secondary)' }}>
+              选择要迁移的配置类别
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+              {categories.map(([category, item]) => {
+                const isSelected = selectedCategories.includes(category as MigrationCategory);
+                return (
+                  <label key={category} style={{
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                    padding: 'var(--space-2) var(--space-4)',
+                    background: isSelected ? 'var(--color-primary-light)' : 'var(--color-bg)',
+                    border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    cursor: 'pointer', fontSize: '0.875rem',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleCategory(category as MigrationCategory)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    {getCategoryIcon(category as MigrationCategory)} {item.label} ({item.data.length})
+                  </label>
+                );
+              })}
             </div>
           </div>
 
@@ -1063,7 +1162,7 @@ const MigrationPage: React.FC = () => {
             <div style={styles.statLabel}>配置项</div>
           </div>
           <div style={styles.statItem}>
-            <div style={styles.statValue}>{parsedSchema.metadata.sensitiveItems?.length || 0}</div>
+            <div style={styles.statValue}>{parseResult?.warnings?.length || 0}</div>
             <div style={styles.statLabel}>敏感项已脱敏</div>
           </div>
           <div style={styles.statItem}>
@@ -1170,24 +1269,52 @@ const MigrationPage: React.FC = () => {
   };
 
   const renderContent = () => {
-    switch (currentStep) {
-      case 'select-source':
-        return renderSelectSource();
-      case 'export':
-        return renderExport();
-      case 'parse':
-        return renderParse();
-      case 'preview':
-        return renderPreview();
-      case 'select-target':
-        return renderSelectTarget();
-      case 'import':
-        return renderImport();
-      case 'complete':
-        return renderComplete();
-      default:
-        return null;
-    }
+    return (
+      <>
+        {showDraftPrompt && (
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)', zIndex: 1000,
+            boxShadow: 'var(--shadow-xl)', maxWidth: '400px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)' }}>📋</div>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>发现未完成的迁移</h3>
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', marginBottom: 'var(--space-5)' }}>
+              是否恢复上次的迁移进度？
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+              <button style={styles.btnSecondary} onClick={() => { clearDraft(); setShowDraftPrompt(false); }}>
+                重新开始
+              </button>
+              <button style={styles.btnPrimary} onClick={() => { loadDraft(); setShowDraftPrompt(false); }}>
+                恢复进度
+              </button>
+            </div>
+          </div>
+        )}
+        {(() => {
+          switch (currentStep) {
+            case 'select-source':
+              return renderSelectSource();
+            case 'export':
+              return renderExport();
+            case 'parse':
+              return renderParse();
+            case 'preview':
+              return renderPreview();
+            case 'select-target':
+              return renderSelectTarget();
+            case 'import':
+              return renderImport();
+            case 'complete':
+              return renderComplete();
+            default:
+              return null;
+          }
+        })()}
+      </>
+    );
   };
 
   return (

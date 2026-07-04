@@ -233,6 +233,14 @@ const platforms = [
   { id: 'claude', name: 'Claude', icon: '🧠', desc: 'Anthropic 大模型助手' },
   { id: 'kimi', name: 'Kimi', icon: '🌙', desc: '月之暗面 AI 助手' },
   { id: 'openclaw', name: 'OpenClaw', icon: '🦞', desc: '开源 AI 助手平台' },
+  { id: 'qclaw', name: 'QClaw', icon: '🤖', desc: 'Q系列 AI 助手' },
+  { id: 'workbuddy', name: 'WorkBuddy', icon: '💼', desc: '工作助手平台' },
+  { id: 'maxclaw', name: 'MaxClaw', icon: '🚀', desc: 'Max 系列 AI 助手' },
+  { id: 'duclaw', name: 'DuClaw', icon: '🎭', desc: 'Du 系列 AI 助手' },
+  { id: 'autoclw', name: 'AutoClaw', icon: '⚡', desc: '自动化 AI 助手' },
+  { id: 'arkclaw', name: 'ArkClaw', icon: '🦅', desc: 'Ark 系列 AI 助手' },
+  { id: 'claw360', name: 'Claw360', icon: '🌐', desc: '全方位 AI 助手' },
+  { id: 'easyclaw', name: 'EasyClaw', icon: '✨', desc: '简易 AI 助手' },
 ];
 
 const steps = [
@@ -272,14 +280,14 @@ export const HomePage: React.FC = () => {
       <section className="hero-section" style={styles.hero}>
         <div style={styles.badge}>
           <Sparkles size={16} />
-          AI 助手配置迁移工具
+          虾管家 · AI 配置迁移工具
         </div>
         <h1 style={styles.title}>
           一键迁移你的 AI 助手配置
         </h1>
         <p style={styles.subtitle}>
-          无需手动复制粘贴，虾管家可以帮助你在不同 AI 助手平台之间
-          安全、快速地迁移技能、自动化、记忆和设置。
+          虾管家（ClawMigrate）帮助你在不同 AI 助手平台之间
+          安全、快速地迁移技能、自动化、记忆和设置，5 分钟搞定。
         </p>
         <div className="cta-section" style={styles.ctaSection}>
           <button
@@ -300,7 +308,7 @@ export const HomePage: React.FC = () => {
               e.currentTarget.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.4)';
             }}
           >
-            开始迁移
+            {isAuthenticated ? '开始迁移' : '登录后开始迁移'}
             <ArrowRight size={20} />
           </button>
         </div>
@@ -335,6 +343,36 @@ export const HomePage: React.FC = () => {
               <p style={styles.platformDesc}>{platform.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section style={{
+        marginBottom: 'var(--space-12)',
+        padding: 'var(--space-6)',
+        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05))',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-5)',
+        flexWrap: 'wrap',
+      }}>
+        <div style={{
+          width: '56px', height: '56px', flexShrink: 0,
+          background: 'var(--color-primary-light)',
+          borderRadius: 'var(--radius-lg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--color-primary)',
+        }}>
+          <Shield size={28} />
+        </div>
+        <div style={{ flex: 1, minWidth: '250px' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-1)' }}>
+            你的配置数据绝不离开浏览器
+          </h3>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9375rem' }}>
+            所有解析、映射、生成都在前端完成，后端只存元数据。API Key 等敏感信息自动脱敏。
+          </p>
         </div>
       </section>
 
