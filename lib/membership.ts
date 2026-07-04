@@ -147,7 +147,7 @@ export async function createOrder(
   amount: number,
   payMethod?: 'wechat' | 'alipay' | 'stripe'
 ): Promise<{ order_id: string } | null> {
-  const orderId = 'CM' + Date.now() + Math.random().toString(36).substring(2, 10).toUpperCase();
+  const orderId = 'CM' + Date.now() + crypto.randomUUID().substring(0, 8).toUpperCase();
   
 
   const { data, error } = await supabase

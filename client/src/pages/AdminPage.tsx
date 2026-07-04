@@ -2,1300 +2,604 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminStore } from '../stores/adminStore';
 import {
-  Users,
-  ArrowRightLeft,
-  Eye,
-  UserCheck,
-  Trash2,
-  RefreshCw,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Shield,
-  Lock,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  DollarSign,
-  ShoppingCart,
-  Activity,
-  PieChart as PieChartIcon,
+  LayoutDashboard, Users, ArrowRightLeft, ShoppingCart, TrendingUp,
+  Trash2, RefreshCw, CheckCircle, XCircle, Clock, Shield, Lock,
+  ChevronLeft, ChevronRight, DollarSign, UserCheck, Eye, Activity,
+  PieChart as PieChartIcon, Search, ArrowLeft, Crown, CreditCard,
 } from 'lucide-react';
 import {
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
+  PieChart, Pie, Cell, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
-// 图表颜色 - 暖色系
+// ---- 常量 ----
 const CHART_COLORS = {
-  primary: '#f97316', // 橙色
-  secondary: '#fbbf24', // 浅黄色
-  accent: '#a78bfa', // 浅紫色
-  success: '#34d399', // 绿色
-  warning: '#fb923c', // 橙黄色
-  info: '#60a5fa', // 蓝色
-  pink: '#f472b6', // 粉色
-  cyan: '#22d3ee', // 青色
+  primary: '#f97316', secondary: '#fbbf24', accent: '#a78bfa',
+  success: '#34d399', warning: '#fb923c', info: '#60a5fa',
+  pink: '#f472b6', cyan: '#22d3ee',
 };
 
-// 平台图标映射
+const PIE_COLORS = [
+  CHART_COLORS.primary, CHART_COLORS.secondary, CHART_COLORS.accent,
+  CHART_COLORS.success, CHART_COLORS.warning, CHART_COLORS.info,
+  CHART_COLORS.pink, CHART_COLORS.cyan,
+];
+
 const platformIcons: Record<string, string> = {
   claude: '🧠', kimi: '🌙', openclaw: '🦞', qclaw: '🤖', workbuddy: '💼',
-  maxclaw: '🚀', duclaw: '🎭', autoclw: '⚡', arkclaw: '🦅', claw360: '🌐', easyclaw: '✨',
+  maxclaw: '🚀', duclaw: '🎭', autoclaw: '⚡', arkclaw: '🦅', claw360: '🌐', easyclaw: '✨',
 };
 
-// 平台名称映射
 const platformNames: Record<string, string> = {
   claude: 'Claude', kimi: 'Kimi', openclaw: 'OpenClaw', qclaw: 'QClaw', workbuddy: 'WorkBuddy',
-  maxclaw: 'MaxClaw', duclaw: 'DuClaw', autoclw: 'AutoClaw', arkclaw: 'ArkClaw', claw360: 'Claw360', easyclaw: 'EasyClaw',
+  maxclaw: 'MaxClaw', duclaw: 'DuClaw', autoclaw: 'AutoClaw', arkclaw: 'ArkClaw', claw360: 'Claw360', easyclaw: 'EasyClaw',
 };
 
-// 会员等级名称映射
-const tierNames: Record<string, string> = {
-  free: '免费版',
-  pro: '专业版',
-  };
+const tierNames: Record<string, string> = { free: '免费版', pro: '专业版' };
+const planNames: Record<string, string> = { pro_monthly: 'Pro月费', pro_yearly: 'Pro年费' };
+const statusNames: Record<string, string> = { pending: '待支付', paid: '已支付', cancelled: '已取消', refunded: '已退款' };
 
-// 样式定义
-const styles: Record<string, React.CSSProperties> = {
-  // 密码输入页面
-  passwordContainer: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 'var(--space-6)',
-    background: 'var(--color-bg)',
-  },
-  passwordCard: {
-    width: '100%',
-    maxWidth: '400px',
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-xl)',
-    boxShadow: 'var(--shadow-xl)',
-    padding: 'var(--space-8)',
-    textAlign: 'center',
-  },
-  passwordIcon: {
-    width: '64px',
-    height: '64px',
-    margin: '0 auto var(--space-5)',
-    background: 'rgba(249, 115, 22, 0.15)',
-    borderRadius: 'var(--radius-lg)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'var(--color-primary)',
-  },
-  passwordTitle: {
-    fontSize: '1.5rem',
-    fontWeight: 700,
-    marginBottom: 'var(--space-2)',
-  },
-  passwordSubtitle: {
-    color: 'var(--color-text-secondary)',
-    fontSize: '0.9375rem',
-    marginBottom: 'var(--space-6)',
-  },
-  passwordInput: {
-    width: '100%',
-    padding: 'var(--space-4)',
-    background: 'var(--color-bg)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--color-text)',
-    fontSize: '1rem',
-    textAlign: 'center',
-    marginBottom: 'var(--space-4)',
-  },
-  passwordBtn: {
-    width: '100%',
-    padding: 'var(--space-4)',
-    background: 'var(--color-primary)',
-    color: 'white',
-    border: 'none',
-    borderRadius: 'var(--radius-md)',
-    fontSize: '1rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 'var(--space-2)',
-  },
-  passwordError: {
-    marginTop: 'var(--space-4)',
-    padding: 'var(--space-3)',
-    background: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--color-danger)',
-    fontSize: '0.875rem',
-  },
-  
-  // 主内容
-  container: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: 'var(--space-6)',
-  },
-  header: {
-    marginBottom: 'var(--space-8)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 'var(--space-4)',
-  },
-  headerLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-4)',
-  },
-  title: {
-    fontSize: '1.75rem',
-    fontWeight: 700,
-    marginBottom: 'var(--space-1)',
-  },
-  subtitle: {
-    color: 'var(--color-text-secondary)',
-    fontSize: '1rem',
-  },
-  adminBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-    padding: 'var(--space-2) var(--space-3)',
-    background: 'rgba(249, 115, 22, 0.15)',
-    color: 'var(--color-primary)',
-    borderRadius: 'var(--radius-md)',
-    fontSize: '0.875rem',
-    fontWeight: 500,
-  },
-  refreshBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-    padding: 'var(--space-2) var(--space-4)',
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--color-text)',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
+type Page = 'dashboard' | 'users' | 'migrations' | 'orders' | 'revenue';
 
-  // 统计卡片网格
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 'var(--space-4)',
-    marginBottom: 'var(--space-6)',
-  },
-  statCard: {
-    padding: 'var(--space-5)',
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 'var(--space-4)',
-  },
-  statIcon: {
-    width: '44px',
-    height: '44px',
-    borderRadius: 'var(--radius-md)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  statContent: {
-    flex: 1,
-  },
-  statValue: {
-    fontSize: '1.5rem',
-    fontWeight: 700,
-    marginBottom: 'var(--space-1)',
-  },
-  statLabel: {
-    fontSize: '0.8125rem',
-    color: 'var(--color-text-secondary)',
-  },
+const formatDate = (s: string) => new Date(s).toLocaleDateString('zh-CN', {
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+});
+const formatNumber = (n: number) => n >= 10000 ? (n / 10000).toFixed(1) + '万' : n.toLocaleString();
+const formatMoney = (n: number) => `¥${n.toLocaleString()}`;
+const getInitials = (name: string) => name.charAt(0).toUpperCase();
 
-  // 图表区域
-  chartsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-    gap: 'var(--space-6)',
-    marginBottom: 'var(--space-6)',
+// ---- 样式 ----
+const S: Record<string, React.CSSProperties> = {
+  root: { display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' },
+  sidebar: {
+    width: '240px', flexShrink: 0, background: 'var(--color-bg-secondary)',
+    borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column',
   },
-  chartCard: {
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--space-5)',
+  sidebarLogo: {
+    padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--color-border)',
+    display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
   },
-  chartTitle: {
-    fontSize: '1rem',
-    fontWeight: 600,
-    marginBottom: 'var(--space-4)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
+  sidebarNav: { flex: 1, padding: 'var(--space-4) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' },
+  navItem: {
+    display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+    padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-md)',
+    cursor: 'pointer', fontSize: '0.9375rem', fontWeight: 500,
+    color: 'var(--color-text-secondary)', transition: 'all 0.15s', border: 'none',
+    background: 'transparent', width: '100%', textAlign: 'left',
   },
-  chartContainer: {
-    height: '280px',
+  navItemActive: { background: 'rgba(249, 115, 22, 0.12)', color: 'var(--color-primary)' },
+  main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  topbar: {
+    height: '64px', flexShrink: 0, background: 'var(--color-bg-secondary)',
+    borderBottom: '1px solid var(--color-border)', display: 'flex',
+    alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-6)',
   },
-
-  // 标签页
-  tabs: {
-    display: 'flex',
-    gap: 'var(--space-1)',
-    padding: 'var(--space-1)',
-    background: 'var(--color-bg)',
-    borderRadius: 'var(--radius-md)',
-    marginBottom: 'var(--space-6)',
-  },
-  tab: {
-    padding: 'var(--space-3) var(--space-5)',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--color-text-secondary)',
-    fontSize: '0.9375rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-  },
-  tabActive: {
-    background: 'var(--color-bg-secondary)',
-    color: 'var(--color-text)',
-    boxShadow: 'var(--shadow-sm)',
-  },
-
-  // 表格卡片
-  card: {
-    background: 'var(--color-bg-secondary)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
-    marginBottom: 'var(--space-6)',
-  },
-  cardHeader: {
-    padding: 'var(--space-5) var(--space-6)',
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 'var(--space-3)',
-  },
-  cardTitle: {
-    fontSize: '1.125rem',
-    fontWeight: 600,
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  tableHeader: {
-    background: 'var(--color-bg)',
-  },
-  th: {
-    padding: 'var(--space-3) var(--space-4)',
-    textAlign: 'left',
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    color: 'var(--color-text-secondary)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    borderBottom: '1px solid var(--color-border)',
-  },
-  td: {
-    padding: 'var(--space-4)',
-    borderBottom: '1px solid var(--color-border)',
-    fontSize: '0.9375rem',
-  },
-  userCell: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-3)',
-  },
-  avatar: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '50%',
-    background: 'var(--color-primary)',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 600,
-    fontSize: '0.875rem',
-    flexShrink: 0,
-  },
-  userInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  userName: {
-    fontWeight: 500,
-  },
-  userEmail: {
-    fontSize: '0.8125rem',
-    color: 'var(--color-text-secondary)',
-  },
-  roleBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '2px 8px',
-    borderRadius: '9999px',
-    fontSize: '0.75rem',
-    fontWeight: 500,
-  },
-  roleAdmin: {
-    background: 'rgba(249, 115, 22, 0.15)',
-    color: 'var(--color-primary)',
-  },
-  roleUser: {
-    background: 'var(--color-bg-tertiary)',
-    color: 'var(--color-text-secondary)',
-  },
-  tierBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '2px 8px',
-    borderRadius: '9999px',
-    fontSize: '0.75rem',
-    fontWeight: 500,
-  },
-  tierFree: {
-    background: 'rgba(96, 165, 250, 0.15)',
-    color: 'var(--color-info)',
-  },
-  tierPro: {
-    background: 'rgba(249, 115, 22, 0.15)',
-    color: 'var(--color-primary)',
-  },
-  statusBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '2px 8px',
-    borderRadius: '9999px',
-    fontSize: '0.75rem',
-    fontWeight: 500,
-  },
-  statusSuccess: {
-    background: 'rgba(52, 211, 153, 0.15)',
-    color: 'var(--color-success)',
-  },
-  statusFailed: {
-    background: 'rgba(248, 113, 113, 0.15)',
-    color: '#f87171',
-  },
-  statusPending: {
-    background: 'rgba(251, 191, 36, 0.15)',
-    color: 'var(--color-warning)',
-  },
-  actionBtn: {
-    padding: 'var(--space-2)',
-    background: 'transparent',
-    border: 'none',
-    color: 'var(--color-text-secondary)',
-    cursor: 'pointer',
-    borderRadius: 'var(--radius-sm)',
-    transition: 'all 0.2s',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateCell: {
-    fontSize: '0.875rem',
-    color: 'var(--color-text-secondary)',
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: 'var(--space-10)',
-    color: 'var(--color-text-secondary)',
-  },
-
-  // 分页
-  pagination: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 'var(--space-4) var(--space-6)',
-    borderTop: '1px solid var(--color-border)',
-  },
-  paginationInfo: {
-    fontSize: '0.875rem',
-    color: 'var(--color-text-secondary)',
-  },
-  paginationBtns: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-  },
-  pageBtn: {
-    padding: 'var(--space-2) var(--space-3)',
-    background: 'var(--color-bg)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--color-text)',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-1)',
-  },
-  pageBtnDisabled: {
-    opacity: 0.5,
-    cursor: 'not-allowed',
-  },
-
-  // 迁移路径
-  migrationPath: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-  },
+  content: { flex: 1, overflow: 'auto', padding: 'var(--space-6)' },
+  card: { background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' },
+  statCard: { padding: 'var(--space-5)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' },
+  chartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 'var(--space-6)', marginBottom: 'var(--space-6)' },
+  chartCard: { background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)' },
+  chartTitle: { fontSize: '0.9375rem', fontWeight: 600, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: { padding: 'var(--space-3) var(--space-4)', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' },
+  td: { padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border)', fontSize: '0.9375rem' },
+  badge: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500 },
+  btn: { display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)', fontSize: '0.875rem', cursor: 'pointer' },
+  searchInput: { padding: 'var(--space-2) var(--space-3) var(--space-2) var(--space-10)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.875rem', width: '240px' },
+  emptyState: { textAlign: 'center', padding: 'var(--space-10)', color: 'var(--color-text-secondary)' },
+  pagination: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-4) var(--space-6)', borderTop: '1px solid var(--color-border)' },
+  pageBtn: { padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)', fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' },
+  // 抽屉
+  drawer: { position: 'fixed', top: 0, right: 0, width: '560px', maxWidth: '90vw', height: '100vh', background: 'var(--color-bg-secondary)', borderLeft: '1px solid var(--color-border)', boxShadow: 'var(--shadow-xl)', zIndex: 100, overflow: 'auto', padding: 'var(--space-6)' },
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 99 },
 };
 
-// 辅助函数
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-const formatNumber = (num: number) => {
-  if (num >= 10000) {
-    return (num / 10000).toFixed(1) + '万';
-  }
-  return num.toLocaleString();
-};
-
-const getInitials = (name: string) => {
-  return name.charAt(0).toUpperCase();
-};
-
-// 密码输入页面组件
-const PasswordPage: React.FC<{
-  onSuccess: () => void;
-  verifyAdmin: (password: string) => Promise<{ success: boolean; error?: string }>;
-  isLoading: boolean;
-}> = ({ onSuccess, verifyAdmin, isLoading }) => {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password.trim()) {
-      setError('请输入管理密码');
-      return;
-    }
-
-    setError('');
-
-    const result = await verifyAdmin(password);
-    if (result.success) {
-      onSuccess();
-    } else {
-      setError(result.error || '密码验证失败');
-    }
-  };
-
-  return (
-    <div style={styles.passwordContainer}>
-      <div style={styles.passwordCard}>
-        <div style={styles.passwordIcon}>
-          <Lock size={32} />
-        </div>
-        <h1 style={styles.passwordTitle}>管理后台</h1>
-        <p style={styles.passwordSubtitle}>请输入管理密码以继续</p>
-        
-        <form onSubmit={handleSubmit}>
-          <input
-            type="password"
-            placeholder="输入管理密码"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.passwordInput}
-            disabled={isLoading}
-          />
-          
-          <button
-            type="submit"
-            style={{
-              ...styles.passwordBtn,
-              opacity: isLoading ? 0.7 : 1,
-            }}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <RefreshCw size={18} className="animate-spin" />
-                验证中...
-              </>
-            ) : (
-              <>
-                <Shield size={18} />
-                进入后台
-              </>
-            )}
-          </button>
-        </form>
-
-        {error && <div style={styles.passwordError}>{error}</div>}
-        
-        <div style={{ marginTop: 'var(--space-6)' }}>
-          <a
-            href="/"
-            style={{
-              color: 'var(--color-text-secondary)',
-              fontSize: '0.875rem',
-              textDecoration: 'none',
-            }}
-          >
-            ← 返回首页
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// 统计卡片组件
-const StatCard: React.FC<{
-  icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
-  value: number | string;
-  label: string;
-  valueColor?: string;
-}> = ({ icon, iconBg, iconColor, value, label, valueColor }) => (
-  <div style={styles.statCard}>
-    <div style={{ ...styles.statIcon, background: iconBg, color: iconColor }}>
-      {icon}
-    </div>
-    <div style={styles.statContent}>
-      <div style={{ ...styles.statValue, color: valueColor || 'var(--color-text)' }}>
-        {typeof value === 'number' ? formatNumber(value) : value}
-      </div>
-      <div style={styles.statLabel}>{label}</div>
+// ---- 通用组件 ----
+const StatCard: React.FC<{ icon: React.ReactNode; bg: string; color: string; value: number | string; label: string; }> = ({ icon, bg, color, value, label }) => (
+  <div style={S.statCard}>
+    <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, color, flexShrink: 0 }}>{icon}</div>
+    <div>
+      <div style={{ fontSize: '1.375rem', fontWeight: 700 }}>{typeof value === 'number' ? formatNumber(value) : value}</div>
+      <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>{label}</div>
     </div>
   </div>
 );
 
-// 平台分布饼图
-const PlatformPieChart: React.FC<{
-  data: { platform: string; count: number }[];
-}> = ({ data }) => {
-  const COLORS = [
-    CHART_COLORS.primary,
-    CHART_COLORS.secondary,
-    CHART_COLORS.accent,
-    CHART_COLORS.success,
-    CHART_COLORS.warning,
-    CHART_COLORS.info,
-  ];
-
-  const chartData = data.map((item) => ({
-    name: platformNames[item.platform] || item.platform,
-    value: item.count,
-  }));
-
-  if (chartData.length === 0) {
-    return (
-      <div style={{ ...styles.chartCard, height: '100%' }}>
-        <h3 style={styles.chartTitle}>
-          <PieChartIcon size={18} />
-          平台分布
-        </h3>
-        <div style={{ ...styles.chartContainer, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: 'var(--color-text-secondary)' }}>暂无数据</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={styles.chartCard}>
-      <h3 style={styles.chartTitle}>
-        <PieChartIcon size={18} />
-        平台分布
-      </h3>
-      <div style={styles.chartContainer}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={100}
-              paddingAngle={2}
-              dataKey="value"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              labelLine={false}
-            >
-              {chartData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-};
-
-// 会员分布饼图
-const TierPieChart: React.FC<{
-  data: { tier: string; count: number }[];
-}> = ({ data }) => {
-  const COLORS = [
-    CHART_COLORS.info,
-    CHART_COLORS.primary,
-    CHART_COLORS.accent,
-  ];
-
-  const chartData = data.map((item) => ({
-    name: tierNames[item.tier] || item.tier,
-    value: item.count,
-  }));
-
-  if (chartData.length === 0) {
-    return (
-      <div style={{ ...styles.chartCard, height: '100%' }}>
-        <h3 style={styles.chartTitle}>
-          <Users size={18} />
-          会员分布
-        </h3>
-        <div style={{ ...styles.chartContainer, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: 'var(--color-text-secondary)' }}>暂无数据</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={styles.chartCard}>
-      <h3 style={styles.chartTitle}>
-        <Users size={18} />
-        会员分布
-      </h3>
-      <div style={styles.chartContainer}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={100}
-              paddingAngle={2}
-              dataKey="value"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              labelLine={false}
-            >
-              {chartData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-};
-
-// 迁移趋势折线图（真实数据）
-const MigrationTrendChart: React.FC = () => {
-  const [data, setData] = useState<{date: string; migrations: number; success: number}[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchTrend = async () => {
-      try {
-        const res = await fetch('/api/admin/trend?days=7', {
-          headers: { 'X-Admin-Token': localStorage.getItem('admin_token') || '' }
-        });
-        const result = await res.json();
-        if (result.ok && result.data) {
-          setData(result.data);
-        }
-      } catch (err) {
-        console.error('获取趋势数据失败:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTrend();
-  }, []);
-
-  return (
-    <div style={{ ...styles.chartCard, gridColumn: '1 / -1' }}>
-      <h3 style={styles.chartTitle}>
-        <TrendingUp size={18} />
-        迁移趋势（近7天）
-      </h3>
-      <div style={{ ...styles.chartContainer, height: '250px' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis
-              dataKey="date"
-              stroke="var(--color-text-secondary)"
-              fontSize={12}
-            />
-            <YAxis stroke="var(--color-text-secondary)" fontSize={12} />
-            <Tooltip
-              contentStyle={{
-                background: 'var(--color-bg-secondary)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-              }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="migrations"
-              stroke={CHART_COLORS.primary}
-              strokeWidth={2}
-              dot={{ fill: CHART_COLORS.primary, r: 4 }}
-              name="总迁移"
-            />
-            <Line
-              type="monotone"
-              dataKey="success"
-              stroke={CHART_COLORS.success}
-              strokeWidth={2}
-              dot={{ fill: CHART_COLORS.success, r: 4 }}
-              name="成功"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-};
-
-// 状态徽章组件
-const StatusBadge: React.FC<{ status: 'success' | 'failed' | 'pending' }> = ({ status }) => {
-  const configs: Record<string, { icon: React.ReactNode; label: string; style: React.CSSProperties }> = {
-    success: { icon: <CheckCircle size={12} />, label: '成功', style: styles.statusSuccess },
-    failed: { icon: <XCircle size={12} />, label: '失败', style: styles.statusFailed },
-    pending: { icon: <Clock size={12} />, label: '进行中', style: styles.statusPending },
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const map: Record<string, { icon: React.ReactNode; label: string; bg: string; color: string }> = {
+    completed: { icon: <CheckCircle size={12} />, label: '成功', bg: 'rgba(52,211,153,0.15)', color: 'var(--color-success)' },
+    paid: { icon: <CheckCircle size={12} />, label: '已支付', bg: 'rgba(52,211,153,0.15)', color: 'var(--color-success)' },
+    success: { icon: <CheckCircle size={12} />, label: '成功', bg: 'rgba(52,211,153,0.15)', color: 'var(--color-success)' },
+    failed: { icon: <XCircle size={12} />, label: '失败', bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
+    cancelled: { icon: <XCircle size={12} />, label: '已取消', bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
+    in_progress: { icon: <Clock size={12} />, label: '进行中', bg: 'rgba(251,191,36,0.15)', color: 'var(--color-warning)' },
+    pending: { icon: <Clock size={12} />, label: '待支付', bg: 'rgba(251,191,36,0.15)', color: 'var(--color-warning)' },
+    refunded: { icon: <Clock size={12} />, label: '已退款', bg: 'rgba(96,165,250,0.15)', color: 'var(--color-info)' },
   };
-  const config = configs[status];
-  return (
-    <span style={{ ...styles.statusBadge, ...config.style }}>
-      {config.icon}
-      {config.label}
-    </span>
-  );
+  const c = map[status] || { icon: null, label: status, bg: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' };
+  return <span style={{ ...S.badge, background: c.bg, color: c.color }}>{c.icon}{c.label}</span>;
 };
 
-// 会员等级徽章
 const TierBadge: React.FC<{ tier?: string }> = ({ tier }) => {
   if (!tier) return null;
-  
-  const configs: Record<string, { label: string; style: React.CSSProperties }> = {
-    free: { label: '免费', style: styles.tierFree },
-    pro: { label: '专业', style: styles.tierPro },
-      };
-  const config = configs[tier] || { label: tier, style: {} };
-  
+  const isPro = tier === 'pro';
+  return <span style={{ ...S.badge, background: isPro ? 'rgba(249,115,22,0.15)' : 'rgba(96,165,250,0.15)', color: isPro ? 'var(--color-primary)' : 'var(--color-info)' }}>{isPro && <Crown size={10} />}{tierNames[tier] || tier}</span>;
+};
+
+const ChartCard: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; full?: boolean }> = ({ title, icon, children, full }) => (
+  <div style={{ ...S.chartCard, ...(full ? { gridColumn: '1 / -1' } : {}) }}>
+    <h3 style={S.chartTitle}>{icon}{title}</h3>
+    {children}
+  </div>
+);
+
+const EmptyData: React.FC = () => (
+  <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)' }}>暂无数据</div>
+);
+
+// ---- 密码页 ----
+const PasswordPage: React.FC<{ onSuccess: () => void; verifyAdmin: (p: string) => Promise<{ success: boolean; error?: string }>; isLoading: boolean }> = ({ onSuccess, verifyAdmin, isLoading }) => {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password.trim()) { setError('请输入管理密码'); return; }
+    setError('');
+    const result = await verifyAdmin(password);
+    if (result.success) onSuccess();
+    else setError(result.error || '密码验证失败');
+  };
+
   return (
-    <span style={{ ...styles.tierBadge, ...config.style }}>
-      {config.label}
-    </span>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-6)', background: 'var(--color-bg)' }}>
+      <div style={{ width: '100%', maxWidth: '400px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-xl)', padding: 'var(--space-8)', textAlign: 'center' }}>
+        <div style={{ width: '64px', height: '64px', margin: '0 auto var(--space-5)', background: 'rgba(249,115,22,0.15)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
+          <Lock size={32} />
+        </div>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-2)' }}>管理后台</h1>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9375rem', marginBottom: 'var(--space-6)' }}>请输入管理密码以继续</p>
+        <form onSubmit={handleSubmit}>
+          <input type="password" placeholder="输入管理密码" value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading}
+            style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem', textAlign: 'center', marginBottom: 'var(--space-4)' }} />
+          <button type="submit" disabled={isLoading}
+            style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-md)', fontSize: '1rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', opacity: isLoading ? 0.7 : 1 }}>
+            {isLoading ? <><RefreshCw size={18} className="animate-spin" />验证中...</> : <><Shield size={18} />进入后台</>}
+          </button>
+        </form>
+        {error && <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', fontSize: '0.875rem' }}>{error}</div>}
+        <button onClick={() => navigate('/')} style={{ marginTop: 'var(--space-6)', background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '0.875rem', cursor: 'pointer' }}>← 返回首页</button>
+      </div>
+    </div>
   );
 };
 
-// 主组件
-export const AdminPage: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [activeTab, setActiveTab] = useState<'users' | 'migrations' | 'orders'>('users');
-  const [orders, setOrders] = useState<any[]>([]);
-  
-  const {
-    adminToken,
-    verifyAdmin,
-    stats,
-    users,
-    usersTotal,
-    usersPage,
-    usersLimit,
-    migrationRecords,
-    isLoading,
-    error,
-    fetchDashboard,
-    fetchUsers,
-    fetchMigrationRecords,
-    deleteUser,
-    clearError,
-  } = useAdminStore();
+// ---- 仪表盘 ----
+const Dashboard: React.FC = () => {
+  const { stats, trendData, fetchTrend } = useAdminStore();
 
-  // 检查是否已有 admin token
-  useEffect(() => {
-    const savedToken = localStorage.getItem('admin_token');
-    if (savedToken) {
-      setIsAuthenticated(true);
-    }
-  }, []);
+  useEffect(() => { fetchTrend(7); }, [fetchTrend]);
 
-  // 当 admin token 被清理时（API返回401/403），退回密码页
-  useEffect(() => {
-    if (isAuthenticated && !adminToken && !localStorage.getItem('admin_token')) {
-      setIsAuthenticated(false);
-    }
-  }, [isAuthenticated, adminToken]);
-
-  // 加载数据
-  const loadData = useCallback(() => {
-    if (isAuthenticated) {
-      fetchDashboard();
-      fetchUsers(usersPage, usersLimit);
-      fetchMigrationRecords();
-      fetch('/api/admin/orders', { headers: { 'X-Admin-Token': localStorage.getItem('admin_token') || '' } })
-        .then(res => res.json())
-        .then(result => { if (result.ok) setOrders(result.data || []); })
-        .catch(err => console.error('获取订单失败:', err));
-    }
-  }, [isAuthenticated, fetchDashboard, fetchUsers, fetchMigrationRecords, usersPage, usersLimit]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // 处理删除用户
-  const handleDeleteUser = async (userId: string, username: string) => {
-    if (window.confirm(`确定要删除用户 "${username}" 吗？此操作不可撤销。`)) {
-      await deleteUser(userId);
-    }
-  };
-
-  // 处理刷新
-  const handleRefresh = () => {
-    loadData();
-  };
-
-  // 分页
-  const handlePrevPage = () => {
-    if (usersPage > 1) {
-      fetchUsers(usersPage - 1, usersLimit);
-    }
-  };
-
-  const handleNextPage = () => {
-    const totalPages = Math.ceil(usersTotal / usersLimit);
-    if (usersPage < totalPages) {
-      fetchUsers(usersPage + 1, usersLimit);
-    }
-  };
-
-  const totalPages = Math.ceil(usersTotal / usersLimit);
-
-  // 认证成功回调
-  const handleAuthSuccess = () => {
-    setIsAuthenticated(true);
-    loadData();
-  };
-
-  // 未认证显示密码输入页面
-  if (!isAuthenticated) {
-    return <PasswordPage onSuccess={handleAuthSuccess} verifyAdmin={verifyAdmin} isLoading={isLoading} />;
-  }
+  const platformData = (stats.platformDistribution || []).map(p => ({ name: platformNames[p.platform] || p.platform, value: p.count }));
+  const tierData = (stats.tierDistribution || []).map(t => ({ name: tierNames[t.tier] || t.tier, value: t.count }));
 
   return (
-    <div style={styles.container}>
-      {/* 错误提示 */}
-      {error && (
-        <div
-          style={{
-            marginBottom: 'var(--space-4)',
-            padding: 'var(--space-4)',
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--color-danger)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span>{error}</span>
-          <button
-            onClick={clearError}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'inherit',
-              cursor: 'pointer',
-              padding: 'var(--space-2)',
-            }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* 头部 */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <div>
-            <h1 style={styles.title}>数据看板</h1>
-            <p style={styles.subtitle}>业务数据概览</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          <span style={styles.adminBadge}>
-            <Shield size={14} />
-            管理员
-          </span>
-          <button
-            style={styles.refreshBtn}
-            onClick={handleRefresh}
-            disabled={isLoading}
-          >
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-            刷新
-          </button>
-        </div>
+    <>
+      <div style={S.statsGrid}>
+        <StatCard icon={<Users size={20} />} bg="rgba(249,115,22,0.15)" color={CHART_COLORS.primary} value={stats.totalUsers} label="总用户数" />
+        <StatCard icon={<ArrowRightLeft size={20} />} bg="rgba(52,211,153,0.15)" color={CHART_COLORS.success} value={stats.completedMigrations} label="成功迁移" />
+        <StatCard icon={<UserCheck size={20} />} bg="rgba(167,139,250,0.15)" color={CHART_COLORS.accent} value={stats.paidUsers} label="付费用户" />
+        <StatCard icon={<Eye size={20} />} bg="rgba(96,165,250,0.15)" color={CHART_COLORS.info} value={stats.todayPV} label="今日PV" />
+        <StatCard icon={<Activity size={20} />} bg="rgba(251,191,36,0.15)" color={CHART_COLORS.secondary} value={stats.todayUV} label="今日UV" />
+        <StatCard icon={<TrendingUp size={20} />} bg="rgba(52,211,153,0.15)" color={CHART_COLORS.success} value={stats.conversionRate ? `${stats.conversionRate}%` : '0%'} label="转化率" />
+        <StatCard icon={<DollarSign size={20} />} bg="rgba(249,115,22,0.15)" color={CHART_COLORS.primary} value={formatMoney(stats.monthlyRevenue)} label="本月收入" />
+        <StatCard icon={<CreditCard size={20} />} bg="rgba(96,165,250,0.15)" color={CHART_COLORS.info} value={stats.paidOrders} label="已支付订单" />
       </div>
 
-      {/* 统计卡片 */}
-      <div className="stats-bar" style={styles.statsGrid}>
-        <StatCard
-          icon={<Users size={22} />}
-          iconBg="rgba(249, 115, 22, 0.15)"
-          iconColor={CHART_COLORS.primary}
-          value={stats.totalUsers}
-          label="总用户数"
-        />
-        <StatCard
-          icon={<ArrowRightLeft size={22} />}
-          iconBg="rgba(52, 211, 153, 0.15)"
-          iconColor={CHART_COLORS.success}
-          value={stats.completedMigrations}
-          label="成功迁移"
-        />
-        <StatCard
-          icon={<XCircle size={22} />}
-          iconBg="rgba(248, 113, 113, 0.15)"
-          iconColor="#f87171"
-          value={stats.failedMigrations}
-          label="失败迁移"
-        />
-        <StatCard
-          icon={<UserCheck size={22} />}
-          iconBg="rgba(167, 139, 250, 0.15)"
-          iconColor={CHART_COLORS.accent}
-          value={stats.paidUsers}
-          label="付费用户"
-        />
-        <StatCard
-          icon={<Eye size={22} />}
-          iconBg="rgba(96, 165, 250, 0.15)"
-          iconColor={CHART_COLORS.info}
-          value={stats.todayPV || '-'}
-          label="今日 PV"
-        />
-        <StatCard
-          icon={<Activity size={22} />}
-          iconBg="rgba(251, 191, 36, 0.15)"
-          iconColor={CHART_COLORS.secondary}
-          value={stats.todayUV || '-'}
-          label="今日 UV"
-        />
-        <StatCard
-          icon={<TrendingUp size={22} />}
-          iconBg="rgba(34, 197, 94, 0.15)"
-          iconColor={CHART_COLORS.success}
-          value={stats.conversionRate ? `${stats.conversionRate}%` : '-'}
-          label="转化率"
-        />
-        <StatCard
-          icon={<DollarSign size={22} />}
-          iconBg="rgba(249, 115, 22, 0.15)"
-          iconColor={CHART_COLORS.primary}
-          value={stats.monthlyRevenue}
-          label="本月收入"
-        />
-      </div>
-
-      {/* 图表区域 */}
-      <div style={styles.chartsGrid}>
-        <PlatformPieChart data={stats.platformDistribution} />
-        <TierPieChart data={stats.tierDistribution} />
-        <MigrationTrendChart />
-      </div>
-
-      {/* 标签页切换 */}
-      <div style={styles.tabs}>
-        <button
-          style={{ ...styles.tab, ...(activeTab === 'users' ? styles.tabActive : {}) }}
-          onClick={() => setActiveTab('users')}
-        >
-          <Users size={16} />
-          用户管理
-        </button>
-        <button
-          style={{ ...styles.tab, ...(activeTab === 'migrations' ? styles.tabActive : {}) }}
-          onClick={() => setActiveTab('migrations')}
-        >
-          <ArrowRightLeft size={16} />
-          迁移记录
-        </button>
-        <button
-          style={{ ...styles.tab, ...(activeTab === 'orders' ? styles.tabActive : {}) }}
-          onClick={() => setActiveTab('orders')}
-        >
-          <ShoppingCart size={16} />
-          订单管理
-        </button>
-      </div>
-
-      {/* 用户管理表格 */}
-      {activeTab === 'users' && (
-        <div style={styles.card}>
-          <div className="card-header" style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>用户列表</h2>
-            <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
-              共 {usersTotal} 个用户
-            </span>
-          </div>
-          
-          {users.length === 0 && !isLoading ? (
-            <div style={styles.emptyState}>暂无用户数据</div>
-          ) : (
-            <>
-              <table style={styles.table}>
-                <thead style={styles.tableHeader}>
-                  <tr>
-                    <th style={styles.th}>用户</th>
-                    <th style={styles.th}>角色</th>
-                    <th style={styles.th}>会员等级</th>
-                    <th style={styles.th}>注册时间</th>
-                    <th style={styles.th}>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id}>
-                      <td style={styles.td}>
-                        <div style={styles.userCell}>
-                          <div style={styles.avatar}>{getInitials(u.username)}</div>
-                          <div style={styles.userInfo}>
-                            <span style={styles.userName}>{u.username}</span>
-                            <span style={styles.userEmail}>{u.email}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.roleBadge, ...(u.role === 'admin' ? styles.roleAdmin : styles.roleUser) }}>
-                          {u.role === 'admin' && <Shield size={10} />}
-                          {u.role === 'admin' ? '管理员' : '用户'}
-                        </span>
-                      </td>
-                      <td style={styles.td}>
-                        <TierBadge tier={u.tier} />
-                      </td>
-                      <td style={{ ...styles.td, ...styles.dateCell }}>
-                        {formatDate(u.created_at)}
-                      </td>
-                      <td style={styles.td}>
-                        <button
-                          style={styles.actionBtn}
-                          onClick={() => handleDeleteUser(u.id, u.username)}
-                          title="删除用户"
-                          disabled={u.role === 'admin'}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* 分页 */}
-              <div style={styles.pagination}>
-                <span style={styles.paginationInfo}>
-                  第 {usersPage} / {totalPages || 1} 页，共 {usersTotal} 条
-                </span>
-                <div style={styles.paginationBtns}>
-                  <button
-                    style={{
-                      ...styles.pageBtn,
-                      ...(usersPage <= 1 ? styles.pageBtnDisabled : {}),
-                    }}
-                    onClick={handlePrevPage}
-                    disabled={usersPage <= 1}
-                  >
-                    <ChevronLeft size={16} />
-                    上一页
-                  </button>
-                  <button
-                    style={{
-                      ...styles.pageBtn,
-                      ...(usersPage >= totalPages ? styles.pageBtnDisabled : {}),
-                    }}
-                    onClick={handleNextPage}
-                    disabled={usersPage >= totalPages}
-                  >
-                    下一页
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            </>
+      <div style={S.chartsGrid}>
+        <ChartCard title="平台分布" icon={<PieChartIcon size={18} />}>
+          {platformData.length === 0 ? <EmptyData /> : (
+            <div style={{ height: '280px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={platformData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                    {platformData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           )}
-        </div>
-      )}
+        </ChartCard>
 
-      {/* 迁移记录表格 */}
-      {activeTab === 'migrations' && (
-        <div style={styles.card}>
-          <div className="card-header" style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>迁移记录</h2>
-            <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
-              共 {migrationRecords.length} 条记录
-            </span>
-          </div>
-          
-          {migrationRecords.length === 0 && !isLoading ? (
-            <div style={styles.emptyState}>暂无迁移记录</div>
-          ) : (
-            <table style={styles.table}>
-              <thead style={styles.tableHeader}>
-                <tr>
-                  <th style={styles.th}>用户</th>
-                  <th style={styles.th}>迁移路径</th>
-                  <th style={styles.th}>状态</th>
-                  <th style={styles.th}>配置项</th>
-                  <th style={styles.th}>时间</th>
-                </tr>
-              </thead>
+        <ChartCard title="会员分布" icon={<Users size={18} />}>
+          {tierData.length === 0 ? <EmptyData /> : (
+            <div style={{ height: '280px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={tierData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                    {tierData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
+
+        <ChartCard title="迁移趋势（近7天）" icon={<TrendingUp size={18} />} full>
+          {trendData.length === 0 ? <EmptyData /> : (
+            <div style={{ height: '250px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="date" stroke="var(--color-text-secondary)" fontSize={12} tickFormatter={d => d.slice(5)} />
+                  <YAxis stroke="var(--color-text-secondary)" fontSize={12} />
+                  <Tooltip contentStyle={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                  <Legend />
+                  <Line type="monotone" dataKey="migrations" stroke={CHART_COLORS.primary} strokeWidth={2} dot={{ fill: CHART_COLORS.primary, r: 4 }} name="总迁移" />
+                  <Line type="monotone" dataKey="success" stroke={CHART_COLORS.success} strokeWidth={2} dot={{ fill: CHART_COLORS.success, r: 4 }} name="成功" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
+      </div>
+    </>
+  );
+};
+
+// ---- 用户管理 ----
+const UsersPage: React.FC = () => {
+  const { users, usersTotal, usersPage, usersLimit, isLoading, fetchUsers, deleteUser, userDetail, fetchUserDetail } = useAdminStore();
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+
+  useEffect(() => { fetchUsers(1, 10); }, [fetchUsers]);
+  useEffect(() => { if (selectedUserId) fetchUserDetail(selectedUserId); }, [selectedUserId, fetchUserDetail]);
+
+  const handleSearch = () => { setSearch(searchInput); fetchUsers(1, 10, searchInput); };
+  const totalPages = Math.ceil(usersTotal / usersLimit);
+
+  return (
+    <>
+      <div style={{ marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div style={{ position: 'relative' }}>
+          <Search size={16} style={{ position: 'absolute', left: 'var(--space-3)', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+          <input value={searchInput} onChange={e => setSearchInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} placeholder="搜索用户名或邮箱..." style={S.searchInput} />
+        </div>
+        <button style={S.btn} onClick={handleSearch}><Search size={14} />搜索</button>
+      </div>
+
+      <div style={S.card}>
+        {users.length === 0 && !isLoading ? <div style={S.emptyState}>暂无用户数据</div> : (
+          <>
+            <table style={S.table}>
+              <thead><tr><th style={S.th}>用户</th><th style={S.th}>角色</th><th style={S.th}>会员</th><th style={S.th}>迁移数</th><th style={S.th}>注册时间</th><th style={S.th}>操作</th></tr></thead>
               <tbody>
-                {migrationRecords.map((record) => (
-                  <tr key={record.id}>
-                    <td style={styles.td}>
-                      {record.username || '未知用户'}
-                    </td>
-                    <td style={styles.td}>
-                      <div style={styles.migrationPath}>
-                        <span>{platformIcons[record.source_platform] || '📦'}</span>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>→</span>
-                        <span>{platformIcons[record.target_platform] || '📦'}</span>
-                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', marginLeft: 'var(--space-1)' }}>
-                          {platformNames[record.source_platform]} → {platformNames[record.target_platform]}
-                        </span>
+                {users.map(u => (
+                  <tr key={u.id}>
+                    <td style={S.td}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.875rem', flexShrink: 0 }}>{getInitials(u.username)}</div>
+                        <div><div style={{ fontWeight: 500 }}>{u.username}</div><div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>{u.email}</div></div>
                       </div>
                     </td>
-                    <td style={styles.td}>
-                      <StatusBadge status={record.status} />
-                    </td>
-                    <td style={styles.td}>
-                      {record.categories.length} 项
-                    </td>
-                    <td style={{ ...styles.td, ...styles.dateCell }}>
-                      {formatDate(record.created_at)}
+                    <td style={S.td}><span style={{ ...S.badge, background: u.role === 'admin' ? 'rgba(249,115,22,0.15)' : 'var(--color-bg-tertiary)', color: u.role === 'admin' ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}>{u.role === 'admin' && <Shield size={10} />}{u.role === 'admin' ? '管理员' : '用户'}</span></td>
+                    <td style={S.td}><TierBadge tier={u.tier || u.membership_tier} /></td>
+                    <td style={S.td}>{u.migrationCount ?? 0}</td>
+                    <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(u.created_at)}</td>
+                    <td style={S.td}>
+                      <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                        <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent' }} onClick={() => setSelectedUserId(Number(u.id))} title="查看详情"><Eye size={16} /></button>
+                        <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除用户 "${u.username}"？`) && deleteUser(u.id)} disabled={u.role === 'admin'} title="删除"><Trash2 size={16} /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
-        </div>
-      )}
+            <div style={S.pagination}>
+              <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>第 {usersPage} / {totalPages || 1} 页，共 {usersTotal} 条</span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button style={{ ...S.pageBtn, opacity: usersPage <= 1 ? 0.5 : 1 }} disabled={usersPage <= 1} onClick={() => fetchUsers(usersPage - 1, usersLimit, search)}><ChevronLeft size={16} />上一页</button>
+                <button style={{ ...S.pageBtn, opacity: usersPage >= totalPages ? 0.5 : 1 }} disabled={usersPage >= totalPages} onClick={() => fetchUsers(usersPage + 1, usersLimit, search)}>下一页<ChevronRight size={16} /></button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
-      {/* 订单管理表格 */}
-      {activeTab === 'orders' && (
-        <div style={styles.card}>
-          <div className="card-header" style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>订单列表</h2>
-            <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
-              共 {orders.length} 条订单
-            </span>
+      {/* 用户详情抽屉 */}
+      {selectedUserId && userDetail && (
+        <>
+          <div style={S.overlay} onClick={() => setSelectedUserId(null)} />
+          <div style={S.drawer}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>用户详情</h2>
+              <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent' }} onClick={() => setSelectedUserId(null)}><ArrowLeft size={16} />关闭</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '1.25rem' }}>{getInitials(userDetail.user.username)}</div>
+              <div>
+                <div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{userDetail.user.username}</div>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>{userDetail.user.email}</div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
+              <div style={{ padding: 'var(--space-3)', background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}><div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>会员等级</div><div style={{ fontWeight: 600, marginTop: '4px' }}><TierBadge tier={userDetail.user.tier || userDetail.user.membership_tier} /></div></div>
+              <div style={{ padding: 'var(--space-3)', background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}><div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>迁移次数</div><div style={{ fontWeight: 600, marginTop: '4px' }}>{userDetail.user.migrationCount}</div></div>
+              <div style={{ padding: 'var(--space-3)', background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}><div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>付费订单</div><div style={{ fontWeight: 600, marginTop: '4px' }}>{userDetail.user.paidOrderCount}</div></div>
+              <div style={{ padding: 'var(--space-3)', background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}><div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>注册时间</div><div style={{ fontWeight: 600, marginTop: '4px', fontSize: '0.875rem' }}>{formatDate(userDetail.user.created_at)}</div></div>
+            </div>
+
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>迁移记录</h3>
+            {userDetail.migrations.length === 0 ? <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', marginBottom: 'var(--space-6)' }}>暂无迁移记录</div> : (
+              <div style={{ marginBottom: 'var(--space-6)' }}>
+                {userDetail.migrations.map(m => (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3)', borderBottom: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <span>{platformIcons[m.source_platform] || '📦'}</span><span style={{ color: 'var(--color-text-secondary)' }}>→</span><span>{platformIcons[m.target_platform] || '📦'}</span>
+                    </div>
+                    <StatusBadge status={m.status} />
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>{formatDate(m.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>订单记录</h3>
+            {userDetail.orders.length === 0 ? <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>暂无订单记录</div> : (
+              userDetail.orders.map(o => (
+                <div key={o.order_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3)', borderBottom: '1px solid var(--color-border)' }}>
+                  <div><div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{planNames[o.plan] || o.plan}</div><div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{o.order_id}</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ fontWeight: 600 }}>{formatMoney(Number(o.amount))}</div><StatusBadge status={o.status} /></div>
+                </div>
+              ))
+            )}
           </div>
-          {orders.length === 0 && !isLoading ? (
-            <div style={styles.emptyState}>暂无订单数据</div>
-          ) : (
-            <table style={styles.table}>
-              <thead style={styles.tableHeader}>
-                <tr>
-                  <th style={styles.th}>订单号</th>
-                  <th style={styles.th}>用户</th>
-                  <th style={styles.th}>套餐</th>
-                  <th style={styles.th}>金额</th>
-                  <th style={styles.th}>状态</th>
-                  <th style={styles.th}>时间</th>
-                </tr>
-              </thead>
+        </>
+      )}
+    </>
+  );
+};
+
+// ---- 迁移管理 ----
+const MigrationsPage: React.FC = () => {
+  const { migrationRecords, isLoading, fetchMigrationRecords } = useAdminStore();
+  useEffect(() => { fetchMigrationRecords(1, 20); }, [fetchMigrationRecords]);
+
+  return (
+    <div style={S.card}>
+      {migrationRecords.length === 0 && !isLoading ? <div style={S.emptyState}>暂无迁移记录</div> : (
+        <table style={S.table}>
+          <thead><tr><th style={S.th}>用户ID</th><th style={S.th}>迁移路径</th><th style={S.th}>状态</th><th style={S.th}>配置项</th><th style={S.th}>时间</th></tr></thead>
+          <tbody>
+            {migrationRecords.map(r => (
+              <tr key={r.id}>
+                <td style={S.td}>#{r.user_id}</td>
+                <td style={S.td}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <span>{platformIcons[r.source_platform] || '📦'}</span><span style={{ color: 'var(--color-text-secondary)' }}>→</span><span>{platformIcons[r.target_platform] || '📦'}</span>
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>{platformNames[r.source_platform] || r.source_platform} → {platformNames[r.target_platform] || r.target_platform}</span>
+                  </div>
+                </td>
+                <td style={S.td}><StatusBadge status={r.status} /></td>
+                <td style={S.td}>{r.items_count ?? (Array.isArray(r.categories) ? r.categories.length : 0)} 项</td>
+                <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(r.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};
+
+// ---- 订单管理 ----
+const OrdersPage: React.FC = () => {
+  const { orders, ordersTotal, ordersPage, isLoading, fetchOrders } = useAdminStore();
+  const [statusFilter, setStatusFilter] = useState('');
+  useEffect(() => { fetchOrders(1, 10, statusFilter || undefined); }, [fetchOrders, statusFilter]);
+  const totalPages = Math.ceil(ordersTotal / 10);
+
+  return (
+    <>
+      <div style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
+        {['', 'pending', 'paid', 'cancelled', 'refunded'].map(s => (
+          <button key={s} style={{ ...S.btn, ...(statusFilter === s ? { background: 'var(--color-primary)', color: 'white', borderColor: 'var(--color-primary)' } : {}) }} onClick={() => setStatusFilter(s)}>{s ? statusNames[s] : '全部'}</button>
+        ))}
+      </div>
+      <div style={S.card}>
+        {orders.length === 0 && !isLoading ? <div style={S.emptyState}>暂无订单数据</div> : (
+          <>
+            <table style={S.table}>
+              <thead><tr><th style={S.th}>订单号</th><th style={S.th}>用户</th><th style={S.th}>套餐</th><th style={S.th}>金额</th><th style={S.th}>状态</th><th style={S.th}>时间</th></tr></thead>
               <tbody>
-                {orders.map((order: any) => (
-                  <tr key={order.order_id}>
-                    <td style={{ ...styles.td, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>
-                      {order.order_id}
-                    </td>
-                    <td style={styles.td}>{order.username || `用户${order.user_id}`}</td>
-                    <td style={styles.td}>
-                      <span style={styles.tierBadge}>
-                        {order.plan === 'pro_monthly' ? 'Pro月费' : order.plan === 'pro_yearly' ? 'Pro年费' : order.plan}
-                      </span>
-                    </td>
-                    <td style={styles.td}>¥{order.amount}</td>
-                    <td style={styles.td}>
-                      <StatusBadge status={order.status === 'paid' ? 'success' : order.status === 'cancelled' ? 'failed' : 'pending'} />
-                    </td>
-                    <td style={{ ...styles.td, ...styles.dateCell }}>
-                      {formatDate(order.created_at)}
-                    </td>
+                {orders.map(o => (
+                  <tr key={o.order_id}>
+                    <td style={{ ...S.td, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>{o.order_id}</td>
+                    <td style={S.td}>{o.username || `用户${o.user_id}`}</td>
+                    <td style={S.td}><span style={S.badge}>{planNames[o.plan] || o.plan}</span></td>
+                    <td style={S.td}>{formatMoney(Number(o.amount))}</td>
+                    <td style={S.td}><StatusBadge status={o.status} /></td>
+                    <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(o.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <div style={S.pagination}>
+              <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>第 {ordersPage} / {totalPages || 1} 页，共 {ordersTotal} 条</span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button style={{ ...S.pageBtn, opacity: ordersPage <= 1 ? 0.5 : 1 }} disabled={ordersPage <= 1} onClick={() => fetchOrders(ordersPage - 1, 10, statusFilter || undefined)}><ChevronLeft size={16} />上一页</button>
+                <button style={{ ...S.pageBtn, opacity: ordersPage >= totalPages ? 0.5 : 1 }} disabled={ordersPage >= totalPages} onClick={() => fetchOrders(ordersPage + 1, 10, statusFilter || undefined)}>下一页<ChevronRight size={16} /></button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+};
+
+// ---- 营收分析 ----
+const RevenuePage: React.FC = () => {
+  const { revenueData, fetchRevenue, stats } = useAdminStore();
+  useEffect(() => { fetchRevenue(); }, [fetchRevenue]);
+
+  const dailyData = (revenueData?.dailyRevenue || []).map(d => ({ date: d.date.slice(5), revenue: d.revenue, orders: d.orders }));
+  const planData = (revenueData?.planRevenue || []).map(p => ({ name: planNames[p.plan] || p.plan, revenue: p.revenue, count: p.count }));
+
+  return (
+    <>
+      <div style={S.statsGrid}>
+        <StatCard icon={<DollarSign size={20} />} bg="rgba(249,115,22,0.15)" color={CHART_COLORS.primary} value={formatMoney(stats.totalRevenue)} label="总收入" />
+        <StatCard icon={<TrendingUp size={20} />} bg="rgba(52,211,153,0.15)" color={CHART_COLORS.success} value={revenueData ? formatMoney(revenueData.totalRevenue30d) : '-'} label="近30天收入" />
+        <StatCard icon={<CreditCard size={20} />} bg="rgba(96,165,250,0.15)" color={CHART_COLORS.info} value={revenueData?.ordersCount30d ?? 0} label="近30天订单" />
+        <StatCard icon={<UserCheck size={20} />} bg="rgba(167,139,250,0.15)" color={CHART_COLORS.accent} value={revenueData ? formatMoney(revenueData.arpu) : '-'} label="ARPU" />
+        <StatCard icon={<Users size={20} />} bg="rgba(251,191,36,0.15)" color={CHART_COLORS.secondary} value={revenueData?.uniquePayingUsers ?? 0} label="近30天付费用户" />
+        <StatCard icon={<TrendingUp size={20} />} bg="rgba(52,211,153,0.15)" color={CHART_COLORS.success} value={stats.conversionRate ? `${stats.conversionRate}%` : '0%'} label="转化率" />
+      </div>
+
+      <div style={S.chartsGrid}>
+        <ChartCard title="每日收入趋势（近30天）" icon={<DollarSign size={18} />} full>
+          {dailyData.length === 0 ? <EmptyData /> : (
+            <div style={{ height: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="date" stroke="var(--color-text-secondary)" fontSize={11} />
+                  <YAxis stroke="var(--color-text-secondary)" fontSize={12} />
+                  <Tooltip contentStyle={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} formatter={(v: number) => formatMoney(v)} />
+                  <Bar dataKey="revenue" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} name="收入" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           )}
+        </ChartCard>
+
+        <ChartCard title="套餐收入分布" icon={<PieChartIcon size={18} />}>
+          {planData.length === 0 ? <EmptyData /> : (
+            <div style={{ height: '280px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={planData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="revenue" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                    {planData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} formatter={(v: number) => formatMoney(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
+
+        <ChartCard title="套餐订单数" icon={<ShoppingCart size={18} />}>
+          {planData.length === 0 ? <EmptyData /> : (
+            <div style={{ height: '280px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={planData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis type="number" stroke="var(--color-text-secondary)" fontSize={12} />
+                  <YAxis type="category" dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} width={80} />
+                  <Tooltip contentStyle={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }} />
+                  <Bar dataKey="count" fill={CHART_COLORS.info} radius={[0, 4, 4, 0]} name="订单数" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartCard>
+      </div>
+    </>
+  );
+};
+
+// ---- 主组件 ----
+export const AdminPage: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const navigate = useNavigate();
+  const { adminToken, verifyAdmin, isLoading, error, fetchDashboard, clearError, clearAdminToken } = useAdminStore();
+
+  useEffect(() => {
+    if (localStorage.getItem('admin_token')) setIsAuthenticated(true);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && !adminToken && !localStorage.getItem('admin_token')) setIsAuthenticated(false);
+  }, [isAuthenticated, adminToken]);
+
+  useEffect(() => {
+    if (isAuthenticated) fetchDashboard();
+  }, [isAuthenticated, fetchDashboard]);
+
+  const handleRefresh = () => { fetchDashboard(); };
+
+  const handleLogout = () => { clearAdminToken(); setIsAuthenticated(false); };
+
+  if (!isAuthenticated) {
+    return <PasswordPage onSuccess={() => setIsAuthenticated(true)} verifyAdmin={verifyAdmin} isLoading={isLoading} />;
+  }
+
+  const navItems: { key: Page; label: string; icon: React.ReactNode }[] = [
+    { key: 'dashboard', label: '仪表盘', icon: <LayoutDashboard size={18} /> },
+    { key: 'users', label: '用户管理', icon: <Users size={18} /> },
+    { key: 'migrations', label: '迁移管理', icon: <ArrowRightLeft size={18} /> },
+    { key: 'orders', label: '订单管理', icon: <ShoppingCart size={18} /> },
+    { key: 'revenue', label: '营收分析', icon: <TrendingUp size={18} /> },
+  ];
+
+  return (
+    <div style={S.root}>
+      {/* 侧边栏 */}
+      <div style={S.sidebar}>
+        <div style={S.sidebarLogo}>
+          <span style={{ fontSize: '1.5rem' }}>🦐</span>
+          <span style={{ fontSize: '1.125rem', fontWeight: 700 }}>虾管家后台</span>
         </div>
-      )}
+        <nav style={S.sidebarNav}>
+          {navItems.map(item => (
+            <button key={item.key} style={{ ...S.navItem, ...(currentPage === item.key ? S.navItemActive : {}) }} onClick={() => setCurrentPage(item.key)}>
+              {item.icon}{item.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{ padding: 'var(--space-4) var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
+          <button style={{ ...S.navItem, color: 'var(--color-text-secondary)' }} onClick={() => navigate('/')}>
+            <ArrowLeft size={18} />返回前台
+          </button>
+        </div>
+      </div>
+
+      {/* 主内容 */}
+      <div style={S.main}>
+        {/* 顶栏 */}
+        <div style={S.topbar}>
+          <h1 style={{ fontSize: '1.125rem', fontWeight: 600 }}>{navItems.find(n => n.key === currentPage)?.label}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <span style={{ ...S.badge, background: 'rgba(249,115,22,0.15)', color: 'var(--color-primary)' }}><Shield size={12} />管理员</span>
+            <button style={S.btn} onClick={handleRefresh} disabled={isLoading}><RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />刷新</button>
+            <button style={S.btn} onClick={handleLogout}>退出</button>
+          </div>
+        </div>
+
+        {/* 内容区 */}
+        <div style={S.content}>
+          {error && (
+            <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{error}</span>
+              <button onClick={clearError} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+            </div>
+          )}
+          {currentPage === 'dashboard' && <Dashboard />}
+          {currentPage === 'users' && <UsersPage />}
+          {currentPage === 'migrations' && <MigrationsPage />}
+          {currentPage === 'orders' && <OrdersPage />}
+          {currentPage === 'revenue' && <RevenuePage />}
+        </div>
+      </div>
     </div>
   );
 };

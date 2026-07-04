@@ -20,6 +20,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if ((subPath === 'orders' || subPath === 'list') && req.method === 'GET') return handleGetOrders(req, res);
   if (segments[0] === 'orders' && segments.length === 2 && req.method === 'PUT') return handleUpdateOrder(req, res, subPath);
   if (subPath === 'stats' && req.method === 'GET') return handleStats(req, res);
+  if (subPath === 'trend' && req.method === 'GET') return handleTrend(req, res);
+  if (subPath === 'revenue' && req.method === 'GET') return handleRevenue(req, res);
+  if (subPath === 'user-detail' && req.method === 'GET') return handleUserDetail(req, res);
   if ((subPath === 'users' || subPath === '') && req.method === 'GET') return handleGetUsers(req, res);
   if (segments[0] === 'users' && segments.length === 2 && req.method === 'PUT') return handleUpdateUser(req, res, subPath);
   if (segments[0] === 'users' && segments.length === 2 && req.method === 'DELETE') return handleDeleteUser(req, res, subPath);
@@ -182,16 +185,23 @@ async function handleStats(req: VercelRequest, res: VercelResponse) {
     const { count: failedMigrations } = await supabase.from('migrations').select('*', { count: 'exact', head: true }).eq('status', 'failed');
     const { count: inProgressMigrations } = await supabase.from('migrations').select('*', { count: 'exact', head: true }).eq('status', 'in_progress');
 
-    const { data: platformStats } = await supabase.from('migrations').select('source_platform, target_platform');
-    const platformDistribution: Record<string, Record<string, number>> = {};
+    // 平台分布 - 直接返回数组格式
+    const { data: platformStats } = await supabase.from('migrations').select('source_platform');
+    const platformCountMap: Record<string, number> = {};
     platformStats?.forEach(m => {
-      if (!platformDistribution[m.source_platform]) platformDistribution[m.source_platform] = {};
-      platformDistribution[m.source_platform][m.target_platform] = (platformDistribution[m.source_platform][m.target_platform] || 0) + 1;
+      const p = m.source_platform || 'unknown';
+      platformCountMap[p] = (platformCountMap[p] || 0) + 1;
     });
+    const platformDistribution = Object.entries(platformCountMap).map(([platform, count]) => ({ platform, count }));
 
+    // 会员分布 - 直接返回数组格式
     const { data: tierStats } = await supabase.from('users').select('membership_tier');
-    const tierDistribution: Record<string, number> = { free: 0, pro: 0 };
-    tierStats?.forEach(u => { if (u.membership_tier && tierDistribution[u.membership_tier] !== undefined) tierDistribution[u.membership_tier]++; });
+    const tierCountMap: Record<string, number> = { free: 0, pro: 0 };
+    tierStats?.forEach(u => {
+      const t = u.membership_tier || 'free';
+      tierCountMap[t] = (tierCountMap[t] || 0) + 1;
+    });
+    const tierDistribution = Object.entries(tierCountMap).map(([tier, count]) => ({ tier, count }));
 
     const { data: paidUsersData } = await supabase.from('orders').select('user_id').eq('status', 'paid');
     const paidUsers = new Set(paidUsersData?.map(o => o.user_id) || []).size;
@@ -218,6 +228,172 @@ async function handleStats(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// ---- Trend (迁移趋势) ----
+async function handleTrend(req: VercelRequest, res: VercelResponse) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const days = parseInt(req.query.days as string) || 7;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const { data: migrations } = await supabase
+      .from('migrations')
+      .select('status, created_at')
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: true });
+
+    // 按日期聚合
+    const trendMap: Record<string, { migrations: number; success: number }> = {};
+    for (let i = 0; i < days; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().split('T')[0];
+      trendMap[key] = { migrations: 0, success: 0 };
+    }
+
+    migrations?.forEach(m => {
+      const key = new Date(m.created_at).toISOString().split('T')[0];
+      if (trendMap[key]) {
+        trendMap[key].migrations++;
+        if (m.status === 'completed') trendMap[key].success++;
+      }
+    });
+
+    const trendData = Object.entries(trendMap).map(([date, val]) => ({ date, ...val }));
+
+    return res.json({ ok: true, data: trendData });
+  } catch (error) {
+    console.error('Get trend error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+// ---- Revenue Analysis (营收分析) ----
+async function handleRevenue(req: VercelRequest, res: VercelResponse) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    // 最近30天每日收入趋势
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
+
+    const { data: paidOrders } = await supabase
+      .from('orders')
+      .select('amount, plan, paid_at')
+      .eq('status', 'paid')
+      .gte('paid_at', startDate.toISOString())
+      .order('paid_at', { ascending: true });
+
+    // 按日期聚合收入
+    const revenueMap: Record<string, { revenue: number; orders: number }> = {};
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().split('T')[0];
+      revenueMap[key] = { revenue: 0, orders: 0 };
+    }
+
+    paidOrders?.forEach(o => {
+      const key = new Date(o.paid_at).toISOString().split('T')[0];
+      if (revenueMap[key]) {
+        revenueMap[key].revenue += Number(o.amount);
+        revenueMap[key].orders++;
+      }
+    });
+
+    const dailyRevenue = Object.entries(revenueMap).map(([date, val]) => ({ date, ...val }));
+
+    // 按套餐统计
+    const planRevenueMap: Record<string, { revenue: number; count: number }> = {};
+    paidOrders?.forEach(o => {
+      if (!planRevenueMap[o.plan]) planRevenueMap[o.plan] = { revenue: 0, count: 0 };
+      planRevenueMap[o.plan].revenue += Number(o.amount);
+      planRevenueMap[o.plan].count++;
+    });
+    const planRevenue = Object.entries(planRevenueMap).map(([plan, val]) => ({ plan, ...val }));
+
+    // ARPU（每付费用户平均收入）
+    const uniquePayingUsers = new Set(paidOrders?.map(o => o.user_id) || []).size;
+    const totalRevenue30d = paidOrders?.reduce((sum, o) => sum + Number(o.amount), 0) || 0;
+    const arpu = uniquePayingUsers > 0 ? Math.round(totalRevenue30d / uniquePayingUsers * 100) / 100 : 0;
+
+    return res.json({
+      ok: true, data: {
+        dailyRevenue, planRevenue, arpu,
+        totalRevenue30d, ordersCount30d: paidOrders?.length || 0,
+        uniquePayingUsers
+      }
+    });
+  } catch (error) {
+    console.error('Get revenue error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+// ---- User Detail (用户详情) ----
+async function handleUserDetail(req: VercelRequest, res: VercelResponse) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const userId = parseInt(req.query.userId as string);
+    if (isNaN(userId)) return res.status(400).json({ ok: false, error: 'Invalid user ID' });
+
+    // 用户基本信息
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, username, email, role, membership_tier, membership_expire_at, phone, created_at, updated_at')
+      .eq('id', userId)
+      .single();
+
+    if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
+
+    // 用户迁移记录
+    const { data: migrations } = await supabase
+      .from('migrations')
+      .select('id, source_platform, target_platform, status, items_count, categories, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    // 用户订单记录
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('order_id, plan, amount, status, created_at, paid_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    // 统计
+    const { count: migrationCount } = await supabase
+      .from('migrations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    const { count: orderCount } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'paid');
+
+    return res.json({
+      ok: true, data: {
+        user: { ...user, tier: user.membership_tier, migrationCount: migrationCount || 0, paidOrderCount: orderCount || 0 },
+        migrations: migrations || [],
+        orders: orders || []
+      }
+    });
+  } catch (error) {
+    console.error('Get user detail error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
 // ---- Users ----
 async function handleGetUsers(req: VercelRequest, res: VercelResponse) {
   try {
@@ -226,13 +402,29 @@ async function handleGetUsers(req: VercelRequest, res: VercelResponse) {
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
+    const search = req.query.search as string | undefined;
     const offset = (page - 1) * limit;
 
-    const { data: users, count } = await supabase.from('users')
+    let query = supabase.from('users')
       .select('id, username, email, role, membership_tier, membership_expire_at, created_at, updated_at', { count: 'exact' })
-      .order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+      .order('created_at', { ascending: false });
 
-    return res.json({ ok: true, data: { users: users || [], pagination: { page, limit, total: count || 0, totalPages: Math.ceil((count || 0) / limit) } } });
+    if (search) {
+      query = query.or(`username.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    const { data: users, count } = await query.range(offset, offset + limit - 1);
+
+    // 为每个用户添加 tier 和 migrationCount
+    const usersWithTier = await Promise.all((users || []).map(async u => {
+      const { count: mc } = await supabase
+        .from('migrations')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', u.id);
+      return { ...u, tier: u.membership_tier, migrationCount: mc || 0 };
+    }));
+
+    return res.json({ ok: true, data: { users: usersWithTier, pagination: { page, limit, total: count || 0, totalPages: Math.ceil((count || 0) / limit) } } });
   } catch (error) {
     console.error('Get users error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });

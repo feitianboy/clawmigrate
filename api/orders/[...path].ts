@@ -149,7 +149,8 @@ async function processPayment(orderId: string, tradeNo: string, type: string, mo
 
     const callbackAmount = parseFloat(money);
     const orderAmount = parseFloat(String(order.amount));
-    if (Math.abs(callbackAmount - orderAmount) > 0.01) {
+    // 用整数分比较，避免浮点数精度问题
+    if (Math.round(callbackAmount * 100) !== Math.round(orderAmount * 100)) {
       console.error('ZPAY callback amount mismatch:', { callbackAmount, orderAmount, orderId });
       return;
     }
@@ -215,12 +216,13 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    // 验签通过后立即返回 success，再异步处理支付
-    res.send('success');
-
+    // 验签通过后，同步处理支付，完成后再返回 success
+    // Serverless 环境中 res.send() 后函数可能被终止，必须确保支付处理完成
     const orderId = String(out_trade_no);
     const clientIp = (req.headers['x-forwarded-for'] as string) || '';
-    processPayment(orderId, String(trade_no || ''), String(type || ''), String(money || ''), clientIp);
+    await processPayment(orderId, String(trade_no || ''), String(type || ''), String(money || ''), clientIp);
+
+    res.send('success');
   } catch (error) {
     console.error('ZPAY callback error:', error);
     // 异常时返回 fail，让 ZPAY 重试
