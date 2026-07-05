@@ -15,12 +15,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const subPath = segments.join('/');
 
   if (subPath === 'debug-env' && req.method === 'GET') {
+    const dbUrl = process.env.DATABASE_URL || '';
+    let dbHost = '', dbPort = '', dbUser = '';
+    try {
+      const u = new URL(dbUrl);
+      dbHost = u.hostname;
+      dbPort = u.port;
+      dbUser = decodeURIComponent(u.username);
+    } catch {}
     return res.json({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'not set',
       serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'not set',
-      databaseUrl: process.env.DATABASE_URL ? 'set' : 'not set',
-      postgresUrl: process.env.POSTGRES_URL ? 'set' : 'not set',
-      dbPassword: process.env.SUPABASE_DB_PASSWORD ? 'set' : 'not set',
+      databaseUrl: dbUrl ? 'set' : 'not set',
+      databaseHost: dbHost,
+      databasePort: dbPort,
+      databaseUser: dbUser,
       jwtSecret: process.env.JWT_SECRET ? 'set' : 'not set',
       supabaseUrlValue: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     });
