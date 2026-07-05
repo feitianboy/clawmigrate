@@ -170,7 +170,7 @@ const PasswordPage: React.FC<{
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !email.trim() || !password.trim()) { setError('请填写所有字段'); return; }
+    if (!username.trim() || !password.trim()) { setError('请填写用户名和密码'); return; }
     setError('');
     const result = await setupAdmin(username, email, password);
     if (result.success) onSuccess();
@@ -205,8 +205,8 @@ const PasswordPage: React.FC<{
           </div>
           {isSetup && (
             <div style={{ marginBottom: 'var(--space-3)', textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>邮箱</label>
-              <input type="email" placeholder="输入邮箱地址" value={email} onChange={e => setEmail(e.target.value)} disabled={isLoading}
+              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>邮箱（选填）</label>
+              <input type="email" placeholder="输入邮箱地址（选填）" value={email} onChange={e => setEmail(e.target.value)} disabled={isLoading}
                 style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem' }} />
             </div>
           )}

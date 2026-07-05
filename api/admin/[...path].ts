@@ -578,9 +578,8 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
 
     const { username, email, password } = req.body || {};
 
-    // 参数校验
-    if (!username || !email || !password) {
-      return res.status(400).json({ ok: false, error: '用户名、邮箱、密码均为必填' });
+    if (!username || !password) {
+      return res.status(400).json({ ok: false, error: '用户名和密码为必填' });
     }
     if (username.length < 3 || username.length > 20) {
       return res.status(400).json({ ok: false, error: '用户名长度需 3-20 个字符' });
@@ -588,20 +587,20 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
     if (password.length < 6) {
       return res.status(400).json({ ok: false, error: '密码长度至少 6 位' });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ ok: false, error: '邮箱格式不正确' });
     }
 
-    // 检查用户名和邮箱是否已存在
     const { data: existingUser } = await supabase.from('users').select('id').eq('username', username).single();
     if (existingUser) return res.status(400).json({ ok: false, error: '用户名已存在' });
-    const { data: existingEmail } = await supabase.from('users').select('id').eq('email', email).single();
-    if (existingEmail) return res.status(400).json({ ok: false, error: '邮箱已被注册' });
+    if (email) {
+      const { data: existingEmail } = await supabase.from('users').select('id').eq('email', email).single();
+      if (existingEmail) return res.status(400).json({ ok: false, error: '邮箱已被注册' });
+    }
 
-    // 创建管理员账号
     const passwordHash = bcrypt.hashSync(password, 10);
     const { data: newAdmin, error } = await supabase.from('users').insert({
-      username, email, password_hash: passwordHash, role: 'admin'
+      username, email: email || null, password_hash: passwordHash, role: 'admin'
     }).select('id, username, email, role').single();
 
     if (error || !newAdmin) {
