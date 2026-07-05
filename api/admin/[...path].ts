@@ -288,7 +288,7 @@ async function handleRevenue(req: VercelRequest, res: VercelResponse) {
 
     const { data: paidOrders } = await supabase
       .from('orders')
-      .select('amount, plan, paid_at')
+      .select('amount, plan, paid_at, user_id')
       .eq('status', 'paid')
       .gte('paid_at', startDate.toISOString())
       .order('paid_at', { ascending: true });
