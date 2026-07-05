@@ -16,15 +16,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (subPath === 'debug-env' && req.method === 'GET') {
     const dbUrl = process.env.DATABASE_URL || '';
-    let dbHost = '', dbPort = '', dbUser = '';
+    let dbHost = '', dbPort = '', dbUser = '', dbPwdPreview = '';
     try {
       const u = new URL(dbUrl);
       dbHost = u.hostname;
       dbPort = u.port;
       dbUser = decodeURIComponent(u.username);
+      const pwd = decodeURIComponent(u.password);
+      dbPwdPreview = pwd.length > 0 ? `${pwd.slice(0, 2)}***(${pwd.length} chars, last=${pwd.slice(-1)})` : '(empty)';
     } catch {}
-    // 查询 admins 表是否存在/有数据
-    const { count, error } = await supabase.from('admins').select('*', { count: 'exact', head: true });
+    // 用 select('id').limit(1) 准确检测表是否存在
+    const { count, error } = await supabase.from('admins').select('id').limit(1);
     return res.json({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'not set',
       serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'not set',
@@ -32,12 +34,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       databaseHost: dbHost,
       databasePort: dbPort,
       databaseUser: dbUser,
+      dbPwdPreview,
       jwtSecret: process.env.JWT_SECRET ? 'set' : 'not set',
       supabaseUrlValue: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       adminsTable: {
-        exists: !error,
-        count: count ?? null,
         error: error ? { code: error.code, message: error.message } : null,
+        data: count,
       },
     });
   }
