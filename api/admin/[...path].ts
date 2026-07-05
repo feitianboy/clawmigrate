@@ -680,13 +680,22 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
     // 尝试通过 Supabase REST API 的 rpc 功能执行 SQL
     // 方案1：尝试直接用 pg 连接
     const dbPassword = process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD || process.env.DB_PASSWORD;
-    const connectionString = process.env.DATABASE_URL ||
+    const databaseUrl = process.env.DATABASE_URL ||
       (dbPassword ? `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres` : null);
 
-    if (connectionString) {
+    if (databaseUrl) {
       try {
         const { Client } = await import('pg');
-        const client = new Client({ connectionString, ssl: { rejectUnauthorized: false } });
+        // 解析连接字符串，分别设置参数（解决 Supabase pooler 用户名格式问题）
+        const url = new URL(databaseUrl);
+        const client = new Client({
+          host: url.hostname,
+          port: parseInt(url.port || '5432'),
+          database: url.pathname.slice(1) || 'postgres',
+          user: decodeURIComponent(url.username),
+          password: decodeURIComponent(url.password),
+          ssl: { rejectUnauthorized: false },
+        });
         await client.connect();
 
         await client.query(`
@@ -716,7 +725,7 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
         `);
         await client.end();
         return res.json({ ok: true, message: 'admins table created via pg connection' });
-      } catch (pgError) {
+      } catch (pgError: any) {
         console.error('PG connection failed:', pgError);
       }
     }
