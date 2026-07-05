@@ -14,6 +14,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
+  if (subPath === 'debug-env' && req.method === 'GET') {
+    return res.json({
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'not set',
+      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'not set',
+      databaseUrl: process.env.DATABASE_URL ? 'set' : 'not set',
+      postgresUrl: process.env.POSTGRES_URL ? 'set' : 'not set',
+      dbPassword: process.env.SUPABASE_DB_PASSWORD ? 'set' : 'not set',
+      jwtSecret: process.env.JWT_SECRET ? 'set' : 'not set',
+      supabaseUrlValue: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    });
+  }
   if (subPath === 'init-tables' && req.method === 'POST') return handleInitTables(req, res);
   if (subPath === 'verify' && req.method === 'POST') return handleVerify(req, res);
   if (subPath === 'setup' && req.method === 'POST') return handleSetup(req, res);
