@@ -686,15 +686,27 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
     if (databaseUrl) {
       try {
         const { Client } = await import('pg');
-        // 解析连接字符串，分别设置参数（解决 Supabase pooler 用户名格式问题）
+        // 解析连接字符串
         const url = new URL(databaseUrl);
+        let host = url.hostname;
+        let port = parseInt(url.port || '5432');
+        let user = decodeURIComponent(url.username);
+        let password = decodeURIComponent(url.password);
+
+        // 如果是 pooler 连接（端口 6543 或 6432），转换为 direct connection
+        // pooler 用户名格式: postgres.{project_ref}，direct 用户名: postgres
+        if (port === 6543 || port === 6432 || host.includes('pooler.supabase.com')) {
+          host = `db.${projectRef}.supabase.co`;
+          port = 5432;
+          user = 'postgres';
+        }
+
         const client = new Client({
-          host: url.hostname,
-          port: parseInt(url.port || '5432'),
+          host, port,
           database: url.pathname.slice(1) || 'postgres',
-          user: decodeURIComponent(url.username),
-          password: decodeURIComponent(url.password),
+          user, password,
           ssl: { rejectUnauthorized: false },
+          connectionTimeoutMillis: 10000,
         });
         await client.connect();
 
