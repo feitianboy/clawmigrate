@@ -14,6 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const segments = [].concat(req.query['...path'] || []);
   const subPath = segments.join('/');
 
+  if (subPath === 'init-tables' && req.method === 'POST') return handleInitTables(req, res);
   if (subPath === 'verify' && req.method === 'POST') return handleVerify(req, res);
   if (subPath === 'setup' && req.method === 'POST') return handleSetup(req, res);
   if (subPath === 'setup-status' && req.method === 'GET') return handleSetupStatus(req, res);
@@ -542,20 +543,64 @@ async function handleVerify(req: VercelRequest, res: VercelResponse) {
 // ---- Setup Status (检查是否已有管理员) ----
 async function handleSetupStatus(req: VercelRequest, res: VercelResponse) {
   try {
-    const { count } = await supabase
+    // 尝试查询 admins 表，如果表不存在则返回 hasAdmin: false
+    const { count, error } = await supabase
       .from('admins')
       .select('*', { count: 'exact', head: true });
+
+    // 如果表不存在或其他错误，返回 hasAdmin: false（允许 setup 流程自动建表）
+    if (error) {
+      return res.json({ ok: true, hasAdmin: false });
+    }
 
     return res.json({ ok: true, hasAdmin: (count || 0) > 0 });
   } catch (error) {
     console.error('Setup status error:', error);
-    return res.status(500).json({ ok: false, error: 'Internal server error' });
+    return res.json({ ok: true, hasAdmin: false });
+  }
+}
+
+// 确保 admins 表存在
+async function ensureAdminsTable(): Promise<void> {
+  try {
+    // 尝试查询，如果报错说明表不存在
+    const { error } = await supabase.from('admins').select('id').limit(1);
+    if (error && (error.message.includes('does not exist') || error.code === '42P01')) {
+      // 通过 Supabase REST API 执行建表 SQL
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && serviceKey) {
+        await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
+          method: 'POST',
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': `Bearer ${serviceKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            sql_text: `CREATE TABLE IF NOT EXISTS admins (
+              id SERIAL PRIMARY KEY,
+              username TEXT UNIQUE NOT NULL,
+              password_hash TEXT NOT NULL,
+              created_at TIMESTAMPTZ DEFAULT NOW(),
+              updated_at TIMESTAMPTZ DEFAULT NOW()
+            );`
+          })
+        }).catch(() => {});
+      }
+    }
+  } catch {
+    // 忽略错误，setup 时 insert 会再次报错
   }
 }
 
 // ---- Setup (初始化管理员账号，仅在没有管理员时可用) ----
 async function handleSetup(req: VercelRequest, res: VercelResponse) {
   try {
+    // 先确保 admins 表存在
+    await ensureAdminsTable();
+
     // 安全检查：如果已有管理员，禁止再次创建
     const { count: adminCount } = await supabase
       .from('admins')
@@ -584,13 +629,14 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
     }
 
     const passwordHash = bcrypt.hashSync(password, 10);
-    const { data: newAdmin, error } = await supabase.from('admins').insert({
+    const { data: newAdmin, error: insertError } = await supabase.from('admins').insert({
       username,
       password_hash: passwordHash
     }).select('id, username').single();
 
-    if (error || !newAdmin) {
-      return res.status(500).json({ ok: false, error: '创建管理员账号失败' });
+    if (insertError || !newAdmin) {
+      console.error('Create admin error:', insertError);
+      return res.status(500).json({ ok: false, error: '创建管理员账号失败，请稍后重试或联系管理员创建 admins 表' });
     }
 
     // 生成 JWT token
@@ -606,5 +652,57 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('Setup admin error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+// ---- 初始化数据库表（临时接口） ----
+async function handleInitTables(req: VercelRequest, res: VercelResponse) {
+  try {
+    const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+    if (!databaseUrl) {
+      return res.status(500).json({ ok: false, error: 'DATABASE_URL not configured' });
+    }
+
+    const { Client } = await import('pg');
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admins (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`ALTER TABLE admins ENABLE ROW LEVEL SECURITY;`);
+
+    // 创建策略（如果不存在）
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'admins' AND policyname = 'admins_no_anon_access') THEN
+          CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);
+        END IF;
+      END $$;
+    `);
+
+    // 创建 updated_at 触发器
+    await client.query(`
+      DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
+      CREATE TRIGGER update_admins_updated_at
+        BEFORE UPDATE ON admins
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+    `);
+
+    await client.end();
+
+    return res.json({ ok: true, message: 'admins table created successfully' });
+  } catch (error) {
+    console.error('Init tables error:', error);
+    return res.status(500).json({ ok: false, error: String(error) });
   }
 }
