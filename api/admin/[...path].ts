@@ -658,14 +658,58 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
 // ---- 初始化数据库表（临时接口） ----
 async function handleInitTables(req: VercelRequest, res: VercelResponse) {
   try {
-    const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-    if (!databaseUrl) {
-      return res.status(500).json({ ok: false, error: 'DATABASE_URL not configured' });
+    // 从 Supabase URL 推导数据库连接信息
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    // 提取 project ref：https://xxx.supabase.co -> xxx
+    const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+    const dbPassword = process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD;
+
+    if (!projectRef) {
+      return res.status(500).json({ ok: false, error: 'Cannot determine Supabase project ref' });
     }
 
-    const { Client } = await import('pg');
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
+    // 尝试多种连接方式
+    let client;
+    try {
+      const { Client } = await import('pg');
+      // Supabase 连接字符串格式：postgresql://postgres:{password}@db.{ref}.supabase.co:5432/postgres
+      const connectionString = process.env.DATABASE_URL ||
+        process.env.POSTGRES_URL ||
+        (dbPassword ? `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres` : null);
+
+      if (!connectionString) {
+        return res.status(500).json({
+          ok: false,
+          error: 'No database connection info. Please set DATABASE_URL or SUPABASE_DB_PASSWORD in Vercel env vars',
+          sql: `CREATE TABLE IF NOT EXISTS admins (
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);`
+        });
+      }
+
+      client = new Client({
+        connectionString,
+        ssl: { rejectUnauthorized: false }
+      });
+      await client.connect();
+    } catch (connError) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Database connection failed',
+        detail: String(connError),
+        sql: `CREATE TABLE IF NOT EXISTS admins (
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);`
+      });
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS admins (
@@ -679,7 +723,6 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
 
     await client.query(`ALTER TABLE admins ENABLE ROW LEVEL SECURITY;`);
 
-    // 创建策略（如果不存在）
     await client.query(`
       DO $$
       BEGIN
@@ -689,7 +732,6 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
       END $$;
     `);
 
-    // 创建 updated_at 触发器
     await client.query(`
       DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
       CREATE TRIGGER update_admins_updated_at
