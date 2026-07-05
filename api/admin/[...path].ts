@@ -636,7 +636,7 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
 
     if (insertError || !newAdmin) {
       console.error('Create admin error:', insertError);
-      return res.status(500).json({ ok: false, error: '创建管理员账号失败，请稍后重试或联系管理员创建 admins 表' });
+      return res.status(500).json({ ok: false, error: '创建管理员账号失败', detail: insertError?.message || 'unknown error' });
     }
 
     // 生成 JWT token
