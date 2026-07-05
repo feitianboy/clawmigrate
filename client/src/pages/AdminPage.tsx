@@ -6,11 +6,13 @@ import {
   Trash2, RefreshCw, CheckCircle, XCircle, Clock, Shield, Lock,
   ChevronLeft, ChevronRight, DollarSign, UserCheck, Eye, Activity,
   PieChart as PieChartIcon, Search, ArrowLeft, Crown, CreditCard, UserPlus,
+  Menu,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import '../styles/admin.css';
 
 // ---- 常量 ----
 const CHART_COLORS = {
@@ -50,58 +52,66 @@ const getInitials = (name: string) => name.charAt(0).toUpperCase();
 
 // ---- 样式 ----
 const S: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' },
-  sidebar: {
-    width: '240px', flexShrink: 0, background: 'var(--color-bg-secondary)',
-    borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column',
+  statCard: {
+    padding: 'var(--space-5)',
+    background: 'var(--color-bg-secondary)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-lg)',
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 'var(--space-3)',
   },
-  sidebarLogo: {
-    padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--color-border)',
-    display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+  badge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '2px 8px',
+    borderRadius: '9999px',
+    fontSize: '0.75rem',
+    fontWeight: 500,
   },
-  sidebarNav: { flex: 1, padding: 'var(--space-4) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' },
-  navItem: {
-    display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-    padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-md)',
-    cursor: 'pointer', fontSize: '0.9375rem', fontWeight: 500,
-    color: 'var(--color-text-secondary)', transition: 'all 0.15s', border: 'none',
-    background: 'transparent', width: '100%', textAlign: 'left',
+  btn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) var(--space-4)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-md)',
+    background: 'var(--color-bg-secondary)',
+    color: 'var(--color-text)',
+    fontSize: '0.875rem',
+    cursor: 'pointer',
   },
-  navItemActive: { background: 'rgba(249, 115, 22, 0.12)', color: 'var(--color-primary)' },
-  main: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  topbar: {
-    height: '64px', flexShrink: 0, background: 'var(--color-bg-secondary)',
-    borderBottom: '1px solid var(--color-border)', display: 'flex',
-    alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--space-6)',
+  searchInput: {
+    padding: 'var(--space-2) var(--space-3) var(--space-2) var(--space-10)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-md)',
+    background: 'var(--color-bg)',
+    color: 'var(--color-text)',
+    fontSize: '0.875rem',
+    width: '240px',
   },
-  content: { flex: 1, overflow: 'auto', padding: 'var(--space-6)' },
-  card: { background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' },
-  statCard: { padding: 'var(--space-5)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' },
-  chartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 'var(--space-6)', marginBottom: 'var(--space-6)' },
-  chartCard: { background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)' },
-  chartTitle: { fontSize: '0.9375rem', fontWeight: 600, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { padding: 'var(--space-3) var(--space-4)', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)' },
-  td: { padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border)', fontSize: '0.9375rem' },
-  badge: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500 },
-  btn: { display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)', fontSize: '0.875rem', cursor: 'pointer' },
-  searchInput: { padding: 'var(--space-2) var(--space-3) var(--space-2) var(--space-10)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: '0.875rem', width: '240px' },
-  emptyState: { textAlign: 'center', padding: 'var(--space-10)', color: 'var(--color-text-secondary)' },
-  pagination: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-4) var(--space-6)', borderTop: '1px solid var(--color-border)' },
-  pageBtn: { padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', color: 'var(--color-text)', fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' },
-  // 抽屉
-  drawer: { position: 'fixed', top: 0, right: 0, width: '560px', maxWidth: '90vw', height: '100vh', background: 'var(--color-bg-secondary)', borderLeft: '1px solid var(--color-border)', boxShadow: 'var(--shadow-xl)', zIndex: 100, overflow: 'auto', padding: 'var(--space-6)' },
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 99 },
+  pageBtn: {
+    padding: 'var(--space-2) var(--space-3)',
+    background: 'var(--color-bg)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--color-text)',
+    fontSize: '0.875rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 'var(--space-1)',
+  },
 };
 
 // ---- 通用组件 ----
 const StatCard: React.FC<{ icon: React.ReactNode; bg: string; color: string; value: number | string; label: string; }> = ({ icon, bg, color, value, label }) => (
-  <div style={S.statCard}>
-    <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bg, color, flexShrink: 0 }}>{icon}</div>
+  <div className="admin-stat-card">
+    <div className="admin-stat-icon" style={{ background: bg, color }}>{icon}</div>
     <div>
-      <div style={{ fontSize: '1.375rem', fontWeight: 700 }}>{typeof value === 'number' ? formatNumber(value) : value}</div>
-      <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>{label}</div>
+      <div className="admin-stat-value">{typeof value === 'number' ? formatNumber(value) : value}</div>
+      <div className="admin-stat-label">{label}</div>
     </div>
   </div>
 );
@@ -128,8 +138,8 @@ const TierBadge: React.FC<{ tier?: string }> = ({ tier }) => {
 };
 
 const ChartCard: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; full?: boolean }> = ({ title, icon, children, full }) => (
-  <div style={{ ...S.chartCard, ...(full ? { gridColumn: '1 / -1' } : {}) }}>
-    <h3 style={S.chartTitle}>{icon}{title}</h3>
+  <div className={`admin-chart-card ${full ? 'full' : ''}`}>
+    <h3 className="admin-chart-title">{icon}{title}</h3>
     {children}
   </div>
 );
@@ -238,18 +248,18 @@ const Dashboard: React.FC = () => {
 
   return (
     <>
-      <div style={S.statsGrid}>
-        <StatCard icon={<Users size={20} />} bg="rgba(249,115,22,0.15)" color={CHART_COLORS.primary} value={stats.totalUsers} label="总用户数" />
+      <div className="admin-stats-grid">
+        <StatCard icon={<Users size={20} />} bg="rgba(59,130,246,0.15)" color={CHART_COLORS.primary} value={stats.totalUsers} label="总用户数" />
         <StatCard icon={<ArrowRightLeft size={20} />} bg="rgba(52,211,153,0.15)" color={CHART_COLORS.success} value={stats.completedMigrations} label="成功迁移" />
         <StatCard icon={<UserCheck size={20} />} bg="rgba(167,139,250,0.15)" color={CHART_COLORS.accent} value={stats.paidUsers} label="付费用户" />
         <StatCard icon={<Eye size={20} />} bg="rgba(96,165,250,0.15)" color={CHART_COLORS.info} value={stats.todayPV} label="今日PV" />
         <StatCard icon={<Activity size={20} />} bg="rgba(251,191,36,0.15)" color={CHART_COLORS.secondary} value={stats.todayUV} label="今日UV" />
         <StatCard icon={<TrendingUp size={20} />} bg="rgba(52,211,153,0.15)" color={CHART_COLORS.success} value={stats.conversionRate ? `${stats.conversionRate}%` : '0%'} label="转化率" />
-        <StatCard icon={<DollarSign size={20} />} bg="rgba(249,115,22,0.15)" color={CHART_COLORS.primary} value={formatMoney(stats.monthlyRevenue)} label="本月收入" />
+        <StatCard icon={<DollarSign size={20} />} bg="rgba(59,130,246,0.15)" color={CHART_COLORS.primary} value={formatMoney(stats.monthlyRevenue)} label="本月收入" />
         <StatCard icon={<CreditCard size={20} />} bg="rgba(96,165,250,0.15)" color={CHART_COLORS.info} value={stats.paidOrders} label="已支付订单" />
       </div>
 
-      <div style={S.chartsGrid}>
+      <div className="admin-charts-grid">
         <ChartCard title="平台分布" icon={<PieChartIcon size={18} />}>
           {platformData.length === 0 ? <EmptyData /> : (
             <div style={{ height: '280px' }}>
@@ -571,6 +581,7 @@ const RevenuePage: React.FC = () => {
 export const AdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { adminToken, adminUser, verifyAdmin, setupAdmin, checkSetupStatus, isLoading, error, fetchDashboard, clearError, clearAdminToken } = useAdminStore();
 
@@ -598,6 +609,7 @@ export const AdminPage: React.FC = () => {
 
   const handleRefresh = () => { fetchDashboard(); };
   const handleLogout = () => { clearAdminToken(); setIsAuthenticated(false); };
+  const handleNavClick = (key: Page) => { setCurrentPage(key); setSidebarOpen(false); };
 
   if (!isAuthenticated) {
     return <PasswordPage onSuccess={() => setIsAuthenticated(true)} verifyAdmin={verifyAdmin} setupAdmin={setupAdmin} checkSetupStatus={checkSetupStatus} isLoading={isLoading} />;
@@ -612,53 +624,72 @@ export const AdminPage: React.FC = () => {
   ];
 
   return (
-    <div style={S.root}>
+    <div className="admin-root">
+      {/* 侧边栏遮罩 */}
+      <div
+        className={`admin-sidebar-overlay ${sidebarOpen ? 'show' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* 侧边栏 */}
-      <div style={S.sidebar}>
-        <div style={S.sidebarLogo}>
+      <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="admin-sidebar-logo">
           <span style={{ fontSize: '1.5rem' }}>🦐</span>
           <span style={{ fontSize: '1.125rem', fontWeight: 700 }}>虾管家后台</span>
         </div>
-        <nav style={S.sidebarNav}>
+        <nav className="admin-sidebar-nav">
           {navItems.map(item => (
-            <button key={item.key} style={{ ...S.navItem, ...(currentPage === item.key ? S.navItemActive : {}) }} onClick={() => setCurrentPage(item.key)}>
+            <button
+              key={item.key}
+              className={`admin-nav-item ${currentPage === item.key ? 'active' : ''}`}
+              onClick={() => handleNavClick(item.key)}
+            >
               {item.icon}{item.label}
             </button>
           ))}
         </nav>
         {/* 底部管理员信息 */}
-        <div style={{ padding: 'var(--space-4) var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-4)', marginBottom: 'var(--space-2)' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.8125rem', flexShrink: 0 }}>
+        <div className="admin-sidebar-footer">
+          <div className="admin-user-info">
+            <div className="admin-user-avatar">
               {adminUser ? getInitials(adminUser.username) : 'A'}
             </div>
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{adminUser?.username || '管理员'}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{adminUser?.email || ''}</div>
+            <div className="admin-user-details">
+              <div className="admin-user-name">{adminUser?.username || '管理员'}</div>
+              <div className="admin-user-email">{adminUser?.email || ''}</div>
             </div>
           </div>
-          <button style={{ ...S.navItem, color: 'var(--color-text-secondary)' }} onClick={() => navigate('/')}>
+          <button className="admin-nav-item" style={{ color: 'var(--color-text-secondary)' }} onClick={() => navigate('/')}>
             <ArrowLeft size={18} />返回前台
           </button>
-          <button style={{ ...S.navItem, color: 'var(--color-text-secondary)' }} onClick={handleLogout}>
+          <button className="admin-nav-item" style={{ color: 'var(--color-text-secondary)' }} onClick={handleLogout}>
             <Lock size={18} />退出登录
           </button>
         </div>
-      </div>
+      </aside>
 
       {/* 主内容 */}
-      <div style={S.main}>
+      <div className="admin-main">
         {/* 顶栏 */}
-        <div style={S.topbar}>
-          <h1 style={{ fontSize: '1.125rem', fontWeight: 600 }}>{navItems.find(n => n.key === currentPage)?.label}</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <span style={{ ...S.badge, background: 'rgba(249,115,22,0.15)', color: 'var(--color-primary)' }}><Shield size={12} />管理员</span>
-            <button style={S.btn} onClick={handleRefresh} disabled={isLoading}><RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />刷新</button>
+        <header className="admin-topbar">
+          <div className="admin-topbar-left">
+            <button className="admin-menu-btn" onClick={() => setSidebarOpen(true)}>
+              <Menu size={18} />
+            </button>
+            <h1 className="admin-page-title">{navItems.find(n => n.key === currentPage)?.label}</h1>
           </div>
-        </div>
+          <div className="admin-topbar-right">
+            <span className="admin-badge" style={{ background: 'rgba(59,130,246,0.15)', color: 'var(--color-primary)' }}>
+              <Shield size={12} />管理员
+            </span>
+            <button className="admin-btn" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />刷新
+            </button>
+          </div>
+        </header>
 
         {/* 内容区 */}
-        <div style={S.content}>
+        <div className="admin-content">
           {error && (
             <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{error}</span>

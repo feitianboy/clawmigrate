@@ -132,7 +132,12 @@ async function handleLogin(req: VercelRequest, res: VercelResponse) {
     return res.status(429).json({ ok: false, error: `尝试过于频繁，请 ${rateLimit.retryAfter} 秒后再试` });
   }
 
-  const { data: user } = await supabase.from('users').select('id, username, email, role, password_hash').eq('username', username).single();
+  // 支持用户名或邮箱登录
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username);
+  const { data: user } = isEmail
+    ? await supabase.from('users').select('id, username, email, role, password_hash').eq('email', username).single()
+    : await supabase.from('users').select('id, username, email, role, password_hash').eq('username', username).single();
+
   if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
     recordFailedAttempt(rateLimitKey);
     return res.status(401).json({ ok: false, error: '用户名或密码错误' });
