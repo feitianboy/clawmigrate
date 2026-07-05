@@ -676,123 +676,115 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
 }
 
 // ---- 初始化数据库表（临时接口） ----
+async function execAdminsDDL(client: any) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS admins (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  await client.query(`ALTER TABLE admins ENABLE ROW LEVEL SECURITY;`);
+  await client.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'admins' AND policyname = 'admins_no_anon_access') THEN
+        CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);
+      END IF;
+    END $$;
+  `);
+  await client.query(`
+    DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
+    CREATE TRIGGER update_admins_updated_at
+      BEFORE UPDATE ON admins
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+  `);
+}
+
+async function tryPgConnect(opts: { host: string; port: number; database: string; user: string; password: string; label: string }) {
+  const { Client } = await import('pg');
+  const client = new Client({
+    host: opts.host, port: opts.port,
+    database: opts.database, user: opts.user, password: opts.password,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15000,
+  });
+  await client.connect();
+  await execAdminsDDL(client);
+  await client.end();
+  return { label: opts.label, ok: true };
+}
+
 async function handleInitTables(req: VercelRequest, res: VercelResponse) {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const attempts: any[] = [];
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-    if (!projectRef || !serviceKey) {
-      return res.status(500).json({ ok: false, error: 'Supabase config missing' });
-    }
-
-    // 尝试通过 Supabase REST API 的 rpc 功能执行 SQL
-    // 方案1：尝试直接用 pg 连接
-    const dbPassword = process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD || process.env.DB_PASSWORD;
-    const databaseUrl = process.env.DATABASE_URL ||
-      (dbPassword ? `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres` : null);
-
-    if (databaseUrl) {
-      try {
-        const { Client } = await import('pg');
-        // 解析连接字符串
-        const url = new URL(databaseUrl);
-        let host = url.hostname;
-        let port = parseInt(url.port || '5432');
-        let user = decodeURIComponent(url.username);
-        let password = decodeURIComponent(url.password);
-
-        // 如果是 pooler 连接（端口 6543 或 6432），转换为 direct connection
-        // pooler 用户名格式: postgres.{project_ref}，direct 用户名: postgres
-        if (port === 6543 || port === 6432 || host.includes('pooler.supabase.com')) {
-          host = `db.${projectRef}.supabase.co`;
-          port = 5432;
-          user = 'postgres';
-        }
-
-        const client = new Client({
-          host, port,
-          database: url.pathname.slice(1) || 'postgres',
-          user, password,
-          ssl: { rejectUnauthorized: false },
-          connectionTimeoutMillis: 10000,
-        });
-        await client.connect();
-
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS admins (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-          );
-        `);
-        await client.query(`ALTER TABLE admins ENABLE ROW LEVEL SECURITY;`);
-        await client.query(`
-          DO $$
-          BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'admins' AND policyname = 'admins_no_anon_access') THEN
-              CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);
-            END IF;
-          END $$;
-        `);
-        await client.query(`
-          DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
-          CREATE TRIGGER update_admins_updated_at
-            BEFORE UPDATE ON admins
-            FOR EACH ROW
-            EXECUTE FUNCTION update_updated_at_column();
-        `);
-        await client.end();
-        return res.json({ ok: true, message: 'admins table created via pg connection' });
-      } catch (pgError: any) {
-        console.error('PG connection failed:', pgError);
-        // 继续尝试其他方案，但记录错误
-        return res.json({ ok: false, error: 'PG连接失败', detail: pgError.message, code: pgError.code });
-      }
-    }
-
-    // 方案2：通过 Supabase pg_meta endpoint（Studio 内部 API）
-    try {
-      const pgMetaResponse = await fetch(`${supabaseUrl}/pg/query`, {
-        method: 'POST',
-        headers: {
-          'apiKey': serviceKey,
-          'Authorization': `Bearer ${serviceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query: `CREATE TABLE IF NOT EXISTS admins (
-          id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        ); ALTER TABLE admins ENABLE ROW LEVEL SECURITY;` })
-      });
-      if (pgMetaResponse.ok) {
-        return res.json({ ok: true, message: 'admins table created via pg_meta' });
-      }
-    } catch (e: any) {
-      console.error('pg_meta failed:', e.message);
-    }
-
-    // 方案3：返回 SQL 语句让用户手动执行
-    return res.json({
-      ok: false,
-      error: '无法自动建表，需要手动执行',
-      projectRef,
-      sql: `CREATE TABLE IF NOT EXISTS admins (
-  id SERIAL PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
-CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);`,
-      instructions: '请登录 Supabase 控制台，进入 SQL Editor，执行上面的 SQL 语句'
-    });
-  } catch (error) {
-    console.error('Init tables error:', error);
-    return res.status(500).json({ ok: false, error: String(error) });
+  if (!projectRef || !serviceKey) {
+    return res.status(500).json({ ok: false, error: 'Supabase config missing' });
   }
+
+  const databaseUrl = process.env.DATABASE_URL;
+  let dbHost = '', dbPort = 6543, dbUser = '', dbPassword = '', dbName = 'postgres';
+  if (databaseUrl) {
+    try {
+      const u = new URL(databaseUrl);
+      dbHost = u.hostname;
+      dbPort = parseInt(u.port || '5432');
+      dbUser = decodeURIComponent(u.username);
+      dbPassword = decodeURIComponent(u.password);
+      dbName = u.pathname.slice(1) || 'postgres';
+    } catch {}
+  }
+
+  // 方案A: Supabase pg_meta API (用 service role key)
+  try {
+    const r = await fetch(`${supabaseUrl}/pg/query`, {
+      method: 'POST',
+      headers: { 'apiKey': serviceKey, 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: `CREATE TABLE IF NOT EXISTS admins (id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()); ALTER TABLE admins ENABLE ROW LEVEL SECURITY;` })
+    });
+    const text = await r.text();
+    attempts.push({ label: 'pg_meta', ok: r.ok, status: r.status, detail: text.slice(0, 300) });
+    if (r.ok) return res.json({ ok: true, message: 'admins table created via pg_meta', attempts });
+  } catch (e: any) {
+    attempts.push({ label: 'pg_meta', ok: false, error: e.message });
+  }
+
+  if (!databaseUrl) {
+    return res.json({ ok: false, error: 'DATABASE_URL not set', attempts });
+  }
+
+  // 方案B: pooler transaction mode (端口6543, 原始用户名 postgres.{ref})
+  try {
+    const r = await tryPgConnect({ host: dbHost, port: 6543, database: dbName, user: dbUser, password: dbPassword, label: 'pooler-txn-6543' });
+    attempts.push(r);
+    return res.json({ ok: true, message: 'admins table created via pooler transaction mode', attempts });
+  } catch (e: any) { attempts.push({ label: 'pooler-txn-6543', ok: false, code: e.code, error: e.message }); }
+
+  // 方案C: pooler session mode (端口5432, host仍是pooler, 用户名 postgres.{ref})
+  try {
+    const r = await tryPgConnect({ host: dbHost, port: 5432, database: dbName, user: dbUser, password: dbPassword, label: 'pooler-sess-5432' });
+    attempts.push(r);
+    return res.json({ ok: true, message: 'admins table created via pooler session mode', attempts });
+  } catch (e: any) { attempts.push({ label: 'pooler-sess-5432', ok: false, code: e.code, error: e.message }); }
+
+  // 方案D: direct connection (db.{ref}.supabase.co:5432, 用户名 postgres)
+  try {
+    const r = await tryPgConnect({ host: `db.${projectRef}.supabase.co`, port: 5432, database: dbName, user: 'postgres', password: dbPassword, label: 'direct-5432' });
+    attempts.push(r);
+    return res.json({ ok: true, message: 'admins table created via direct connection', attempts });
+  } catch (e: any) { attempts.push({ label: 'direct-5432', ok: false, code: e.code, error: e.message }); }
+
+  return res.json({
+    ok: false,
+    error: '所有连接方式均失败',
+    projectRef,
+    dbHost, dbUser, dbName,
+    attempts
+  });
 }
