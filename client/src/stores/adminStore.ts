@@ -93,7 +93,7 @@ export interface AdminStats {
 
 interface AdminState {
   adminToken: string | null;
-  adminUser: { id: number; username: string; email: string; role: string } | null;
+  adminUser: { id: number; username: string } | null;
   users: User[];
   usersTotal: number;
   usersPage: number;
@@ -110,7 +110,7 @@ interface AdminState {
   error: string | null;
 
   verifyAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  setupAdmin: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  setupAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   checkSetupStatus: () => Promise<{ hasAdmin: boolean }>;
   clearAdminToken: () => void;
   fetchDashboard: () => Promise<void>;
@@ -178,13 +178,13 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }
   },
 
-  setupAdmin: async (username, email, password) => {
+  setupAdmin: async (username, password) => {
     set({ isLoading: true, error: null });
     try {
       const response = await fetch('/api/admin/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await response.json();
       if (response.ok && data.ok) {

@@ -152,13 +152,12 @@ const EmptyData: React.FC = () => (
 const PasswordPage: React.FC<{
   onSuccess: () => void;
   verifyAdmin: (u: string, p: string) => Promise<{ success: boolean; error?: string }>;
-  setupAdmin: (u: string, e: string, p: string) => Promise<{ success: boolean; error?: string }>;
+  setupAdmin: (u: string, p: string) => Promise<{ success: boolean; error?: string }>;
   checkSetupStatus: () => Promise<{ hasAdmin: boolean }>;
   isLoading: boolean;
 }> = ({ onSuccess, verifyAdmin, setupAdmin, checkSetupStatus, isLoading }) => {
   const [mode, setMode] = useState<'login' | 'setup' | 'loading'>('loading');
   const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -182,7 +181,7 @@ const PasswordPage: React.FC<{
     e.preventDefault();
     if (!username.trim() || !password.trim()) { setError('请填写用户名和密码'); return; }
     setError('');
-    const result = await setupAdmin(username, email, password);
+    const result = await setupAdmin(username, password);
     if (result.success) onSuccess();
     else setError(result.error || '初始化失败');
   };
@@ -213,13 +212,6 @@ const PasswordPage: React.FC<{
             <input type="text" placeholder="输入管理员用户名" value={username} onChange={e => setUsername(e.target.value)} disabled={isLoading} autoFocus
               style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem' }} />
           </div>
-          {isSetup && (
-            <div style={{ marginBottom: 'var(--space-3)', textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>邮箱（选填）</label>
-              <input type="email" placeholder="输入邮箱地址（选填）" value={email} onChange={e => setEmail(e.target.value)} disabled={isLoading}
-                style={{ width: '100%', padding: 'var(--space-4)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '1rem' }} />
-            </div>
-          )}
           <div style={{ marginBottom: 'var(--space-4)', textAlign: 'left' }}>
             <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>密码</label>
             <input type="password" placeholder={isSetup ? '设置密码（至少6位）' : '输入密码'} value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading}
@@ -339,7 +331,7 @@ const UsersPage: React.FC = () => {
         {users.length === 0 && !isLoading ? <div style={S.emptyState}>暂无用户数据</div> : (
           <>
             <table style={S.table}>
-              <thead><tr><th style={S.th}>用户</th><th style={S.th}>角色</th><th style={S.th}>会员</th><th style={S.th}>迁移数</th><th style={S.th}>注册时间</th><th style={S.th}>操作</th></tr></thead>
+              <thead><tr><th style={S.th}>用户</th><th style={S.th}>会员</th><th style={S.th}>迁移数</th><th style={S.th}>注册时间</th><th style={S.th}>操作</th></tr></thead>
               <tbody>
                 {users.map(u => (
                   <tr key={u.id}>
@@ -349,14 +341,13 @@ const UsersPage: React.FC = () => {
                         <div><div style={{ fontWeight: 500 }}>{u.username}</div><div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>{u.email}</div></div>
                       </div>
                     </td>
-                    <td style={S.td}><span style={{ ...S.badge, background: u.role === 'admin' ? 'rgba(249,115,22,0.15)' : 'var(--color-bg-tertiary)', color: u.role === 'admin' ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}>{u.role === 'admin' && <Shield size={10} />}{u.role === 'admin' ? '管理员' : '用户'}</span></td>
                     <td style={S.td}><TierBadge tier={u.tier || u.membership_tier} /></td>
                     <td style={S.td}>{u.migrationCount ?? 0}</td>
                     <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(u.created_at)}</td>
                     <td style={S.td}>
                       <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
                         <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent' }} onClick={() => setSelectedUserId(Number(u.id))} title="查看详情"><Eye size={16} /></button>
-                        <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除用户 "${u.username}"？`) && deleteUser(u.id)} disabled={u.role === 'admin'} title="删除"><Trash2 size={16} /></button>
+                        <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除用户 "${u.username}"？`) && deleteUser(u.id)} title="删除"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -656,7 +647,6 @@ export const AdminPage: React.FC = () => {
             </div>
             <div className="admin-user-details">
               <div className="admin-user-name">{adminUser?.username || '管理员'}</div>
-              <div className="admin-user-email">{adminUser?.email || ''}</div>
             </div>
           </div>
           <button className="admin-nav-item" style={{ color: 'var(--color-text-secondary)' }} onClick={() => navigate('/')}>

@@ -68,7 +68,7 @@ async function handleMembership(req: VercelRequest, res: VercelResponse) {
     const updated = await updateMembership(userId, tier as MembershipTier, expireDate);
     if (!updated) return res.status(500).json({ ok: false, error: 'Failed to update membership' });
 
-    await logActivity(result.user!.id, 'admin_update_membership', { targetUserId: userId, tier, expireAt }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    await logActivity(null, 'admin_update_membership', { adminUsername: result.user!.username, targetUserId: userId, tier, expireAt }, req.headers['x-forwarded-for'] as string || (req as any).ip);
     return res.json({ ok: true, data: { message: 'Membership updated successfully' } });
   } catch (error) {
     console.error('Update membership error:', error);
@@ -108,7 +108,7 @@ async function handleDeleteMigration(req: VercelRequest, res: VercelResponse, su
     const { error } = await supabase.from('migrations').delete().eq('id', migrationId);
     if (error) return res.status(404).json({ ok: false, error: 'Migration not found' });
 
-    await logActivity(result.user!.id, 'delete_migration', { migrationId }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    await logActivity(null, 'delete_migration', { adminUsername: result.user!.username, migrationId }, req.headers['x-forwarded-for'] as string || (req as any).ip);
     return res.json({ ok: true, data: { message: 'Migration deleted successfully' } });
   } catch (error) {
     console.error('Delete migration error:', error);
@@ -169,7 +169,7 @@ async function handleUpdateOrder(req: VercelRequest, res: VercelResponse, subPat
       await updateMembership(order.user_id, tier, expireAt);
     }
 
-    await logActivity(result.user!.id, 'admin_update_order', { orderId, oldStatus: order.status, newStatus: status }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    await logActivity(null, 'admin_update_order', { adminUsername: result.user!.username, orderId, oldStatus: order.status, newStatus: status }, req.headers['x-forwarded-for'] as string || (req as any).ip);
     return res.json({ ok: true, data: { message: 'Order updated successfully' } });
   } catch (error) {
     console.error('Update order error:', error);
@@ -410,7 +410,7 @@ async function handleGetUsers(req: VercelRequest, res: VercelResponse) {
     const offset = (page - 1) * limit;
 
     let query = supabase.from('users')
-      .select('id, username, email, role, membership_tier, membership_expire_at, created_at, updated_at', { count: 'exact' })
+      .select('id, username, email, membership_tier, membership_expire_at, created_at, updated_at', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (search) {
@@ -456,13 +456,12 @@ async function handleUpdateUser(req: VercelRequest, res: VercelResponse, subPath
       if (emailExists) return res.status(400).json({ ok: false, error: 'Email already exists' });
     }
 
-    const updateData: { username?: string; email?: string; role?: string } = {};
+    const updateData: { username?: string; email?: string; membership_tier?: string } = {};
     if (username) updateData.username = username;
     if (email) updateData.email = email;
-    if (role && (role === 'user' || role === 'admin')) updateData.role = role;
 
-    const { data: updatedUser } = await supabase.from('users').update(updateData).eq('id', userId).select('id, username, email, role').single();
-    await logActivity(result.user!.id, 'update_user', { targetUserId: userId, updates: updateData }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    const { data: updatedUser } = await supabase.from('users').update(updateData).eq('id', userId).select('id, username, email').single();
+    await logActivity(null, 'update_user', { adminUsername: result.user!.username, targetUserId: userId, updates: updateData }, req.headers['x-forwarded-for'] as string || (req as any).ip);
 
     return res.json({ ok: true, data: updatedUser });
   } catch (error) {
@@ -478,12 +477,11 @@ async function handleDeleteUser(req: VercelRequest, res: VercelResponse, subPath
 
     const userId = parseInt(subPath.split('/')[1]);
     if (isNaN(userId)) return res.status(400).json({ ok: false, error: 'Invalid user ID' });
-    if (userId === result.user!.id) return res.status(400).json({ ok: false, error: 'Cannot delete your own account' });
 
     const { error } = await supabase.from('users').delete().eq('id', userId);
     if (error) return res.status(404).json({ ok: false, error: 'User not found' });
 
-    await logActivity(result.user!.id, 'delete_user', { deletedUserId: userId }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    await logActivity(null, 'delete_user', { adminUsername: result.user!.username, deletedUserId: userId }, req.headers['x-forwarded-for'] as string || (req as any).ip);
     return res.json({ ok: true, data: { message: 'User deleted successfully' } });
   } catch (error) {
     console.error('Delete user error:', error);
@@ -506,24 +504,19 @@ async function handleVerify(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, error: '请输入账号和密码' });
     }
 
-    // 查询用户，验证 admin 角色 + 密码
-    const { data: user } = await supabase
-      .from('users')
-      .select('id, username, email, role, password_hash')
+    // 从 admins 表查询管理员
+    const { data: admin } = await supabase
+      .from('admins')
+      .select('id, username, password_hash')
       .eq('username', username)
       .single();
 
-    if (!user || !user.password_hash) {
+    if (!admin || !admin.password_hash) {
       recordFailedAttempt(rateLimitKey);
       return res.status(401).json({ ok: false, error: '账号或密码错误' });
     }
 
-    if (user.role !== 'admin') {
-      recordFailedAttempt(rateLimitKey);
-      return res.status(403).json({ ok: false, error: '无管理员权限' });
-    }
-
-    if (!bcrypt.compareSync(password, user.password_hash)) {
+    if (!bcrypt.compareSync(password, admin.password_hash)) {
       recordFailedAttempt(rateLimitKey);
       return res.status(401).json({ ok: false, error: '账号或密码错误' });
     }
@@ -534,14 +527,12 @@ async function handleVerify(req: VercelRequest, res: VercelResponse) {
     const secret = process.env.JWT_SECRET;
     if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
     const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role },
+      { userId: admin.id, username: admin.username, role: 'admin' },
       secret,
       { expiresIn: '24h' }
     );
 
-    await logActivity(user.id, 'admin_login', { username: user.username }, getClientIp(req));
-
-    return res.json({ ok: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+    return res.json({ ok: true, token, user: { id: admin.id, username: admin.username } });
   } catch (error) {
     console.error('Verify admin error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
@@ -552,9 +543,8 @@ async function handleVerify(req: VercelRequest, res: VercelResponse) {
 async function handleSetupStatus(req: VercelRequest, res: VercelResponse) {
   try {
     const { count } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'admin');
+      .from('admins')
+      .select('*', { count: 'exact', head: true });
 
     return res.json({ ok: true, hasAdmin: (count || 0) > 0 });
   } catch (error) {
@@ -568,15 +558,14 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
   try {
     // 安全检查：如果已有管理员，禁止再次创建
     const { count: adminCount } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'admin');
+      .from('admins')
+      .select('*', { count: 'exact', head: true });
 
     if ((adminCount || 0) > 0) {
       return res.status(403).json({ ok: false, error: '管理员账号已存在，如需新增请登录后台操作' });
     }
 
-    const { username, email, password } = req.body || {};
+    const { username, password } = req.body || {};
 
     if (!username || !password) {
       return res.status(400).json({ ok: false, error: '用户名和密码为必填' });
@@ -587,24 +576,18 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
     if (password.length < 6) {
       return res.status(400).json({ ok: false, error: '密码长度至少 6 位' });
     }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ ok: false, error: '邮箱格式不正确' });
-    }
 
-    const { data: existingUser } = await supabase.from('users').select('id, role, email').eq('username', username).single();
-
-    if (existingUser) {
-      return res.status(400).json({ ok: false, error: '用户名已被注册，请使用其他用户名' });
-    }
-    if (email) {
-      const { data: existingEmail } = await supabase.from('users').select('id').eq('email', email).single();
-      if (existingEmail) return res.status(400).json({ ok: false, error: '邮箱已被注册' });
+    // 检查 admins 表中是否已存在同名管理员
+    const { data: existingAdmin } = await supabase.from('admins').select('id').eq('username', username).single();
+    if (existingAdmin) {
+      return res.status(400).json({ ok: false, error: '管理员用户名已存在' });
     }
 
     const passwordHash = bcrypt.hashSync(password, 10);
-    const { data: newAdmin, error } = await supabase.from('users').insert({
-      username, email: email || null, password_hash: passwordHash, role: 'admin'
-    }).select('id, username, email, role').single();
+    const { data: newAdmin, error } = await supabase.from('admins').insert({
+      username,
+      password_hash: passwordHash
+    }).select('id, username').single();
 
     if (error || !newAdmin) {
       return res.status(500).json({ ok: false, error: '创建管理员账号失败' });
@@ -614,12 +597,10 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
     const secret = process.env.JWT_SECRET;
     if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
     const token = jwt.sign(
-      { userId: newAdmin.id, username: newAdmin.username, role: newAdmin.role },
+      { userId: newAdmin.id, username: newAdmin.username, role: 'admin' },
       secret,
       { expiresIn: '24h' }
     );
-
-    await logActivity(newAdmin.id, 'admin_setup', { username: newAdmin.username }, getClientIp(req));
 
     return res.json({ ok: true, token, user: newAdmin });
   } catch (error) {

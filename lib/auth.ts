@@ -15,6 +15,11 @@ export interface AuthUser {
   role: string;
 }
 
+export interface AdminUser {
+  id: number;
+  username: string;
+}
+
 // 管理员 Token 有效期：24 小时（毫秒）
 const ADMIN_TOKEN_MAX_AGE = 24 * 60 * 60 * 1000;
 
@@ -186,9 +191,8 @@ export async function requireAuth(req: VercelRequest): Promise<{ user: AuthUser;
   }
 }
 
-export async function requireAdmin(req: VercelRequest): Promise<{ user: AuthUser; error?: undefined } | { user?: undefined; error: { status: number; message: string } }> {
-  // 管理员鉴权：使用 JWT token + admin 角色
-  // 支持 X-Admin-Token（管理后台）和 Authorization Bearer（前台用户）两种传递方式
+export async function requireAdmin(req: VercelRequest): Promise<{ user: AdminUser; error?: undefined } | { user?: undefined; error: { status: number; message: string } }> {
+  // 管理员鉴权：使用独立的 admins 表，支持 X-Admin-Token 和 Authorization Bearer
   const adminToken = req.headers['x-admin-token'] as string | undefined;
   const authHeader = req.headers.authorization as string | undefined;
 
@@ -213,27 +217,21 @@ export async function requireAdmin(req: VercelRequest): Promise<{ user: AuthUser
   try {
     const decoded = jwt.verify(token, secret) as JwtPayload;
 
-    // 从数据库验证用户仍然存在且是 admin
-    const { data: user } = await supabase
-      .from('users')
-      .select('id, username, email, role')
+    // 从 admins 表验证管理员存在
+    const { data: admin } = await supabase
+      .from('admins')
+      .select('id, username')
       .eq('id', decoded.userId)
       .single();
 
-    if (!user) {
-      return { error: { status: 401, message: 'User not found' } };
-    }
-
-    if (user.role !== 'admin') {
-      return { error: { status: 403, message: 'Admin access required' } };
+    if (!admin) {
+      return { error: { status: 401, message: 'Admin not found' } };
     }
 
     return {
       user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role
+        id: admin.id,
+        username: admin.username
       }
     };
   } catch (error) {

@@ -1,7 +1,7 @@
 -- ClawMigrate Database Schema for Supabase PostgreSQL
 -- Run this in Supabase SQL Editor to create all required tables
 
--- Users table
+-- Users table (前端普通用户)
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
@@ -11,6 +11,15 @@ CREATE TABLE IF NOT EXISTS users (
   membership_tier TEXT DEFAULT 'free',
   membership_expire_at TIMESTAMPTZ,
   phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Admins table (后台管理员，独立体系)
+CREATE TABLE IF NOT EXISTS admins (
+  id SERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -88,6 +97,13 @@ CREATE TRIGGER update_users_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Trigger for admins table
+DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
+CREATE TRIGGER update_admins_updated_at
+    BEFORE UPDATE ON admins
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Trigger for migration_drafts table
 DROP TRIGGER IF EXISTS update_migration_drafts_updated_at ON migration_drafts;
 CREATE TRIGGER update_migration_drafts_updated_at
@@ -103,10 +119,14 @@ CREATE TRIGGER update_migration_drafts_updated_at
 
 -- 启用 RLS
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE migrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE migration_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+
+-- admins 表：禁止 anon key 访问（只通过 service_role 访问）
+CREATE POLICY "admins_no_anon_access" ON admins FOR ALL USING (false);
 
 -- users 表：用户只能读写自己的记录
 CREATE POLICY "users_select_own" ON users FOR SELECT USING (auth.uid() = id::text::uuid OR id::text = auth.uid()::text);
