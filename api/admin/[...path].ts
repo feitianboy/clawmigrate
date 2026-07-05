@@ -727,6 +727,8 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
         return res.json({ ok: true, message: 'admins table created via pg connection' });
       } catch (pgError: any) {
         console.error('PG connection failed:', pgError);
+        // 继续尝试其他方案，但记录错误
+        return res.json({ ok: false, error: 'PG连接失败', detail: pgError.message, code: pgError.code });
       }
     }
 
