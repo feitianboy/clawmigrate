@@ -23,6 +23,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dbPort = u.port;
       dbUser = decodeURIComponent(u.username);
     } catch {}
+    // 查询 admins 表是否存在/有数据
+    const { count, error } = await supabase.from('admins').select('*', { count: 'exact', head: true });
     return res.json({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'not set',
       serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'not set',
@@ -32,6 +34,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       databaseUser: dbUser,
       jwtSecret: process.env.JWT_SECRET ? 'set' : 'not set',
       supabaseUrlValue: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      adminsTable: {
+        exists: !error,
+        count: count ?? null,
+        error: error ? { code: error.code, message: error.message } : null,
+      },
     });
   }
   if (subPath === 'init-tables' && req.method === 'POST') return handleInitTables(req, res);
