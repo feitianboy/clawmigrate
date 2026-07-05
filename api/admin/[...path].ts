@@ -591,7 +591,31 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ ok: false, error: '邮箱格式不正确' });
     }
 
-    const { data: existingUser } = await supabase.from('users').select('id').eq('username', username).single();
+    const { data: existingUser } = await supabase.from('users').select('id, role, email').eq('username', username).single();
+
+    // 如果同名用户存在但不是管理员，自动将其提升为管理员并更新密码
+    if (existingUser && existingUser.role !== 'admin') {
+      const passwordHash = bcrypt.hashSync(password, 10);
+      const { data: updatedAdmin, error: updateError } = await supabase
+        .from('users')
+        .update({ role: 'admin', password_hash: passwordHash, email: email || existingUser.email })
+        .eq('id', existingUser.id)
+        .select('id, username, email, role')
+        .single();
+      if (updateError || !updatedAdmin) {
+        return res.status(500).json({ ok: false, error: '提升管理员失败' });
+      }
+      const secret = process.env.JWT_SECRET;
+      if (!secret) return res.status(500).json({ ok: false, error: 'Server authentication not configured' });
+      const token = jwt.sign(
+        { userId: updatedAdmin.id, username: updatedAdmin.username, role: updatedAdmin.role },
+        secret,
+        { expiresIn: '24h' }
+      );
+      await logActivity(updatedAdmin.id, 'admin_setup', { username: updatedAdmin.username }, getClientIp(req));
+      return res.json({ ok: true, token, user: updatedAdmin });
+    }
+
     if (existingUser) return res.status(400).json({ ok: false, error: '用户名已存在' });
     if (email) {
       const { data: existingEmail } = await supabase.from('users').select('id').eq('email', email).single();
