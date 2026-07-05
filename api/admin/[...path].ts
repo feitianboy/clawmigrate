@@ -710,7 +710,29 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 方案2：返回 SQL 语句让用户手动执行
+    // 方案2：通过 Supabase pg_meta endpoint（Studio 内部 API）
+    try {
+      const pgMetaResponse = await fetch(`${supabaseUrl}/pg/query`, {
+        method: 'POST',
+        headers: {
+          'apiKey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: `CREATE TABLE IF NOT EXISTS admins (
+          id SERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        ); ALTER TABLE admins ENABLE ROW LEVEL SECURITY;` })
+      });
+      if (pgMetaResponse.ok) {
+        return res.json({ ok: true, message: 'admins table created via pg_meta' });
+      }
+    } catch (e: any) {
+      console.error('pg_meta failed:', e.message);
+    }
+
+    // 方案3：返回 SQL 语句让用户手动执行
     return res.json({
       ok: false,
       error: '无法自动建表，需要手动执行',
