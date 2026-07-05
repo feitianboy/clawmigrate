@@ -713,14 +713,24 @@ async function execAdminsDDL(client: any) {
   `);
 }
 
-async function tryPgConnect(opts: { host: string; port: number; database: string; user: string; password: string; label: string }) {
+async function tryPgConnect(opts: { host: string; port: number; database: string; user: string; password: string; label: string } | { connectionString: string; label: string }) {
   const { Client } = await import('pg');
-  const client = new Client({
-    host: opts.host, port: opts.port,
-    database: opts.database, user: opts.user, password: opts.password,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 15000,
-  });
+  let client;
+  if ('connectionString' in opts) {
+    // 直接用原始 connectionString，避免手动解析破坏密码中的特殊字符
+    client = new Client({
+      connectionString: opts.connectionString,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 15000,
+    });
+  } else {
+    client = new Client({
+      host: opts.host, port: opts.port,
+      database: opts.database, user: opts.user, password: opts.password,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 15000,
+    });
+  }
   await client.connect();
   await execAdminsDDL(client);
   await client.end();
@@ -767,6 +777,13 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
   if (!databaseUrl) {
     return res.json({ ok: false, error: 'DATABASE_URL not set', attempts });
   }
+
+  // 方案B0: 直接用原始 connectionString (避免手动解析破坏密码特殊字符)
+  try {
+    const r = await tryPgConnect({ connectionString: databaseUrl, label: 'raw-connString' });
+    attempts.push(r);
+    return res.json({ ok: true, message: 'admins table created via raw connectionString', attempts });
+  } catch (e: any) { attempts.push({ label: 'raw-connString', ok: false, code: e.code, error: e.message }); }
 
   // 方案B: pooler transaction mode (端口6543, 原始用户名 postgres.{ref})
   try {
