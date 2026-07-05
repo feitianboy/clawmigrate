@@ -27,6 +27,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {}
     // 用 select('id').limit(1) 准确检测表是否存在
     const { count, error } = await supabase.from('admins').select('id').limit(1);
+    // 列出所有可能相关的环境变量 key（只返回 key 名和值长度，不返回值）
+    const allKeys = Object.keys(process.env);
+    const interestingKeys = allKeys.filter(k =>
+      /SUPABASE|DATABASE|DB_|POSTGRES|VERCEL|GITHUB|TOKEN|PASSWORD|SECRET|PG_|ADMIN/i.test(k)
+    );
+    const envSummary = interestingKeys.map(k => ({ key: k, len: (process.env[k] || '').length }));
     return res.json({
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'not set',
       serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'not set',
@@ -41,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         error: error ? { code: error.code, message: error.message } : null,
         data: count,
       },
+      envKeys: envSummary,
     });
   }
   if (subPath === 'init-tables' && req.method === 'POST') return handleInitTables(req, res);
