@@ -658,91 +658,74 @@ async function handleSetup(req: VercelRequest, res: VercelResponse) {
 // ---- 初始化数据库表（临时接口） ----
 async function handleInitTables(req: VercelRequest, res: VercelResponse) {
   try {
-    // 从 Supabase URL 推导数据库连接信息
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    // 提取 project ref：https://xxx.supabase.co -> xxx
     const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
-    const dbPassword = process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-    if (!projectRef) {
-      return res.status(500).json({ ok: false, error: 'Cannot determine Supabase project ref' });
+    if (!projectRef || !serviceKey) {
+      return res.status(500).json({ ok: false, error: 'Supabase config missing' });
     }
 
-    // 尝试多种连接方式
-    let client;
-    try {
-      const { Client } = await import('pg');
-      // Supabase 连接字符串格式：postgresql://postgres:{password}@db.{ref}.supabase.co:5432/postgres
-      const connectionString = process.env.DATABASE_URL ||
-        process.env.POSTGRES_URL ||
-        (dbPassword ? `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres` : null);
+    // 尝试通过 Supabase REST API 的 rpc 功能执行 SQL
+    // 方案1：尝试直接用 pg 连接
+    const dbPassword = process.env.SUPABASE_DB_PASSWORD || process.env.POSTGRES_PASSWORD || process.env.DB_PASSWORD;
+    const connectionString = process.env.DATABASE_URL ||
+      (dbPassword ? `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres` : null);
 
-      if (!connectionString) {
-        return res.status(500).json({
-          ok: false,
-          error: 'No database connection info. Please set DATABASE_URL or SUPABASE_DB_PASSWORD in Vercel env vars',
-          sql: `CREATE TABLE IF NOT EXISTS admins (
-  id SERIAL PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);`
-        });
+    if (connectionString) {
+      try {
+        const { Client } = await import('pg');
+        const client = new Client({ connectionString, ssl: { rejectUnauthorized: false } });
+        await client.connect();
+
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admins (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          );
+        `);
+        await client.query(`ALTER TABLE admins ENABLE ROW LEVEL SECURITY;`);
+        await client.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'admins' AND policyname = 'admins_no_anon_access') THEN
+              CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);
+            END IF;
+          END $$;
+        `);
+        await client.query(`
+          DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
+          CREATE TRIGGER update_admins_updated_at
+            BEFORE UPDATE ON admins
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+        `);
+        await client.end();
+        return res.json({ ok: true, message: 'admins table created via pg connection' });
+      } catch (pgError) {
+        console.error('PG connection failed:', pgError);
       }
+    }
 
-      client = new Client({
-        connectionString,
-        ssl: { rejectUnauthorized: false }
-      });
-      await client.connect();
-    } catch (connError) {
-      return res.status(500).json({
-        ok: false,
-        error: 'Database connection failed',
-        detail: String(connError),
-        sql: `CREATE TABLE IF NOT EXISTS admins (
+    // 方案2：返回 SQL 语句让用户手动执行
+    return res.json({
+      ok: false,
+      error: '无法自动建表，需要手动执行',
+      projectRef,
+      sql: `CREATE TABLE IF NOT EXISTS admins (
   id SERIAL PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
-);`
-      });
-    }
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS admins (
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
-    await client.query(`ALTER TABLE admins ENABLE ROW LEVEL SECURITY;`);
-
-    await client.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'admins' AND policyname = 'admins_no_anon_access') THEN
-          CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);
-        END IF;
-      END $$;
-    `);
-
-    await client.query(`
-      DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
-      CREATE TRIGGER update_admins_updated_at
-        BEFORE UPDATE ON admins
-        FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column();
-    `);
-
-    await client.end();
-
-    return res.json({ ok: true, message: 'admins table created successfully' });
+);
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);`,
+      instructions: '请登录 Supabase 控制台，进入 SQL Editor，执行上面的 SQL 语句'
+    });
   } catch (error) {
     console.error('Init tables error:', error);
     return res.status(500).json({ ok: false, error: String(error) });
