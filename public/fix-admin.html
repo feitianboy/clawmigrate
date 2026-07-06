@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>修复管理员账号</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center; }
+    .btn { padding: 15px 40px; font-size: 18px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    .btn:hover { background: #1d4ed8; }
+    .log { text-align: left; background: #f3f4f6; padding: 15px; border-radius: 8px; margin-top: 20px; font-family: monospace; font-size: 12px; }
+    .success { color: #16a34a; }
+    .error { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <h1>修复管理员账号</h1>
+  <p>点击下方按钮，系统将自动创建管理员账号</p>
+  <button class="btn" onclick="fixAdmin()">修复管理员账号</button>
+  <div class="log" id="log"></div>
+
+  <script>
+    async function fixAdmin() {
+      const log = document.getElementById('log');
+      log.innerHTML = '';
+      
+      function addLog(text, type = '') {
+        log.innerHTML += `<div class="${type}">${text}</div>`;
+        log.scrollTop = log.scrollHeight;
+      }
+
+      addLog('开始修复...');
+
+      try {
+        addLog('正在连接数据库并修复权限...');
+        const res = await fetch('/api/admin/fix-admin-rls', { method: 'POST' });
+        const data = await res.json();
+        
+        if (data.ok) {
+          addLog('✅ 管理员账号创建成功！', 'success');
+          addLog(`用户名: admin`, 'success');
+          addLog(`密码: hu870812`, 'success');
+          addLog(`您现在可以返回后台登录了`, 'success');
+        } else {
+          addLog('❌ 直接修复失败，尝试其他方法...', 'error');
+          
+          addLog('尝试初始化表格...');
+          const initRes = await fetch('/api/admin/init-tables', { method: 'POST' });
+          const initData = await initRes.json();
+          
+          if (initData.ok) {
+            addLog('✅ 表格初始化成功！', 'success');
+            
+            addLog('再次尝试创建管理员...');
+            const setupRes = await fetch('/api/admin/setup', { 
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: 'admin', password: 'hu870812' })
+            });
+            const setupData = await setupRes.json();
+            
+            if (setupData.ok) {
+              addLog('✅ 管理员账号创建成功！', 'success');
+              addLog(`用户名: admin`, 'success');
+              addLog(`密码: hu870812`, 'success');
+            } else {
+              addLog('❌ 创建失败: ' + setupData.error, 'error');
+            }
+          } else {
+            addLog('❌ 表格初始化失败: ' + initData.error, 'error');
+            addLog('请联系技术支持', 'error');
+          }
+        }
+      } catch (e) {
+        addLog('❌ 错误: ' + e.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>
