@@ -37,6 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'not set',
       serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'not set',
       databaseUrl: dbUrl ? 'set' : 'not set',
+      databaseUrlFull: dbUrl,
       databaseHost: dbHost,
       databasePort: dbPort,
       databaseUser: dbUser,
