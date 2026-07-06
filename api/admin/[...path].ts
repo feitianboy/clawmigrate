@@ -881,13 +881,15 @@ async function handleFixAdminRls(req: VercelRequest, res: VercelResponse) {
       ok: true,
       message: 'Admin RLS fixed and admin user created',
       steps,
-      admin: result.rows[0]
+      admin: result.rows[0],
+      connectionInfo: { host: dbHost, port: dbPort, user: dbUser, dbName: dbName }
     });
   } catch (error: any) {
     return res.status(500).json({
       ok: false,
       error: error.message,
-      code: error.code
+      code: error.code,
+      connectionInfo: { host: dbHost, port: dbPort, user: dbUser, dbName: dbName }
     });
   } finally {
     await client.end();

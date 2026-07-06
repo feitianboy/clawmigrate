@@ -1,16 +1,14 @@
 const { Client } = require('pg');
 
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFicGlyeW9menBoYnRxbWp3anFrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTI1MTY2OSwiZXhwIjoyMDk2ODI3NjY5fQ.CZDdg2h1qpl2t9bxmiywuafKuY35AND6__A4Rg4zZdo';
-
 async function main() {
-  console.log('Connecting to Supabase database using IPv6...');
+  console.log('Connecting to Supabase database...');
   
   const client = new Client({
-    host: '2406:da18:167b:f902:c76d:6409:e1e2:f47d',
-    port: 5432,
+    host: 'aws-0-ap-southeast-1.pooler.supabase.com',
+    port: 6543,
     database: 'postgres',
-    user: 'postgres',
-    password: serviceRoleKey,
+    user: 'postgres.abpiryofzphbtqmjwjqk',
+    password: '2aRDtCzL6QUJUXtu',
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 30000,
   });
