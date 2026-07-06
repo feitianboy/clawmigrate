@@ -53,6 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (subPath === 'init-tables' && req.method === 'POST') return handleInitTables(req, res);
   if (subPath === 'fix-admin-rls' && req.method === 'POST') return handleFixAdminRls(req, res);
+  if (subPath === 'force-fix-admin' && req.method === 'POST') return handleForceFixAdmin(req, res);
   if (subPath === 'verify' && req.method === 'POST') return handleVerify(req, res);
   if (subPath === 'setup' && req.method === 'POST') return handleSetup(req, res);
   if (subPath === 'setup-status' && req.method === 'GET') return handleSetupStatus(req, res);
@@ -893,4 +894,50 @@ async function handleFixAdminRls(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(500).json({ ok: false, error: 'All connection attempts failed', attempts });
+}
+
+async function handleForceFixAdmin(req: VercelRequest, res: VercelResponse) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+  const steps: any[] = [];
+
+  try {
+    steps.push({ step: 'check-supabase-url', status: 'running' });
+    if (!supabaseUrl || !serviceKey) {
+      throw new Error('Supabase config missing');
+    }
+    steps[0].status = 'done';
+
+    steps.push({ step: 'try-supabase-js', status: 'running' });
+    const { data: exists, error: selectError } = await supabase.from('admins').select('id').limit(1);
+    if (!selectError) {
+      steps[0].status = 'done';
+      return res.json({ ok: true, message: 'Supabase JS already has access', steps, data: exists });
+    }
+    steps[1].status = 'done';
+
+    steps.push({ step: 'try-create-function', status: 'running' });
+    try {
+      const { data: funcResult, error: funcError } = await supabase.rpc('pg_stat_user_tables');
+      steps[2].status = 'done';
+    } catch {}
+
+    steps.push({ step: 'try-insert-direct', status: 'running' });
+    try {
+      const { data: insertResult, error: insertError } = await supabase.from('admins').insert({
+        username: 'admin',
+        password_hash: '$2a$10$TtJKus8CxqVBM98ULfRBj.YiuYE66T35fmxwD4lA.4IuO7Sc9Iq7u'
+      }).select('id, username').single();
+      if (!insertError) {
+        steps[3].status = 'done';
+        return res.json({ ok: true, message: 'Admin inserted via Supabase JS', steps, admin: insertResult });
+      }
+    } catch {}
+    steps[3].status = 'done';
+
+    return res.status(500).json({ ok: false, error: 'All methods failed', steps });
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error.message, steps });
+  }
 }
