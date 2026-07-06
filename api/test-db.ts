@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (projectRef && serviceKey) {
     attempts.push(await tryConnect(`db.${projectRef}.supabase.co`, 5432, 'postgres', serviceKey, 'direct-postgres-servicekey'));
+    attempts.push(await tryConnect('2406:da18:167b:f902:c76d:6409:e1e2:f47d', 5432, 'postgres', serviceKey, 'ipv6-direct-postgres-servicekey'));
   }
 
   const success = attempts.find(a => a.ok);
