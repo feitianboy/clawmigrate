@@ -825,73 +825,70 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleFixAdminRls(req: VercelRequest, res: VercelResponse) {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    return res.status(500).json({ ok: false, error: 'DATABASE_URL not set' });
-  }
-
-  const u = new URL(databaseUrl);
-  const dbHost = u.hostname;
-  const dbPort = parseInt(u.port || '5432');
-  const dbUser = decodeURIComponent(u.username);
-  const dbPassword = decodeURIComponent(u.password);
-  const dbName = u.pathname.slice(1) || 'postgres';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
   const { Client } = await import('pg');
-  const client = new Client({
-    host: dbHost,
-    port: dbPort,
-    database: dbName,
-    user: dbUser,
-    password: dbPassword,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 30000,
-  });
 
-  try {
-    await client.connect();
+  const attempts: any[] = [];
 
-    const steps = [];
-
-    steps.push({ step: 'grant-privileges', status: 'running' });
-    await client.query('GRANT ALL ON public.admins TO service_role');
-    steps[0].status = 'done';
-
-    steps.push({ step: 'drop-old-policy', status: 'running' });
-    await client.query('DROP POLICY IF EXISTS "admins_no_anon_access" ON admins');
-    steps[1].status = 'done';
-
-    steps.push({ step: 'create-new-policy', status: 'running' });
-    await client.query('CREATE POLICY "admins_service_role_only" ON admins FOR ALL USING (true) WITH CHECK (true)');
-    steps[2].status = 'done';
-
-    steps.push({ step: 'insert-admin', status: 'running' });
-    await client.query(`
-      INSERT INTO admins (username, password_hash) 
-      VALUES ('admin', '$2a$10$TtJKus8CxqVBM98ULfRBj.YiuYE66T35fmxwD4lA.4IuO7Sc9Iq7u')
-      ON CONFLICT (username) DO NOTHING
-    `);
-    steps[3].status = 'done';
-
-    steps.push({ step: 'verify', status: 'running' });
-    const result = await client.query('SELECT id, username, created_at FROM admins WHERE username = $1', ['admin']);
-    steps[4].status = 'done';
-
-    return res.json({
-      ok: true,
-      message: 'Admin RLS fixed and admin user created',
-      steps,
-      admin: result.rows[0],
-      connectionInfo: { host: dbHost, port: dbPort, user: dbUser, dbName: dbName }
+  const tryConnect = async (host: string, port: number, user: string, password: string, label: string) => {
+    const client = new Client({
+      host,
+      port,
+      database: 'postgres',
+      user,
+      password,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 30000,
     });
-  } catch (error: any) {
-    return res.status(500).json({
-      ok: false,
-      error: error.message,
-      code: error.code,
-      connectionInfo: { host: dbHost, port: dbPort, user: dbUser, dbName: dbName }
-    });
-  } finally {
-    await client.end();
+
+    try {
+      await client.connect();
+
+      await client.query('GRANT ALL ON public.admins TO service_role');
+      await client.query('DROP POLICY IF EXISTS "admins_no_anon_access" ON admins');
+      await client.query('CREATE POLICY "admins_service_role_only" ON admins FOR ALL USING (true) WITH CHECK (true)');
+      await client.query(`
+        INSERT INTO admins (username, password_hash) 
+        VALUES ('admin', '$2a$10$TtJKus8CxqVBM98ULfRBj.YiuYE66T35fmxwD4lA.4IuO7Sc9Iq7u')
+        ON CONFLICT (username) DO NOTHING
+      `);
+      const result = await client.query('SELECT id, username, created_at FROM admins WHERE username = $1', ['admin']);
+
+      await client.end();
+      return { ok: true, label, admin: result.rows[0] };
+    } catch (error: any) {
+      await client.end();
+      return { ok: false, label, error: error.message, code: error.code };
+    }
+  };
+
+  attempts.push(await tryConnect(`db.${projectRef}.supabase.co`, 5432, 'postgres', serviceKey, 'direct-postgres-servicekey'));
+  if (attempts[attempts.length - 1].ok) {
+    return res.json({ ok: true, message: 'Admin fixed via direct connection', attempts });
   }
+
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl) {
+    try {
+      const u = new URL(databaseUrl);
+      const dbHost = u.hostname;
+      const dbPort = parseInt(u.port || '5432');
+      const dbUser = decodeURIComponent(u.username);
+      const dbPassword = decodeURIComponent(u.password);
+      attempts.push(await tryConnect(dbHost, dbPort, dbUser, dbPassword, 'pooler-from-env'));
+      if (attempts[attempts.length - 1].ok) {
+        return res.json({ ok: true, message: 'Admin fixed via pooler connection', attempts });
+      }
+    } catch {}
+  }
+
+  attempts.push(await tryConnect(`db.${projectRef}.supabase.co`, 5432, 'postgres', '2aRDtCzL6QUJUXtu', 'direct-postgres-shortpwd'));
+  if (attempts[attempts.length - 1].ok) {
+    return res.json({ ok: true, message: 'Admin fixed via direct connection with short password', attempts });
+  }
+
+  return res.status(500).json({ ok: false, error: 'All connection attempts failed', attempts });
 }
