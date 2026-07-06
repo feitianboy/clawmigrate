@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       port: dbPort,
       database: 'postgres',
       user: dbUser,
-      password: dbPassword,
+      password: serviceKey,
       ssl: { 
         rejectUnauthorized: false,
         servername: `db.${projectRef}.supabase.co`
