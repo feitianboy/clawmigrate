@@ -1,15 +1,21 @@
 const { Client } = require('pg');
 
 async function main() {
+  console.log('Trying direct connection with IPv6...');
+  
   const client = new Client({
-    host: 'aws-0-ap-southeast-1.pooler.supabase.com',
-    port: 6543,
+    host: '2406:da18:167b:f902:c76d:6409:e1e2:f47d',
+    port: 5432,
     database: 'postgres',
-    user: 'postgres.abpiryofzphbtqmjwjqk',
-    password: '2aRDtCzL6QUJUXtu',
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 30000,
+    user: 'postgres',
+    password: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFicGlyeW9menBoYnRxbWp3anFrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTI1MTY2OSwiZXhwIjoyMDk2ODI3NjY5fQ.CZDdg2h1qpl2t9bxmiywuafKuY35AND6__A4Rg4zZdo',
+    ssl: { 
+      rejectUnauthorized: false,
+      servername: 'db.abpiryofzphbtqmjwjqk.supabase.co'
+    },
+    connectionTimeoutMillis: 60000,
   });
+
   try {
     console.log('Connecting...');
     await client.connect();
@@ -39,7 +45,7 @@ async function main() {
     console.log('\n✅ ALL DONE!');
   } catch(e) {
     console.error('\n❌ Error:', e.message);
-    process.exit(1);
+    await client.end();
   }
 }
 
