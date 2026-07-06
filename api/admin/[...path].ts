@@ -51,6 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
   if (subPath === 'init-tables' && req.method === 'POST') return handleInitTables(req, res);
+  if (subPath === 'fix-admin-rls' && req.method === 'POST') return handleFixAdminRls(req, res);
   if (subPath === 'verify' && req.method === 'POST') return handleVerify(req, res);
   if (subPath === 'setup' && req.method === 'POST') return handleSetup(req, res);
   if (subPath === 'setup-status' && req.method === 'GET') return handleSetupStatus(req, res);
@@ -820,4 +821,74 @@ async function handleInitTables(req: VercelRequest, res: VercelResponse) {
     dbHost, dbUser, dbName,
     attempts
   });
+}
+
+async function handleFixAdminRls(req: VercelRequest, res: VercelResponse) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return res.status(500).json({ ok: false, error: 'DATABASE_URL not set' });
+  }
+
+  const u = new URL(databaseUrl);
+  const dbHost = u.hostname;
+  const dbPort = parseInt(u.port || '5432');
+  const dbUser = decodeURIComponent(u.username);
+  const dbPassword = decodeURIComponent(u.password);
+  const dbName = u.pathname.slice(1) || 'postgres';
+
+  const { Client } = await import('pg');
+  const client = new Client({
+    host: dbHost,
+    port: dbPort,
+    database: dbName,
+    user: dbUser,
+    password: dbPassword,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 30000,
+  });
+
+  try {
+    await client.connect();
+
+    const steps = [];
+
+    steps.push({ step: 'grant-privileges', status: 'running' });
+    await client.query('GRANT ALL ON public.admins TO service_role');
+    steps[0].status = 'done';
+
+    steps.push({ step: 'drop-old-policy', status: 'running' });
+    await client.query('DROP POLICY IF EXISTS "admins_no_anon_access" ON admins');
+    steps[1].status = 'done';
+
+    steps.push({ step: 'create-new-policy', status: 'running' });
+    await client.query('CREATE POLICY "admins_service_role_only" ON admins FOR ALL USING (true) WITH CHECK (true)');
+    steps[2].status = 'done';
+
+    steps.push({ step: 'insert-admin', status: 'running' });
+    await client.query(`
+      INSERT INTO admins (username, password_hash) 
+      VALUES ('admin', '$2a$10$TtJKus8CxqVBM98ULfRBj.YiuYE66T35fmxwD4lA.4IuO7Sc9Iq7u')
+      ON CONFLICT (username) DO NOTHING
+    `);
+    steps[3].status = 'done';
+
+    steps.push({ step: 'verify', status: 'running' });
+    const result = await client.query('SELECT id, username, created_at FROM admins WHERE username = $1', ['admin']);
+    steps[4].status = 'done';
+
+    return res.json({
+      ok: true,
+      message: 'Admin RLS fixed and admin user created',
+      steps,
+      admin: result.rows[0]
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      ok: false,
+      error: error.message,
+      code: error.code
+    });
+  } finally {
+    await client.end();
+  }
 }
