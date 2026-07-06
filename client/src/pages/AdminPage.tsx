@@ -453,7 +453,7 @@ const MigrationsPage: React.FC = () => {
 
 // ---- 订单管理 ----
 const OrdersPage: React.FC = () => {
-  const { orders, ordersTotal, ordersPage, isLoading, fetchOrders } = useAdminStore();
+  const { orders, ordersTotal, ordersPage, isLoading, fetchOrders, deleteOrder } = useAdminStore();
   const [statusFilter, setStatusFilter] = useState('');
   useEffect(() => { fetchOrders(1, 10, statusFilter || undefined); }, [fetchOrders, statusFilter]);
   const totalPages = Math.ceil(ordersTotal / 10);
@@ -469,7 +469,7 @@ const OrdersPage: React.FC = () => {
         {orders.length === 0 && !isLoading ? <div style={S.emptyState}>暂无订单数据</div> : (
           <>
             <table style={S.table}>
-              <thead><tr><th style={S.th}>订单号</th><th style={S.th}>用户</th><th style={S.th}>套餐</th><th style={S.th}>金额</th><th style={S.th}>状态</th><th style={S.th}>时间</th></tr></thead>
+              <thead><tr><th style={S.th}>订单号</th><th style={S.th}>用户</th><th style={S.th}>套餐</th><th style={S.th}>金额</th><th style={S.th}>状态</th><th style={S.th}>时间</th><th style={S.th}>操作</th></tr></thead>
               <tbody>
                 {orders.map(o => (
                   <tr key={o.order_id}>
@@ -479,6 +479,9 @@ const OrdersPage: React.FC = () => {
                     <td style={S.td}>{formatMoney(Number(o.amount))}</td>
                     <td style={S.td}><StatusBadge status={o.status} /></td>
                     <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(o.created_at)}</td>
+                    <td style={S.td}>
+                      <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除订单 "${o.order_id}"？`) && deleteOrder(o.order_id)} title="删除"><Trash2 size={16} /></button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

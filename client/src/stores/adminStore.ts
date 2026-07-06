@@ -121,6 +121,7 @@ interface AdminState {
   fetchRevenue: () => Promise<void>;
   fetchUserDetail: (userId: number) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
+  deleteOrder: (orderId: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -357,6 +358,27 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : '删除用户失败', isLoading: false });
+    }
+  },
+
+  deleteOrder: async (orderId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: getAdminHeaders(),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `请求失败: ${response.status}`);
+      }
+      set((state) => ({
+        orders: state.orders.filter((o) => o.order_id !== orderId),
+        ordersTotal: state.ordersTotal - 1,
+        isLoading: false,
+      }));
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '删除订单失败', isLoading: false });
     }
   },
 

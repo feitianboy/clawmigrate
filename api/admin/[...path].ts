@@ -63,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if ((subPath.match(/^migrations\/\d+$/) || segments[0] === 'migrations' && segments.length === 2) && req.method === 'DELETE') return handleDeleteMigration(req, res, subPath);
   if ((subPath === 'orders' || subPath === 'list') && req.method === 'GET') return handleGetOrders(req, res);
   if (segments[0] === 'orders' && segments.length === 2 && req.method === 'PUT') return handleUpdateOrder(req, res, subPath);
+  if (segments[0] === 'orders' && segments.length === 2 && req.method === 'DELETE') return handleDeleteOrder(req, res, subPath);
   if (subPath === 'stats' && req.method === 'GET') return handleStats(req, res);
   if (subPath === 'trend' && req.method === 'GET') return handleTrend(req, res);
   if (subPath === 'revenue' && req.method === 'GET') return handleRevenue(req, res);
@@ -213,6 +214,31 @@ async function handleUpdateOrder(req: VercelRequest, res: VercelResponse, subPat
     return res.json({ ok: true, data: { message: 'Order updated successfully' } });
   } catch (error) {
     console.error('Update order error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+async function handleDeleteOrder(req: VercelRequest, res: VercelResponse, subPath: string) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const orderId = subPath.split('/')[1];
+    if (!orderId) return res.status(400).json({ ok: false, error: 'Invalid order ID' });
+
+    const order = await findOrderByOrderId(orderId);
+    if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
+
+    const { error } = await supabase.from('orders').delete().eq('order_id', orderId);
+    if (error) {
+      console.error('Delete order error:', error);
+      return res.status(500).json({ ok: false, error: 'Failed to delete order' });
+    }
+
+    await logActivity(null, 'admin_delete_order', { adminUsername: result.user!.username, orderId, plan: order.plan, amount: order.amount, status: order.status }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    return res.json({ ok: true, data: { message: 'Order deleted successfully' } });
+  } catch (error) {
+    console.error('Delete order error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 }
