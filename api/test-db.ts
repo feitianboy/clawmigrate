@@ -19,11 +19,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { Client } = await import('pg');
     const client = new Client({
-      host: `db.${projectRef}.supabase.co`,
-      port: 5432,
+      host: 'aws-0-ap-southeast-1.pooler.supabase.com',
+      port: 6543,
       database: 'postgres',
-      user: 'postgres',
-      password: serviceKey,
+      user: 'postgres.abpiryofzphbtqmjwjqk',
+      password: dbPassword,
       ssl: { 
         rejectUnauthorized: false,
         servername: `db.${projectRef}.supabase.co`
