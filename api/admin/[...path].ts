@@ -704,15 +704,12 @@ async function execAdminsDDL(client: any) {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  await client.query(`GRANT ALL ON public.admins TO service_role;`);
+  await client.query(`GRANT ALL ON SEQUENCE admins_id_seq TO service_role;`);
   await client.query(`ALTER TABLE admins ENABLE ROW LEVEL SECURITY;`);
-  await client.query(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'admins' AND policyname = 'admins_no_anon_access') THEN
-        CREATE POLICY admins_no_anon_access ON admins FOR ALL USING (false);
-      END IF;
-    END $$;
-  `);
+  await client.query(`DROP POLICY IF EXISTS "admins_no_anon_access" ON admins;`);
+  await client.query(`DROP POLICY IF EXISTS "admins_service_role_only" ON admins;`);
+  await client.query(`CREATE POLICY "admins_service_role_only" ON admins FOR ALL USING (true) WITH CHECK (true);`);
   await client.query(`
     DROP TRIGGER IF EXISTS update_admins_updated_at ON admins;
     CREATE TRIGGER update_admins_updated_at
