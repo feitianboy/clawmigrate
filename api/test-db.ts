@@ -3,6 +3,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const databaseUrl = process.env.DATABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
   
   const attempts: any[] = [];
 
@@ -10,7 +12,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { Client } = await import('pg');
     const client = new Client({
       host, port, database: 'postgres', user, password,
-      ssl: { rejectUnauthorized: false },
+      ssl: { 
+        rejectUnauthorized: false,
+        servername: `db.${projectRef}.supabase.co`
+      },
       connectionTimeoutMillis: 30000,
     });
     try {
@@ -40,8 +45,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch {}
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
   if (projectRef && serviceKey) {
     attempts.push(await tryConnect(`db.${projectRef}.supabase.co`, 5432, 'postgres', serviceKey, 'direct-postgres-servicekey'));
   }
