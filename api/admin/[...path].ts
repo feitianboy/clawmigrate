@@ -870,6 +870,11 @@ async function handleFixAdminRls(req: VercelRequest, res: VercelResponse) {
     return res.json({ ok: true, message: 'Admin fixed via direct connection', attempts });
   }
 
+  attempts.push(await tryConnect('2406:da18:167b:f902:c76d:6409:e1e2:f47d', 5432, 'postgres', serviceKey, 'ipv6-direct-postgres-servicekey'));
+  if (attempts[attempts.length - 1].ok) {
+    return res.json({ ok: true, message: 'Admin fixed via IPv6 direct connection', attempts });
+  }
+
   const databaseUrl = process.env.DATABASE_URL;
   if (databaseUrl) {
     try {
