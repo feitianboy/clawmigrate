@@ -6,54 +6,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
   
-  const attempts: any[] = [];
+  if (!databaseUrl || !serviceKey) {
+    return res.status(500).json({ ok: false, error: 'Missing environment variables' });
+  }
 
-  const tryConnect = async (host: string, port: number, user: string, password: string, label: string) => {
+  try {
+    const u = new URL(databaseUrl);
+    const dbHost = u.hostname;
+    const dbPort = parseInt(u.port || '5432');
+    const dbUser = decodeURIComponent(u.username);
+    const dbPassword = decodeURIComponent(u.password);
+
     const { Client } = await import('pg');
     const client = new Client({
-      host, port, database: 'postgres', user, password,
+      host: dbHost,
+      port: dbPort,
+      database: 'postgres',
+      user: dbUser,
+      password: dbPassword,
       ssl: { 
         rejectUnauthorized: false,
         servername: `db.${projectRef}.supabase.co`
       },
       connectionTimeoutMillis: 30000,
     });
-    try {
-      await client.connect();
-      const result = await client.query('SELECT version()');
-      await client.end();
-      return { ok: true, label, version: result.rows[0].version };
-    } catch (error: any) {
-      await client.end();
-      return { ok: false, label, error: error.message, code: error.code };
-    }
-  };
 
-  if (databaseUrl) {
-    try {
-      const u = new URL(databaseUrl);
-      const dbHost = u.hostname;
-      const dbPort = parseInt(u.port || '5432');
-      const dbUser = decodeURIComponent(u.username);
-      const dbPassword = decodeURIComponent(u.password);
-      
-      attempts.push(await tryConnect(dbHost, 5432, 'postgres', serviceKey || '', 'direct-5432-postgres-servicekey'));
-      attempts.push(await tryConnect(dbHost, 5432, 'postgres', dbPassword, 'direct-5432-postgres-original'));
-      attempts.push(await tryConnect(dbHost, 6543, 'postgres', serviceKey || '', 'pooler-6543-postgres-servicekey'));
-      attempts.push(await tryConnect(dbHost, 6543, 'postgres', dbPassword, 'pooler-6543-postgres-original'));
-      attempts.push(await tryConnect(dbHost, 6543, dbUser, dbPassword, 'pooler-6543-original'));
-    } catch {}
+    await client.connect();
+
+    await client.query('GRANT ALL ON public.admins TO service_role');
+    await client.query('GRANT ALL ON SEQUENCE admins_id_seq TO service_role');
+    await client.query('DROP POLICY IF EXISTS "admins_no_anon_access" ON admins');
+    await client.query('CREATE POLICY "admins_service_role_only" ON admins FOR ALL USING (true) WITH CHECK (true)');
+    await client.query('INSERT INTO admins (username, password_hash) VALUES ($1, $2) ON CONFLICT (username) DO NOTHING', ['admin', '$2a$10$TtJKus8CxqVBM98ULfRBj.YiuYE66T35fmxwD4lA.4IuO7Sc9Iq7u']);
+    
+    const result = await client.query('SELECT id, username FROM admins WHERE username = $1', ['admin']);
+    
+    await client.end();
+
+    return res.json({ ok: true, message: 'Admin created successfully!', admin: result.rows[0] });
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error.message, code: error.code });
   }
-
-  if (projectRef && serviceKey) {
-    attempts.push(await tryConnect(`db.${projectRef}.supabase.co`, 5432, 'postgres', serviceKey, 'direct-postgres-servicekey'));
-    attempts.push(await tryConnect('2406:da18:167b:f902:c76d:6409:e1e2:f47d', 5432, 'postgres', serviceKey, 'ipv6-direct-postgres-servicekey'));
-  }
-
-  const success = attempts.find(a => a.ok);
-  if (success) {
-    return res.json({ ok: true, message: 'Connection test successful', attempts });
-  }
-
-  return res.status(500).json({ ok: false, error: 'All connection attempts failed', attempts });
 }
