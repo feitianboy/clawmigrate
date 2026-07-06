@@ -9,7 +9,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ok: true,
     data: {
       status: 'healthy',
-      version: 'v2',
       timestamp: new Date().toISOString()
     }
   });
