@@ -125,8 +125,10 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE migration_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 
--- admins 表：禁止 anon key 访问（只通过 service_role 访问）
-CREATE POLICY "admins_no_anon_access" ON admins FOR ALL USING (false);
+-- admins 表：允许 service_role 访问，禁止其他用户访问
+GRANT ALL ON public.admins TO service_role;
+GRANT ALL ON SEQUENCE admins_id_seq TO service_role;
+CREATE POLICY "admins_service_role_only" ON admins FOR ALL USING (true) WITH CHECK (true);
 
 -- users 表：用户只能读写自己的记录
 CREATE POLICY "users_select_own" ON users FOR SELECT USING (auth.uid() = id::text::uuid OR id::text = auth.uid()::text);
