@@ -32,18 +32,16 @@ export async function getActivityLogs(page: number = 1, limit: number = 20) {
 export async function getActivityStats() {
   const today = new Date().toISOString().split('T')[0];
   
-  const { count: todayPV } = await supabase
+  const { data: todayLogs } = await supabase
     .from('activity_logs')
-    .select('*', { count: 'exact', head: true })
+    .select('user_id, ip, action')
     .gte('created_at', today);
 
-  const { data: todayUVData } = await supabase
-    .from('activity_logs')
-    .select('user_id, ip')
-    .gte('created_at', today);
+  const userLogs = (todayLogs || []).filter(log => !log.action.startsWith('admin_'));
+  const todayPV = userLogs.length;
 
   const uniqueUsers = new Set<string>();
-  todayUVData?.forEach(log => {
+  userLogs.forEach(log => {
     if (log.user_id) {
       uniqueUsers.add(`user_${log.user_id}`);
     } else if (log.ip) {
