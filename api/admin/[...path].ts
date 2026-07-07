@@ -185,11 +185,11 @@ async function handleGetOrders(req: VercelRequest, res: VercelResponse) {
 
     const { data: orders, count } = await query;
     const formattedOrders = (orders || []).map(order => ({
-      id: order.id, orderId: order.order_id, userId: order.user_id,
+      id: order.id, order_id: order.order_id, orderId: order.order_id, userId: order.user_id,
       username: order.users?.username || 'Unknown', email: order.users?.email || 'Unknown',
       plan: order.plan, planName: getPlanName(order.plan), amount: order.amount,
       payMethod: order.pay_method, status: order.status, statusName: getStatusName(order.status),
-      createdAt: order.created_at, paidAt: order.paid_at
+      created_at: order.created_at, createdAt: order.created_at, paidAt: order.paid_at
     }));
 
     return res.json({ ok: true, data: { orders: formattedOrders, pagination: { page, limit, total: count || 0, totalPages: Math.ceil((count || 0) / limit) } } });
@@ -238,7 +238,16 @@ async function handleDeleteOrder(req: VercelRequest, res: VercelResponse, subPat
     const orderId = subPath.split('/')[1];
     if (!orderId) return res.status(400).json({ ok: false, error: 'Invalid order ID' });
 
-    const order = await findOrderByOrderId(orderId);
+    const { data: order, error: findError } = await supabase
+      .from('orders')
+      .select('order_id, user_id, plan, amount, status')
+      .eq('order_id', orderId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('Delete order find error:', findError);
+      return res.status(500).json({ ok: false, error: 'Failed to find order' });
+    }
     if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
 
     const { error } = await supabase.from('orders').delete().eq('order_id', orderId);
