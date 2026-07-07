@@ -6,7 +6,7 @@ import {
   Trash2, RefreshCw, CheckCircle, XCircle, Clock, Shield, Lock,
   ChevronLeft, ChevronRight, DollarSign, UserCheck, Eye, Activity,
   PieChart as PieChartIcon, Search, ArrowLeft, Crown, CreditCard, UserPlus,
-  Menu,
+  Menu, FileText, RotateCcw,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, LineChart, Line, BarChart, Bar,
@@ -41,7 +41,7 @@ const tierNames: Record<string, string> = { free: '免费版', pro: '专业版' 
 const planNames: Record<string, string> = { pro_monthly: 'Pro月费', pro_yearly: 'Pro年费' };
 const statusNames: Record<string, string> = { pending: '待支付', paid: '已支付', cancelled: '已取消', refunded: '已退款' };
 
-type Page = 'dashboard' | 'users' | 'migrations' | 'orders' | 'revenue' | 'admins';
+type Page = 'dashboard' | 'users' | 'migrations' | 'orders' | 'revenue' | 'admins' | 'logs';
 
 const formatDate = (s: string) => new Date(s).toLocaleDateString('zh-CN', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -599,6 +599,69 @@ const RevenuePage: React.FC = () => {
   );
 };
 
+// ---- 访问日志 ----
+const LogsPage: React.FC = () => {
+  const { activityLogs, activityLogsTotal, activityLogsPage, isLoading, fetchActivityLogs } = useAdminStore();
+  const pageSize = 20;
+  const totalPages = Math.ceil(activityLogsTotal / pageSize);
+
+  useEffect(() => { fetchActivityLogs(1, pageSize); }, [fetchActivityLogs]);
+
+  const actionNames: Record<string, string> = {
+    page_view: '页面访问',
+    login: '登录',
+    register: '注册',
+    github_login: 'GitHub登录',
+    create_order: '创建订单',
+    payment_success: '支付成功',
+    cancel_order: '取消订单',
+    start_migration: '开始迁移',
+    admin_login: '管理员登录',
+    admin_update_order: '管理员更新订单',
+    admin_refund_order: '管理员退款',
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>访问日志</h2>
+        <button onClick={() => fetchActivityLogs(activityLogsPage, pageSize)} style={{ ...S.btn }}><RefreshCw size={16} />刷新</button>
+      </div>
+      <div style={S.card}>
+        {activityLogs.length === 0 && !isLoading ? <div style={S.emptyState}>暂无日志数据</div> : (
+          <>
+            <table style={S.table}>
+              <thead><tr><th style={S.th}>时间</th><th style={S.th}>用户</th><th style={S.th}>操作</th><th style={S.th}>IP地址</th><th style={S.th}>详情</th></tr></thead>
+              <tbody>
+                {activityLogs.map(log => (
+                  <tr key={log.id}>
+                    <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(log.created_at)}</td>
+                    <td style={S.td}>
+                      {log.users?.username ? log.users.username : (log.user_id ? `用户${log.user_id}` : <span style={{ color: 'var(--color-text-secondary)' }}>访客</span>)}
+                    </td>
+                    <td style={S.td}><span style={{ ...S.badge, background: 'var(--color-bg)', color: 'var(--color-text)' }}>{actionNames[log.action] || log.action}</span></td>
+                    <td style={{ ...S.td, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>{log.ip || '-'}</td>
+                    <td style={{ ...S.td, fontSize: '0.8125rem', color: 'var(--color-text-secondary)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {log.detail ? JSON.stringify(log.detail) : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={S.pagination}>
+              <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>第 {activityLogsPage} / {totalPages || 1} 页，共 {activityLogsTotal} 条</span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button style={{ ...S.pageBtn, opacity: activityLogsPage <= 1 ? 0.5 : 1 }} disabled={activityLogsPage <= 1} onClick={() => fetchActivityLogs(activityLogsPage - 1, pageSize)}><ChevronLeft size={16} />上一页</button>
+                <button style={{ ...S.pageBtn, opacity: activityLogsPage >= totalPages ? 0.5 : 1 }} disabled={activityLogsPage >= totalPages} onClick={() => fetchActivityLogs(activityLogsPage + 1, pageSize)}>下一页<ChevronRight size={16} /></button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+};
+
 // ---- 管理员管理 ----
 const AdminsPage: React.FC = () => {
   const { adminRecords, adminRecordsTotal, isLoading, fetchAdmins, createAdmin, deleteAdmin, updateAdmin, adminUser } = useAdminStore();
@@ -791,6 +854,7 @@ export const AdminPage: React.FC = () => {
     { key: 'migrations', label: '迁移管理', icon: <ArrowRightLeft size={18} /> },
     { key: 'orders', label: '订单管理', icon: <ShoppingCart size={18} /> },
     { key: 'revenue', label: '营收分析', icon: <TrendingUp size={18} /> },
+    { key: 'logs', label: '访问日志', icon: <FileText size={18} /> },
     { key: 'admins', label: '后台管理', icon: <Shield size={18} /> },
   ];
 
@@ -871,6 +935,7 @@ export const AdminPage: React.FC = () => {
           {currentPage === 'migrations' && <MigrationsPage />}
           {currentPage === 'orders' && <OrdersPage />}
           {currentPage === 'revenue' && <RevenuePage />}
+          {currentPage === 'logs' && <LogsPage />}
           {currentPage === 'admins' && <AdminsPage />}
         </div>
       </div>

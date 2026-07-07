@@ -73,6 +73,16 @@ export interface RevenueData {
   uniquePayingUsers: number;
 }
 
+export interface ActivityLogRecord {
+  id: number;
+  user_id: number | null;
+  action: string;
+  detail?: Record<string, unknown> | null;
+  ip?: string | null;
+  created_at: string;
+  users?: { username: string } | null;
+}
+
 export interface UserDetail {
   user: User & { migrationCount: number; paidOrderCount: number };
   migrations: MigrationRecord[];
@@ -112,6 +122,9 @@ interface AdminState {
   ordersPage: number;
   adminRecords: AdminRecord[];
   adminRecordsTotal: number;
+  activityLogs: ActivityLogRecord[];
+  activityLogsTotal: number;
+  activityLogsPage: number;
   stats: AdminStats;
   trendData: TrendData[];
   revenueData: RevenueData | null;
@@ -134,6 +147,7 @@ interface AdminState {
   deleteOrder: (orderId: string) => Promise<void>;
   updateOrder: (orderId: string, status: string) => Promise<{ success: boolean; error?: string }>;
   fetchAdmins: () => Promise<void>;
+  fetchActivityLogs: (page: number, limit: number) => Promise<void>;
   createAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   deleteAdmin: (adminId: number) => Promise<void>;
   updateAdmin: (adminId: number, data: { password?: string; newUsername?: string }) => Promise<{ success: boolean; error?: string }>;
@@ -165,6 +179,9 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   ordersPage: 1,
   adminRecords: [],
   adminRecordsTotal: 0,
+  activityLogs: [],
+  activityLogsTotal: 0,
+  activityLogsPage: 1,
   stats: emptyStats,
   trendData: [],
   revenueData: null,
@@ -500,6 +517,29 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       const msg = error instanceof Error ? error.message : '更新管理员失败';
       set({ error: msg, isLoading: false });
       return { success: false, error: msg };
+    }
+  },
+
+  fetchActivityLogs: async (page: number = 1, limit: number = 20) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`/api/admin/activity-logs?page=${page}&limit=${limit}`, {
+        headers: getAdminHeaders(),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `请求失败: ${response.status}`);
+      }
+      const result = await response.json();
+      const data = result.data || result;
+      set({
+        activityLogs: data.logs || [],
+        activityLogsTotal: data.pagination?.total ?? data.total ?? 0,
+        activityLogsPage: page,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '获取访问日志失败', isLoading: false });
     }
   },
 
