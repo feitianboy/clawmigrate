@@ -41,7 +41,7 @@ const tierNames: Record<string, string> = { free: '免费版', pro: '专业版' 
 const planNames: Record<string, string> = { pro_monthly: 'Pro月费', pro_yearly: 'Pro年费' };
 const statusNames: Record<string, string> = { pending: '待支付', paid: '已支付', cancelled: '已取消', refunded: '已退款' };
 
-type Page = 'dashboard' | 'users' | 'migrations' | 'orders' | 'revenue';
+type Page = 'dashboard' | 'users' | 'migrations' | 'orders' | 'revenue' | 'admins';
 
 const formatDate = (s: string) => new Date(s).toLocaleDateString('zh-CN', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -571,6 +571,154 @@ const RevenuePage: React.FC = () => {
   );
 };
 
+// ---- 管理员管理 ----
+const AdminsPage: React.FC = () => {
+  const { adminRecords, adminRecordsTotal, isLoading, fetchAdmins, createAdmin, deleteAdmin, updateAdmin, adminUser } = useAdminStore();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [editingAdmin, setEditingAdmin] = useState<{ id: number; username: string } | null>(null);
+  const [editPassword, setEditPassword] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [editError, setEditError] = useState('');
+
+  useEffect(() => { fetchAdmins(); }, [fetchAdmins]);
+
+  const handleCreate = async () => {
+    setCreateError('');
+    if (!newUsername.trim()) { setCreateError('请输入用户名'); return; }
+    if (!newPassword.trim()) { setCreateError('请输入密码'); return; }
+    const result = await createAdmin(newUsername.trim(), newPassword.trim());
+    if (result.success) {
+      setShowCreateModal(false);
+      setNewUsername('');
+      setNewPassword('');
+    } else {
+      setCreateError(result.error || '创建失败');
+    }
+  };
+
+  const handleEdit = async () => {
+    setEditError('');
+    if (!editPassword && !editUsername) { setEditError('请至少修改密码或用户名'); return; }
+    if (editPassword && editPassword.length < 6) { setEditError('密码至少6位'); return; }
+    if (editUsername && editUsername.length < 3) { setEditError('用户名至少3位'); return; }
+    if (!editingAdmin) return;
+    const result = await updateAdmin(editingAdmin.id, {
+      password: editPassword || undefined,
+      newUsername: editUsername || undefined,
+    });
+    if (result.success) {
+      setShowEditModal(false);
+      setEditingAdmin(null);
+      setEditPassword('');
+      setEditUsername('');
+    } else {
+      setEditError(result.error || '更新失败');
+    }
+  };
+
+  const handleDelete = (adminId: number, username: string) => {
+    if (window.confirm(`确定删除管理员 "${username}"？`)) {
+      deleteAdmin(adminId);
+    }
+  };
+
+  const openEditModal = (admin: { id: number; username: string }) => {
+    setEditingAdmin(admin);
+    setEditUsername(admin.username);
+    setEditPassword('');
+    setEditError('');
+    setShowEditModal(true);
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>后台管理员</h2>
+        <button onClick={() => setShowCreateModal(true)} style={{ ...S.btn, background: 'var(--color-primary)', color: 'white', border: 'none' }}><UserPlus size={16} />新建管理员</button>
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-8)' }}><RefreshCw size={24} className="animate-spin" style={{ color: 'var(--color-primary)' }} /></div>
+      ) : adminRecords.length === 0 ? (
+        <div style={S.emptyState}>暂无管理员数据</div>
+      ) : (
+        <table style={S.table}>
+          <thead><tr><th style={S.th}>ID</th><th style={S.th}>用户名</th><th style={S.th}>创建时间</th><th style={S.th}>更新时间</th><th style={S.th}>操作</th></tr></thead>
+          <tbody>
+            {adminRecords.map(admin => (
+              <tr key={admin.id}>
+                <td style={S.td}>{admin.id}</td>
+                <td style={S.td}>{admin.username} {admin.username === adminUser?.username && <span style={{ ...S.badge, background: 'rgba(249,115,22,0.15)', color: 'var(--color-primary)' }}>当前登录</span>}</td>
+                <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(admin.created_at)}</td>
+                <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{admin.updated_at ? formatDate(admin.updated_at) : '-'}</td>
+                <td style={S.td}>
+                  <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)' }} onClick={() => openEditModal({ id: admin.id, username: admin.username })} title="编辑"><Eye size={16} /></button>
+                  {admin.username !== adminUser?.username && (
+                    <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => handleDelete(admin.id, admin.username)} title="删除"><Trash2 size={16} /></button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div style={{ marginTop: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>共 {adminRecordsTotal} 名管理员</div>
+
+      {/* 创建管理员弹窗 */}
+      {showCreateModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ width: '90%', maxWidth: '420px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>新建管理员</h3>
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>用户名</label>
+              <input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} autoFocus
+                style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '0.875rem' }} placeholder="3-20个字符" />
+            </div>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>密码</label>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '0.875rem' }} placeholder="至少6位" />
+            </div>
+            {createError && <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', fontSize: '0.875rem' }}>{createError}</div>}
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <button onClick={() => setShowCreateModal(false)} style={{ flex: 1, ...S.btn }}>取消</button>
+              <button onClick={handleCreate} disabled={isLoading} style={{ flex: 1, ...S.btn, background: 'var(--color-primary)', color: 'white', border: 'none', opacity: isLoading ? 0.7 : 1 }}>{isLoading ? '创建中...' : '创建'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 编辑管理员弹窗 */}
+      {showEditModal && editingAdmin && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ width: '90%', maxWidth: '420px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>编辑管理员: {editingAdmin.username}</h3>
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>新用户名（留空则不变）</label>
+              <input type="text" value={editUsername} onChange={e => setEditUsername(e.target.value)}
+                style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '0.875rem' }} placeholder="3-20个字符" />
+            </div>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <label style={{ display: 'block', fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>新密码（留空则不变）</label>
+              <input type="password" value={editPassword} onChange={e => setEditPassword(e.target.value)}
+                style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', color: 'var(--color-text)', fontSize: '0.875rem' }} placeholder="至少6位" />
+            </div>
+            {editError && <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)', fontSize: '0.875rem' }}>{editError}</div>}
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <button onClick={() => { setShowEditModal(false); setEditingAdmin(null); }} style={{ flex: 1, ...S.btn }}>取消</button>
+              <button onClick={handleEdit} disabled={isLoading} style={{ flex: 1, ...S.btn, background: 'var(--color-primary)', color: 'white', border: 'none', opacity: isLoading ? 0.7 : 1 }}>{isLoading ? '更新中...' : '更新'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 // ---- 主组件 ----
 export const AdminPage: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -615,6 +763,7 @@ export const AdminPage: React.FC = () => {
     { key: 'migrations', label: '迁移管理', icon: <ArrowRightLeft size={18} /> },
     { key: 'orders', label: '订单管理', icon: <ShoppingCart size={18} /> },
     { key: 'revenue', label: '营收分析', icon: <TrendingUp size={18} /> },
+    { key: 'admins', label: '后台管理', icon: <Shield size={18} /> },
   ];
 
   return (
@@ -694,6 +843,7 @@ export const AdminPage: React.FC = () => {
           {currentPage === 'migrations' && <MigrationsPage />}
           {currentPage === 'orders' && <OrdersPage />}
           {currentPage === 'revenue' && <RevenuePage />}
+          {currentPage === 'admins' && <AdminsPage />}
         </div>
       </div>
     </div>

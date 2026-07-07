@@ -83,6 +83,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const userId = req.query.userId as string || req.query.id as string;
     if (userId) return handleDeleteUser(req, res, `users/${userId}`);
   }
+  if (subPath === 'admins' && req.method === 'GET') return handleGetAdmins(req, res);
+  if (subPath === 'admins' && req.method === 'POST') return handleCreateAdmin(req, res);
+  if (subPath === 'admins' && req.method === 'DELETE') {
+    const adminId = req.query.adminId as string || req.query.id as string;
+    if (adminId) return handleDeleteAdmin(req, res, adminId);
+  }
+  if (subPath === 'admins' && req.method === 'PUT') {
+    const adminId = req.query.adminId as string || req.query.id as string;
+    if (adminId) return handleUpdateAdmin(req, res, adminId);
+  }
 
   return res.status(404).json({ ok: false, error: 'Admin route not found' });
 }
@@ -765,6 +775,152 @@ async function execAdminsDDL(client: any) {
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
   `);
+}
+
+// ---- Admin Management ----
+async function handleGetAdmins(req: VercelRequest, res: VercelResponse) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const { data: admins, count, error } = await supabase
+      .from('admins')
+      .select('id, username, created_at, updated_at', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get admins error:', error);
+      return res.status(500).json({ ok: false, error: 'Failed to fetch admins' });
+    }
+
+    return res.json({ ok: true, data: { admins: admins || [], total: count || 0 } });
+  } catch (error) {
+    console.error('Get admins error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+async function handleCreateAdmin(req: VercelRequest, res: VercelResponse) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const { username, password } = req.body || {};
+
+    if (!username || !password) {
+      return res.status(400).json({ ok: false, error: '用户名和密码为必填' });
+    }
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ ok: false, error: '用户名长度需 3-20 个字符' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ ok: false, error: '密码长度至少 6 位' });
+    }
+
+    const { data: existingAdmin } = await supabase.from('admins').select('id').eq('username', username).single();
+    if (existingAdmin) {
+      return res.status(400).json({ ok: false, error: '管理员用户名已存在' });
+    }
+
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const { data: newAdmin, error: insertError } = await supabase.from('admins').insert({
+      username,
+      password_hash: passwordHash
+    }).select('id, username, created_at').single();
+
+    if (insertError || !newAdmin) {
+      console.error('Create admin error:', insertError);
+      return res.status(500).json({ ok: false, error: '创建管理员账号失败' });
+    }
+
+    await logActivity(null, 'admin_create_admin', { adminUsername: result.user!.username, newUsername: username }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    return res.json({ ok: true, data: { admin: newAdmin } });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+async function handleDeleteAdmin(req: VercelRequest, res: VercelResponse, adminId: string) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const id = parseInt(adminId);
+    if (isNaN(id)) return res.status(400).json({ ok: false, error: 'Invalid admin ID' });
+
+    const { data: admin, error: findError } = await supabase.from('admins').select('id, username').eq('id', id).single();
+    if (findError || !admin) {
+      return res.status(404).json({ ok: false, error: 'Admin not found' });
+    }
+
+    if (admin.username === result.user!.username) {
+      return res.status(400).json({ ok: false, error: '不能删除当前登录的管理员账号' });
+    }
+
+    const { error } = await supabase.from('admins').delete().eq('id', id);
+    if (error) {
+      console.error('Delete admin error:', error);
+      return res.status(500).json({ ok: false, error: 'Failed to delete admin' });
+    }
+
+    await logActivity(null, 'admin_delete_admin', { adminUsername: result.user!.username, deletedUsername: admin.username }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    return res.json({ ok: true, data: { message: 'Admin deleted successfully' } });
+  } catch (error) {
+    console.error('Delete admin error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+async function handleUpdateAdmin(req: VercelRequest, res: VercelResponse, adminId: string) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const id = parseInt(adminId);
+    if (isNaN(id)) return res.status(400).json({ ok: false, error: 'Invalid admin ID' });
+
+    const { data: admin, error: findError } = await supabase.from('admins').select('id, username').eq('id', id).single();
+    if (findError || !admin) {
+      return res.status(404).json({ ok: false, error: 'Admin not found' });
+    }
+
+    const { password, newUsername } = req.body || {};
+
+    const updates: Record<string, any> = {};
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ ok: false, error: '密码长度至少 6 位' });
+      }
+      updates.password_hash = bcrypt.hashSync(password, 10);
+    }
+    if (newUsername) {
+      if (newUsername.length < 3 || newUsername.length > 20) {
+        return res.status(400).json({ ok: false, error: '用户名长度需 3-20 个字符' });
+      }
+      const { data: existing } = await supabase.from('admins').select('id').eq('username', newUsername).not('id', 'eq', id).single();
+      if (existing) {
+        return res.status(400).json({ ok: false, error: '用户名已被占用' });
+      }
+      updates.username = newUsername;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ ok: false, error: '没有提供任何更新字段' });
+    }
+
+    const { error } = await supabase.from('admins').update(updates).eq('id', id);
+    if (error) {
+      console.error('Update admin error:', error);
+      return res.status(500).json({ ok: false, error: 'Failed to update admin' });
+    }
+
+    await logActivity(null, 'admin_update_admin', { adminUsername: result.user!.username, targetUsername: admin.username, changes: Object.keys(updates) }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    return res.json({ ok: true, data: { message: 'Admin updated successfully' } });
+  } catch (error) {
+    console.error('Update admin error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
 }
 
 async function tryPgConnect(opts: { host: string; port: number; database: string; user: string; password: string; label: string } | { connectionString: string; label: string }) {

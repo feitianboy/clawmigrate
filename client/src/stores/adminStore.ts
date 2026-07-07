@@ -29,6 +29,7 @@ export interface MigrationRecord {
 export interface OrderRecord {
   id?: number;
   order_id: string;
+  orderId?: string;
   user_id: number;
   username?: string;
   email?: string;
@@ -38,6 +39,13 @@ export interface OrderRecord {
   status: 'pending' | 'paid' | 'cancelled' | 'refunded';
   created_at: string;
   paid_at?: string;
+}
+
+export interface AdminRecord {
+  id: number;
+  username: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface PlatformDistribution {
@@ -102,6 +110,8 @@ interface AdminState {
   orders: OrderRecord[];
   ordersTotal: number;
   ordersPage: number;
+  adminRecords: AdminRecord[];
+  adminRecordsTotal: number;
   stats: AdminStats;
   trendData: TrendData[];
   revenueData: RevenueData | null;
@@ -122,6 +132,10 @@ interface AdminState {
   fetchUserDetail: (userId: number) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
+  fetchAdmins: () => Promise<void>;
+  createAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  deleteAdmin: (adminId: number) => Promise<void>;
+  updateAdmin: (adminId: number, data: { password?: string; newUsername?: string }) => Promise<{ success: boolean; error?: string }>;
   clearError: () => void;
 }
 
@@ -148,6 +162,8 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   orders: [],
   ordersTotal: 0,
   ordersPage: 1,
+  adminRecords: [],
+  adminRecordsTotal: 0,
   stats: emptyStats,
   trendData: [],
   revenueData: null,
@@ -379,6 +395,89 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : '删除订单失败', isLoading: false });
+    }
+  },
+
+  fetchAdmins: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('/api/admin/admins', { headers: getAdminHeaders() });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `请求失败: ${response.status}`);
+      }
+      const result = await response.json();
+      const data = result.data || result;
+      set({ adminRecords: data.admins || [], adminRecordsTotal: data.total || 0, isLoading: false });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '获取管理员列表失败', isLoading: false });
+    }
+  },
+
+  createAdmin: async (username: string, password: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch('/api/admin/admins', {
+        method: 'POST',
+        headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await response.json();
+      if (response.ok && data.ok) {
+        get().fetchAdmins();
+        set({ isLoading: false });
+        return { success: true };
+      }
+      set({ error: data.error || '创建管理员失败', isLoading: false });
+      return { success: false, error: data.error || '创建管理员失败' };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '创建管理员失败';
+      set({ error: msg, isLoading: false });
+      return { success: false, error: msg };
+    }
+  },
+
+  deleteAdmin: async (adminId: number) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`/api/admin/admins?adminId=${adminId}`, {
+        method: 'DELETE',
+        headers: getAdminHeaders(),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `请求失败: ${response.status}`);
+      }
+      set((state) => ({
+        adminRecords: state.adminRecords.filter((a) => a.id !== adminId),
+        adminRecordsTotal: state.adminRecordsTotal - 1,
+        isLoading: false,
+      }));
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '删除管理员失败', isLoading: false });
+    }
+  },
+
+  updateAdmin: async (adminId: number, data: { password?: string; newUsername?: string }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`/api/admin/admins?adminId=${adminId}`, {
+        method: 'PUT',
+        headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await response.json();
+      if (response.ok && result.ok) {
+        get().fetchAdmins();
+        set({ isLoading: false });
+        return { success: true };
+      }
+      set({ error: result.error || '更新管理员失败', isLoading: false });
+      return { success: false, error: result.error || '更新管理员失败' };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '更新管理员失败';
+      set({ error: msg, isLoading: false });
+      return { success: false, error: msg };
     }
   },
 
