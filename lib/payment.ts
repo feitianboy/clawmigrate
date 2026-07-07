@@ -46,9 +46,15 @@ export async function zpayRefund(orderId: string, amount: number): Promise<{ suc
       return { success: false, message: 'ZPAY credentials not configured' };
     }
 
+    const orderResult = await queryZpayOrder(orderId);
+    if (!orderResult.paid || !orderResult.tradeNo) {
+      return { success: false, message: '未找到支付交易记录，无法退款' };
+    }
+
     const params: Record<string, string> = {
       pid: ZPAY_PID,
       act: 'refund',
+      trade_no: orderResult.tradeNo,
       out_trade_no: orderId,
       money: amount.toFixed(2),
     };
@@ -62,6 +68,7 @@ export async function zpayRefund(orderId: string, amount: number): Promise<{ suc
       .join('&');
     const url = `https://zpayz.cn/api.php?${queryString}`;
 
+    console.log('ZPAY refund request URL:', url);
     const response = await fetch(url);
     const data = await response.json();
 

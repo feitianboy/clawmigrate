@@ -637,7 +637,11 @@ const LogsPage: React.FC = () => {
                   <tr key={log.id}>
                     <td style={{ ...S.td, fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>{formatDate(log.created_at)}</td>
                     <td style={S.td}>
-                      {log.users?.username ? log.users.username : (log.user_id ? `用户${log.user_id}` : <span style={{ color: 'var(--color-text-secondary)' }}>访客</span>)}
+                      {log.users?.username ? log.users.username : (log.user_id ? `用户${log.user_id}` : (
+                        (log.detail && typeof log.detail === 'object' && 'adminUsername' in log.detail)
+                          ? <span style={{ color: 'var(--color-primary)' }}>管理员: {log.detail.adminUsername}</span>
+                          : <span style={{ color: 'var(--color-text-secondary)' }}>访客</span>
+                      ))}
                     </td>
                     <td style={S.td}><span style={{ ...S.badge, background: 'var(--color-bg)', color: 'var(--color-text)' }}>{actionNames[log.action] || log.action}</span></td>
                     <td style={{ ...S.td, fontFamily: 'var(--font-mono)', fontSize: '0.8125rem' }}>{log.ip || '-'}</td>
