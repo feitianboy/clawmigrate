@@ -62,15 +62,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (subPath === 'migrations' && req.method === 'GET') return handleAdminMigrations(req, res);
   if ((subPath.match(/^migrations\/\d+$/) || segments[0] === 'migrations' && segments.length === 2) && req.method === 'DELETE') return handleDeleteMigration(req, res, subPath);
   if ((subPath === 'orders' || subPath === 'list') && req.method === 'GET') return handleGetOrders(req, res);
-  if (segments[0] === 'orders' && segments.length === 2 && req.method === 'PUT') return handleUpdateOrder(req, res, subPath);
-  if (segments[0] === 'orders' && segments.length === 2 && req.method === 'DELETE') return handleDeleteOrder(req, res, subPath);
+  if (subPath === 'orders' && req.method === 'PUT') {
+    const orderId = req.query.orderId as string || req.query.id as string;
+    if (orderId) return handleUpdateOrder(req, res, `orders/${orderId}`);
+  }
+  if (subPath === 'orders' && req.method === 'DELETE') {
+    const orderId = req.query.orderId as string || req.query.id as string;
+    if (orderId) return handleDeleteOrder(req, res, `orders/${orderId}`);
+  }
   if (subPath === 'stats' && req.method === 'GET') return handleStats(req, res);
   if (subPath === 'trend' && req.method === 'GET') return handleTrend(req, res);
   if (subPath === 'revenue' && req.method === 'GET') return handleRevenue(req, res);
   if (subPath === 'user-detail' && req.method === 'GET') return handleUserDetail(req, res);
   if ((subPath === 'users' || subPath === '') && req.method === 'GET') return handleGetUsers(req, res);
-  if (segments[0] === 'users' && segments.length === 2 && req.method === 'PUT') return handleUpdateUser(req, res, subPath);
-  if (segments[0] === 'users' && segments.length === 2 && req.method === 'DELETE') return handleDeleteUser(req, res, subPath);
+  if (subPath === 'users' && req.method === 'PUT') {
+    const userId = req.query.userId as string || req.query.id as string;
+    if (userId) return handleUpdateUser(req, res, `users/${userId}`);
+  }
+  if (subPath === 'users' && req.method === 'DELETE') {
+    const userId = req.query.userId as string || req.query.id as string;
+    if (userId) return handleDeleteUser(req, res, `users/${userId}`);
+  }
 
   return res.status(404).json({ ok: false, error: 'Admin route not found' });
 }

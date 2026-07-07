@@ -343,7 +343,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   deleteUser: async (userId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const response = await fetch(`/api/admin/users?userId=${userId}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
       });
@@ -364,7 +364,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   deleteOrder: async (orderId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
+      const response = await fetch(`/api/admin/orders?orderId=${orderId}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
       });
