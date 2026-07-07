@@ -24,6 +24,7 @@ import {
   ArrowLeft,
   Zap,
   Crown,
+  Sparkles,
 } from 'lucide-react';
 import { UsageGuard } from '../components/UsageGuard';
 import { UpgradeModal } from '../components/UpgradeModal';
@@ -740,6 +741,37 @@ const MigrationPage: React.FC = () => {
       setTimeout(() => setExportCopied(false), 2000);
     };
 
+    // 一键迁移提示词（让源平台AI自动调用API）
+    const oneClickPrompt = targetPlatform ? `你好！我想把我的 ${sourcePlatform?.name} 配置迁移到 ${targetPlatform?.name}。
+
+请帮我整理以下内容并调用 ClawMigrate API 进行转换：
+- 所有 Projects/技能/插件（包括名称、描述、人设、系统提示词）
+- MCP 服务器配置（名称、工具列表）
+- 记忆内容
+- 设置（模型、温度、语言偏好）
+
+整理成JSON格式后，发送POST请求到：
+https://clawmigrate.com/api/migrate/convert
+
+请求体格式：
+{
+  "sourcePlatform": "${sourcePlatform?.id}",
+  "targetPlatform": "${targetPlatform?.id}",
+  "rawData": { ... 你整理的配置 ... }
+}
+
+然后返回API生成的 ${targetPlatform?.name} 导入提示词，让我可以直接复制使用。` : null;
+
+    const handleCopyOneClick = () => {
+      if (oneClickPrompt) {
+        navigator.clipboard.writeText(oneClickPrompt);
+        setOneClickCopied(true);
+        setTimeout(() => setOneClickCopied(false), 2000);
+      }
+    };
+
+    const [oneClickCopied, setOneClickCopied] = useState(false);
+
     return (
       <div style={styles.card}>
         <div style={styles.cardHeader}>
@@ -747,35 +779,66 @@ const MigrationPage: React.FC = () => {
           <p style={styles.cardDesc}>按照以下步骤从 {sourcePlatform?.name} 导出配置</p>
         </div>
         <div style={styles.cardBody}>
-          <div style={styles.instructions}>
-            <div style={styles.instructionsTitle}>
-              <Info size={16} />
-              操作步骤
+          {/* 一键迁移提示 */}
+          {targetPlatform && oneClickPrompt && (
+            <div style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-4)', background: 'linear-gradient(135deg, rgba(249,115,22,0.1), rgba(251,191,36,0.1))', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 'var(--radius-lg)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+                <Sparkles size={18} style={{ color: 'var(--color-primary)' }} />
+                <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>⚡ 一键迁移（推荐）</span>
+              </div>
+              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
+                直接发给 {sourcePlatform?.name}，AI会自动整理配置并调用API转换，一步到位！
+              </p>
+              <div style={{ position: 'relative' }}>
+                <pre style={{ padding: 'var(--space-3)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '200px', overflowY: 'auto' }}>
+                  {oneClickPrompt}
+                </pre>
+                <button
+                  onClick={handleCopyOneClick}
+                  style={{ position: 'absolute', top: '8px', right: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 12px', background: oneClickCopied ? 'var(--color-success)' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', cursor: 'pointer' }}
+                >
+                  {oneClickCopied ? <Check size={12} /> : <Copy size={12} />}
+                  {oneClickCopied ? '已复制' : '复制'}
+                </button>
+              </div>
             </div>
-            <ol style={styles.instructionsList}>
-              <li>复制下方提示词</li>
-              <li>打开 {sourcePlatform?.name}，新建一个对话</li>
-              <li>将提示词粘贴到对话中发送</li>
-              <li>等待 AI 返回 JSON 数据，复制全部内容</li>
-            </ol>
-          </div>
+          )}
 
-          <div style={styles.promptBox}>
-            <div style={styles.promptHeader}>
-              <span style={styles.promptLabel}>📋 导出提示词（点击复制）</span>
-              <button
-                style={{
-                  ...styles.copyBtn,
-                  ...(exportCopied ? styles.copyBtnCopied : {}),
-                }}
-                onClick={handleCopy}
-              >
-                {exportCopied ? <Check size={14} /> : <Copy size={14} />}
-                {exportCopied ? '已复制' : '复制'}
-              </button>
+          {/* 传统方式 */}
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+              <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-muted)' }}>或使用传统方式：</span>
             </div>
-            <div style={styles.promptContent}>
-              {exportPromptText}
+            <div style={styles.instructions}>
+              <div style={styles.instructionsTitle}>
+                <Info size={16} />
+                操作步骤
+              </div>
+              <ol style={styles.instructionsList}>
+                <li>复制下方提示词</li>
+                <li>打开 {sourcePlatform?.name}，新建一个对话</li>
+                <li>将提示词粘贴到对话中发送</li>
+                <li>等待 AI 返回 JSON 数据，复制全部内容</li>
+              </ol>
+            </div>
+
+            <div style={styles.promptBox}>
+              <div style={styles.promptHeader}>
+                <span style={styles.promptLabel}>📋 导出提示词（点击复制）</span>
+                <button
+                  style={{
+                    ...styles.copyBtn,
+                    ...(exportCopied ? styles.copyBtnCopied : {}),
+                  }}
+                  onClick={handleCopy}
+                >
+                  {exportCopied ? <Check size={14} /> : <Copy size={14} />}
+                  {exportCopied ? '已复制' : '复制'}
+                </button>
+              </div>
+              <div style={styles.promptContent}>
+                {exportPromptText}
+              </div>
             </div>
           </div>
 
