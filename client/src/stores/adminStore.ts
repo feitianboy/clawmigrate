@@ -147,7 +147,7 @@ interface AdminState {
   deleteOrder: (orderId: string) => Promise<void>;
   updateOrder: (orderId: string, status: string) => Promise<{ success: boolean; error?: string }>;
   fetchAdmins: () => Promise<void>;
-  fetchActivityLogs: (page: number, limit: number) => Promise<void>;
+  fetchActivityLogs: (page: number, limit: number, type?: string) => Promise<void>;
   createAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   deleteAdmin: (adminId: number) => Promise<void>;
   updateAdmin: (adminId: number, data: { password?: string; newUsername?: string }) => Promise<{ success: boolean; error?: string }>;
@@ -520,10 +520,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     }
   },
 
-  fetchActivityLogs: async (page: number = 1, limit: number = 20) => {
+  fetchActivityLogs: async (page: number = 1, limit: number = 20, type: string = 'all') => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch(`/api/admin/activity-logs?page=${page}&limit=${limit}`, {
+      const response = await fetch(`/api/admin/activity-logs?page=${page}&limit=${limit}&type=${type}`, {
         headers: getAdminHeaders(),
       });
       if (!response.ok) {

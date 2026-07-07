@@ -602,10 +602,11 @@ const RevenuePage: React.FC = () => {
 // ---- 访问日志 ----
 const LogsPage: React.FC = () => {
   const { activityLogs, activityLogsTotal, activityLogsPage, isLoading, fetchActivityLogs } = useAdminStore();
+  const [logType, setLogType] = useState<'all' | 'frontend' | 'admin'>('frontend');
   const pageSize = 20;
   const totalPages = Math.ceil(activityLogsTotal / pageSize);
 
-  useEffect(() => { fetchActivityLogs(1, pageSize); }, [fetchActivityLogs]);
+  useEffect(() => { fetchActivityLogs(1, pageSize, logType); }, [fetchActivityLogs, logType]);
 
   const actionNames: Record<string, string> = {
     page_view: '页面访问',
@@ -621,11 +622,18 @@ const LogsPage: React.FC = () => {
     admin_refund_order: '管理员退款',
   };
 
+  const typeLabels: Record<string, string> = { all: '全部日志', frontend: '前端访问', admin: '后台操作' };
+
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>访问日志</h2>
-        <button onClick={() => fetchActivityLogs(activityLogsPage, pageSize)} style={{ ...S.btn }}><RefreshCw size={16} />刷新</button>
+        <button onClick={() => fetchActivityLogs(activityLogsPage, pageSize, logType)} style={{ ...S.btn }}><RefreshCw size={16} />刷新</button>
+      </div>
+      <div style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
+        {(['frontend', 'admin', 'all'] as const).map(t => (
+          <button key={t} style={{ ...S.btn, ...(logType === t ? { background: 'var(--color-primary)', color: 'white', borderColor: 'var(--color-primary)' } : {}) }} onClick={() => setLogType(t)}>{typeLabels[t]}</button>
+        ))}
       </div>
       <div style={S.card}>
         {activityLogs.length === 0 && !isLoading ? <div style={S.emptyState}>暂无日志数据</div> : (
@@ -655,8 +663,8 @@ const LogsPage: React.FC = () => {
             <div style={S.pagination}>
               <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>第 {activityLogsPage} / {totalPages || 1} 页，共 {activityLogsTotal} 条</span>
               <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <button style={{ ...S.pageBtn, opacity: activityLogsPage <= 1 ? 0.5 : 1 }} disabled={activityLogsPage <= 1} onClick={() => fetchActivityLogs(activityLogsPage - 1, pageSize)}><ChevronLeft size={16} />上一页</button>
-                <button style={{ ...S.pageBtn, opacity: activityLogsPage >= totalPages ? 0.5 : 1 }} disabled={activityLogsPage >= totalPages} onClick={() => fetchActivityLogs(activityLogsPage + 1, pageSize)}>下一页<ChevronRight size={16} /></button>
+                <button style={{ ...S.pageBtn, opacity: activityLogsPage <= 1 ? 0.5 : 1 }} disabled={activityLogsPage <= 1} onClick={() => fetchActivityLogs(activityLogsPage - 1, pageSize, logType)}><ChevronLeft size={16} />上一页</button>
+                <button style={{ ...S.pageBtn, opacity: activityLogsPage >= totalPages ? 0.5 : 1 }} disabled={activityLogsPage >= totalPages} onClick={() => fetchActivityLogs(activityLogsPage + 1, pageSize, logType)}>下一页<ChevronRight size={16} /></button>
               </div>
             </div>
           </>

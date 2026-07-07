@@ -14,12 +14,20 @@ export async function logActivity(
   });
 }
 
-export async function getActivityLogs(page: number = 1, limit: number = 20) {
+export async function getActivityLogs(page: number = 1, limit: number = 20, logType: string = 'all') {
   const offset = (page - 1) * limit;
   
-  const { data: logs, count } = await supabase
+  let query = supabase
     .from('activity_logs')
-    .select('*, users(username)', { count: 'exact' })
+    .select('*, users(username)', { count: 'exact' });
+
+  if (logType === 'frontend') {
+    query = query.not('action', 'ilike', 'admin_%');
+  } else if (logType === 'admin') {
+    query = query.ilike('action', 'admin_%');
+  }
+
+  const { data: logs, count } = await query
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   

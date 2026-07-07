@@ -106,7 +106,8 @@ async function handleActivityLogs(req: VercelRequest, res: VercelResponse) {
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
-    const { logs, total } = await getActivityLogs(page, limit);
+    const logType = req.query.type as string || 'all';
+    const { logs, total } = await getActivityLogs(page, limit, logType);
     const formattedLogs = logs.map(log => ({ ...log, detail: log.detail ? JSON.parse(log.detail) : null }));
 
     return res.json({ ok: true, data: { logs: formattedLogs, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } } });
