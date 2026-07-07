@@ -1,13 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.mapField = mapField;
-exports.transformPrompts = transformPrompts;
-exports.transformSettings = transformSettings;
-exports.transformMemories = transformMemories;
-exports.transformMCPConnections = transformMCPConnections;
-exports.transformSkills = transformSkills;
-exports.transformSchema = transformSchema;
-exports.getPlatformFeatureMatrix = getPlatformFeatureMatrix;
 const COMMON_MAPPINGS = {
     prompts: {
         persona_description: [
@@ -42,7 +32,7 @@ const COMMON_MAPPINGS = {
         ],
     },
 };
-function mapField(sourceValue, mappings, context) {
+export function mapField(sourceValue, mappings, context) {
     for (const mapping of mappings) {
         if (mapping.condition && context && !mapping.condition(context)) {
             continue;
@@ -56,7 +46,7 @@ function mapField(sourceValue, mappings, context) {
     }
     return sourceValue;
 }
-function transformPrompts(sourcePrompts, targetAdapter) {
+export function transformPrompts(sourcePrompts, targetAdapter) {
     const targetMapping = targetAdapter.getFieldMapping().prompts || {};
     const sourceFields = Object.keys(targetMapping);
     return sourcePrompts.map((prompt, index) => {
@@ -93,7 +83,7 @@ function transformPrompts(sourcePrompts, targetAdapter) {
         return newPrompt;
     });
 }
-function transformSettings(sourceSettings, targetAdapter) {
+export function transformSettings(sourceSettings, targetAdapter) {
     if (!sourceSettings)
         return undefined;
     const targetMapping = targetAdapter.getFieldMapping().settings || {};
@@ -132,7 +122,7 @@ function transformSettings(sourceSettings, targetAdapter) {
     }
     return newSettings;
 }
-function transformMemories(sourceMemories, targetAdapter) {
+export function transformMemories(sourceMemories, targetAdapter) {
     const targetMapping = targetAdapter.getFieldMapping().memories || {};
     return sourceMemories.map((memory, index) => {
         const newMemory = {
@@ -157,7 +147,7 @@ function transformMemories(sourceMemories, targetAdapter) {
         return newMemory;
     });
 }
-function transformMCPConnections(sourceMCP, targetAdapter) {
+export function transformMCPConnections(sourceMCP, targetAdapter) {
     const targetMapping = targetAdapter.getFieldMapping().mcp_connections || {};
     return sourceMCP.map((mcp, index) => {
         const newMCP = {
@@ -192,7 +182,7 @@ function transformMCPConnections(sourceMCP, targetAdapter) {
         return newMCP;
     });
 }
-function transformSkills(sourceSkills, targetAdapter) {
+export function transformSkills(sourceSkills, targetAdapter) {
     const targetMapping = targetAdapter.getFieldMapping().skills || {};
     return sourceSkills.map((skill, index) => {
         const newSkill = {
@@ -226,7 +216,7 @@ function transformSkills(sourceSkills, targetAdapter) {
         return newSkill;
     });
 }
-function transformSchema(sourceSchema, targetAdapter) {
+export function transformSchema(sourceSchema, targetAdapter) {
     return {
         version: sourceSchema.version,
         sourcePlatform: sourceSchema.sourcePlatform,
@@ -243,7 +233,7 @@ function transformSchema(sourceSchema, targetAdapter) {
         metadata: sourceSchema.metadata,
     };
 }
-function getPlatformFeatureMatrix() {
+export function getPlatformFeatureMatrix() {
     return {
         claude: {
             name: 'Claude',

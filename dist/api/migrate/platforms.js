@@ -2,7 +2,32 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = handler;
 const cors_1 = require("../../lib/cors");
-const adapters_1 = require("../../client/src/adapters");
+const PLATFORMS = [
+    { id: 'claude', name: 'Claude', icon: '🦜', description: 'Anthropic Claude AI 助手', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'kimi', name: 'Kimi', icon: '🦊', description: 'Moonshot Kimi 智能助手', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'openclaw', name: 'OpenClaw', icon: '🦅', description: '开源 AI 助手框架', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'coze', name: 'Coze', icon: '🐦', description: '字节跳动 Coze Bot', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'doubao', name: '豆包', icon: '🫘', description: '字节跳动 豆包', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'deepseek', name: 'DeepSeek', icon: '🧠', description: '深度求索 DeepSeek', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'tongyi', name: '通义千问', icon: '🐉', description: '阿里云 通义千问', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'wenxin', name: '文心一言', icon: '🤖', description: '百度 文心一言', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'qwen', name: 'Qwen', icon: '🦄', description: '阿里 通义 Qwen', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'xunfei', name: '讯飞星火', icon: '🔥', description: '科大讯飞 星火认知', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+    { id: 'gemini', name: 'Gemini', icon: '🌟', description: 'Google Gemini', supportedCategories: ['skills', 'memories', 'mcp_connections', 'projects', 'settings'] },
+];
+const FEATURE_MATRIX = {
+    claude: { description: 'Anthropic Claude AI 助手', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    kimi: { description: 'Moonshot Kimi 智能助手', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    openclaw: { description: '开源 AI 助手框架', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    coze: { description: '字节跳动 Coze Bot', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    doubao: { description: '字节跳动 豆包', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    deepseek: { description: '深度求索 DeepSeek', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    tongyi: { description: '阿里云 通义千问', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    wenxin: { description: '百度 文心一言', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    qwen: { description: '阿里 通义 Qwen', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    xunfei: { description: '科大讯飞 星火认知', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+    gemini: { description: 'Google Gemini', hasProjects: true, hasSkills: true, hasMCP: true, hasMemories: true, hasAutomations: true, hasKnowledgeBase: true },
+};
 async function handler(req, res) {
     (0, cors_1.setCorsHeaders)(req, res);
     if ((0, cors_1.handlePreflight)(req, res))
@@ -11,16 +36,15 @@ async function handler(req, res) {
         return res.status(405).json({ ok: false, error: 'Method not allowed' });
     }
     try {
-        const allAdapters = adapters_1.registry.getAll();
-        const featureMatrix = (0, adapters_1.getPlatformFeatureMatrix)();
-        const platforms = allAdapters.map(adapter => {
-            const id = adapter.id;
-            const features = featureMatrix[id] || {};
+        const platforms = PLATFORMS.map(platform => {
+            const id = platform.id;
+            const features = FEATURE_MATRIX[id] || {};
             return {
                 id,
-                name: adapter.name || id,
-                description: features.description || '',
-                supportedCategories: adapter.supportedExportCategories || [],
+                name: platform.name || id,
+                description: features.description || platform.description,
+                icon: platform.icon,
+                supportedCategories: platform.supportedCategories,
                 features: {
                     hasProjects: features.hasProjects || false,
                     hasSkills: features.hasSkills || false,

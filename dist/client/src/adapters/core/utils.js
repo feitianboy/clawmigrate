@@ -1,24 +1,11 @@
-"use strict";
 /**
  * 适配器通用工具函数
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.preprocessRawInput = preprocessRawInput;
-exports.containsSensitiveData = containsSensitiveData;
-exports.maskSensitiveData = maskSensitiveData;
-exports.detectSensitivity = detectSensitivity;
-exports.detectMemorySensitivity = detectMemorySensitivity;
-exports.mapTransportType = mapTransportType;
-exports.mapMemoryType = mapMemoryType;
-exports.mapPromptType = mapPromptType;
-exports.mapSkillType = mapSkillType;
-exports.mapAutomationType = mapAutomationType;
-exports.mapSourceType = mapSourceType;
-const types_1 = require("./types");
+import { SensitivityLevel } from './types';
 /**
  * 预处理用户粘贴的原始输入，提取 JSON 字符串
  */
-function preprocessRawInput(raw) {
+export function preprocessRawInput(raw) {
     let cleaned = raw.trim();
     // 移除 markdown 代码块包裹
     cleaned = cleaned.replace(/^```(?:json)?\\s*\\n?/i, '').replace(/\\n?```\\s*$/i, '');
@@ -33,7 +20,7 @@ function preprocessRawInput(raw) {
 /**
  * 检测字符串中是否包含敏感信息
  */
-function containsSensitiveData(str) {
+export function containsSensitiveData(str) {
     const patterns = [
         /sk-[a-zA-Z0-9]{20,}/i,
         /api[_-]?key/i,
@@ -48,7 +35,7 @@ function containsSensitiveData(str) {
 /**
  * 对敏感信息进行脱敏替换
  */
-function maskSensitiveData(str) {
+export function maskSensitiveData(str) {
     let masked = str;
     masked = masked.replace(/sk-[a-zA-Z0-9]{8,}/g, 'sk-****');
     masked = masked.replace(/\\"api[_-]?key\\"\\s*:\\s*\\"[^\\"]{4,}\面"/gi, '\\"api_key\\":\\"****\\"');
@@ -60,26 +47,26 @@ function maskSensitiveData(str) {
 /**
  * 检测对象的敏感级别
  */
-function detectSensitivity(obj) {
+export function detectSensitivity(obj) {
     const str = JSON.stringify(obj);
     if (containsSensitiveData(str))
-        return types_1.SensitivityLevel.MUST_REMOVE;
-    return types_1.SensitivityLevel.SAFE;
+        return SensitivityLevel.MUST_REMOVE;
+    return SensitivityLevel.SAFE;
 }
 /**
  * 检测记忆内容的敏感级别
  */
-function detectMemorySensitivity(content) {
+export function detectMemorySensitivity(content) {
     const emailPattern = /[\\w.-]+@[\\w.-]+\\.\\w+/;
     const phonePattern = /1[3-9]\\d{9}/;
     if (containsSensitiveData(content))
-        return types_1.SensitivityLevel.MUST_REMOVE;
+        return SensitivityLevel.MUST_REMOVE;
     if (emailPattern.test(content) || phonePattern.test(content))
-        return types_1.SensitivityLevel.REVIEW_SUGGESTED;
-    return types_1.SensitivityLevel.SAFE;
+        return SensitivityLevel.REVIEW_SUGGESTED;
+    return SensitivityLevel.SAFE;
 }
 // ===== 类型映射工具函数 =====
-function mapTransportType(type) {
+export function mapTransportType(type) {
     const map = {
         stdio: 'stdio',
         sse: 'sse',
@@ -87,7 +74,7 @@ function mapTransportType(type) {
     };
     return map[type] || 'stdio';
 }
-function mapMemoryType(type) {
+export function mapMemoryType(type) {
     const map = {
         fact: 'fact',
         preference: 'preference',
@@ -96,7 +83,7 @@ function mapMemoryType(type) {
     };
     return map[type] || 'fact';
 }
-function mapPromptType(type) {
+export function mapPromptType(type) {
     const map = {
         system: 'system',
         character: 'character',
@@ -104,7 +91,7 @@ function mapPromptType(type) {
     };
     return map[type] || 'system';
 }
-function mapSkillType(type) {
+export function mapSkillType(type) {
     const map = {
         plugin: 'plugin',
         skill: 'skill',
@@ -113,7 +100,7 @@ function mapSkillType(type) {
     };
     return map[type] || 'plugin';
 }
-function mapAutomationType(type) {
+export function mapAutomationType(type) {
     const map = {
         schedule: 'schedule',
         trigger: 'trigger',
@@ -121,7 +108,7 @@ function mapAutomationType(type) {
     };
     return map[type] || 'workflow';
 }
-function mapSourceType(type) {
+export function mapSourceType(type) {
     const map = {
         upload: 'upload',
         url: 'url',

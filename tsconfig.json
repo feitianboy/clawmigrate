@@ -3,18 +3,13 @@
     "target": "ES2020",
     "module": "CommonJS",
     "moduleResolution": "node",
-    "ignoreDeprecations": "5.0",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": false,
     "outDir": "./dist",
     "rootDir": ".",
     "resolveJsonModule": true,
-    "declaration": false,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./client/src/*"]
-    }
+    "declaration": false
   },
   "include": ["api/**/*", "lib/**/*"],
   "exclude": ["node_modules", "client", "dist"]
