@@ -2,18 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { registry } from '../adapters';
-import { PlatformAdapter, MigrationCategory, CATEGORY_LABELS, UnifiedSchema, ParseResult } from '../adapters/core/types';
+import { PlatformAdapter } from '../adapters/core/types';
 import {
   Copy,
   Check,
-  ChevronRight,
   ArrowRight,
-  Sparkles,
   Zap,
   AlertTriangle,
   Info,
   RefreshCw,
-  Loader2,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { getSampleExportJson } from '../data/sampleExports';
 
@@ -69,24 +68,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     flexShrink: 0,
   },
-  stepNumberDone: {
-    background: 'var(--color-success)',
-  },
-  stepNumberActive: {
-    background: 'var(--color-primary)',
-  },
-  stepNumberPending: {
-    background: 'var(--color-bg)',
-    color: 'var(--color-text-muted)',
-    border: '2px solid var(--color-border)',
-  },
-  stepTitle: {
-    fontWeight: 600,
-    fontSize: '0.9375rem',
-  },
-  stepContent: {
-    padding: 'var(--space-5)',
-  },
+  stepNumberDone: { background: 'var(--color-success)' },
+  stepNumberPending: { background: 'var(--color-bg)', color: 'var(--color-text-muted)', border: '2px solid var(--color-border)' },
+  stepTitle: { fontWeight: 600, fontSize: '0.9375rem' },
+  stepContent: { padding: 'var(--space-5)' },
   platformGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
@@ -101,113 +86,11 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     transition: 'all 0.2s',
   },
-  platformCardSelected: {
-    borderColor: 'var(--color-primary)',
-    background: 'var(--color-primary-light)',
-  },
-  platformIcon: {
-    fontSize: '2rem',
-    marginBottom: 'var(--space-2)',
-  },
-  platformName: {
-    fontWeight: 600,
-    fontSize: '0.875rem',
-  },
-  platformDesc: {
-    fontSize: '0.75rem',
-    color: 'var(--color-text-secondary)',
-    marginTop: '4px',
-  },
-  arrowContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 'var(--space-4)',
-    color: 'var(--color-primary)',
-  },
-  promptBox: {
-    background: 'var(--color-bg)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
-    overflow: 'hidden',
-    marginBottom: 'var(--space-4)',
-  },
-  promptHeader: {
-    padding: 'var(--space-4)',
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  promptTitle: {
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    color: 'var(--color-text-secondary)',
-  },
-  copyBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-    padding: 'var(--space-2) var(--space-4)',
-    background: 'var(--color-primary)',
-    color: 'white',
-    border: 'none',
-    borderRadius: 'var(--radius-md)',
-    fontSize: '0.8125rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  copyBtnCopied: {
-    background: 'var(--color-success)',
-  },
-  promptContent: {
-    padding: 'var(--space-4)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: '0.8125rem',
-    lineHeight: 1.6,
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-word',
-    maxHeight: '400px',
-    overflowY: 'auto',
-    color: 'var(--color-text)',
-  },
-  instructions: {
-    padding: 'var(--space-4)',
-    background: 'rgba(59, 130, 246, 0.1)',
-    border: '1px solid rgba(59, 130, 246, 0.3)',
-    borderRadius: 'var(--radius-md)',
-    marginBottom: 'var(--space-4)',
-  },
-  instructionsTitle: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 'var(--space-2)',
-    fontSize: '0.8125rem',
-    fontWeight: 600,
-    color: 'var(--color-primary)',
-    marginBottom: 'var(--space-2)',
-  },
-  instructionsText: {
-    fontSize: '0.8125rem',
-    color: 'var(--color-text)',
-    lineHeight: 1.6,
-  },
-  warningBox: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 'var(--space-3)',
-    padding: 'var(--space-4)',
-    background: 'rgba(245, 158, 11, 0.1)',
-    border: '1px solid rgba(245, 158, 11, 0.3)',
-    borderRadius: 'var(--radius-md)',
-    marginBottom: 'var(--space-4)',
-  },
-  warningContent: {
-    fontSize: '0.8125rem',
-    color: '#fbbf24',
-    lineHeight: 1.6,
-  },
+  platformCardSelected: { borderColor: 'var(--color-primary)', background: 'var(--color-primary-light)' },
+  platformIcon: { fontSize: '2rem', marginBottom: 'var(--space-2)' },
+  platformName: { fontWeight: 600, fontSize: '0.875rem' },
+  platformDesc: { fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '4px' },
+  arrowContainer: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-4)', color: 'var(--color-primary)' },
   actionBtn: {
     width: '100%',
     display: 'inline-flex',
@@ -224,10 +107,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
-  actionBtnDisabled: {
-    opacity: 0.5,
-    cursor: 'not-allowed',
-  },
+  actionBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
   textarea: {
     width: '100%',
     minHeight: '200px',
@@ -241,37 +121,120 @@ const styles: Record<string, React.CSSProperties> = {
     resize: 'vertical',
     boxSizing: 'border-box',
   },
-  previewCard: {
+  warningBox: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 'var(--space-3)',
     padding: 'var(--space-4)',
+    background: 'rgba(245, 158, 11, 0.1)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    borderRadius: 'var(--radius-md)',
+    marginBottom: 'var(--space-4)',
+  },
+  warningContent: { fontSize: '0.8125rem', color: '#fbbf24', lineHeight: 1.6 },
+  infoBox: {
+    padding: 'var(--space-4)',
+    background: 'rgba(59, 130, 246, 0.1)',
+    border: '1px solid rgba(59, 130, 246, 0.3)',
+    borderRadius: 'var(--radius-md)',
+    marginBottom: 'var(--space-4)',
+  },
+  infoContent: { fontSize: '0.8125rem', color: 'var(--color-primary)', lineHeight: 1.6 },
+  resultSection: {
     background: 'var(--color-bg)',
     border: '1px solid var(--color-border)',
     borderRadius: 'var(--radius-lg)',
+    overflow: 'hidden',
     marginBottom: 'var(--space-4)',
   },
-  previewTitle: {
-    fontSize: '0.8125rem',
-    fontWeight: 600,
-    color: 'var(--color-text-secondary)',
-    marginBottom: 'var(--space-3)',
+  resultHeader: {
+    padding: 'var(--space-4)',
+    borderBottom: '1px solid var(--color-border)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  previewItems: {
+  resultTitle: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-secondary)' },
+  resultBody: {
+    padding: 'var(--space-4)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.8125rem',
+    lineHeight: 1.6,
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+    maxHeight: '400px',
+    overflowY: 'auto',
+    color: 'var(--color-text)',
+  },
+  copyBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 'var(--space-2)',
+    padding: 'var(--space-2) var(--space-4)',
+    background: 'var(--color-primary)',
+    color: 'white',
+    border: 'none',
+    borderRadius: 'var(--radius-md)',
+    fontSize: '0.8125rem',
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  copyBtnCopied: { background: 'var(--color-success)' },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+    gap: 'var(--space-3)',
+    marginBottom: 'var(--space-4)',
+  },
+  statCard: {
+    padding: 'var(--space-3)',
+    background: 'var(--color-bg-tertiary)',
+    borderRadius: 'var(--radius-md)',
+    textAlign: 'center',
+  },
+  statValue: { fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-primary)' },
+  statLabel: { fontSize: '0.75rem', color: 'var(--color-text-secondary)' },
+  manualStepList: {
+    margin: 0,
+    paddingLeft: 'var(--space-5)',
     fontSize: '0.8125rem',
     color: 'var(--color-text)',
     lineHeight: 1.8,
   },
-  completeIcon: {
-    width: '80px',
-    height: '80px',
-    background: 'rgba(34, 197, 94, 0.15)',
-    borderRadius: '50%',
+  collapsibleHeader: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    margin: '0 auto var(--space-4)',
+    justifyContent: 'space-between',
+    cursor: 'pointer',
+    padding: 'var(--space-4)',
+    borderBottom: '1px solid var(--color-border)',
   },
 };
 
 type MigrationStep = 1 | 2 | 3;
+
+interface ConvertedResult {
+  format: string;
+  label: string;
+  description: string;
+  config: any;
+  mcpServers?: any[];
+  memories?: any[];
+  skills?: any[];
+  projects?: any[];
+  manualSteps: string[];
+}
+
+interface StatsResult {
+  totalItems: number;
+  skills: number;
+  memories: number;
+  mcpConnections: number;
+  projects: number;
+  hasSettings: boolean;
+  sensitiveItems: number;
+  convertedFormat: string;
+}
 
 const MigrationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -280,99 +243,42 @@ const MigrationPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<MigrationStep>(1);
   const [sourcePlatform, setSourcePlatform] = useState<PlatformAdapter | null>(null);
   const [targetPlatform, setTargetPlatform] = useState<PlatformAdapter | null>(null);
-  const [exportCopied, setExportCopied] = useState(false);
-  const [importCopied, setImportCopied] = useState(false);
-  const [importPrompt, setImportPrompt] = useState('');
   const [jsonData, setJsonData] = useState('');
-  const [parsedSchema, setParsedSchema] = useState<UnifiedSchema | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState<MigrationCategory[]>([]);
+  const [converted, setConverted] = useState<ConvertedResult | null>(null);
+  const [stats, setStats] = useState<StatsResult | null>(null);
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ config: true });
 
   const allAdapters = registry.getAll();
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
+    if (!isAuthenticated) navigate('/login');
   }, [isAuthenticated, navigate]);
 
-  useEffect(() => {
-    if (currentStep === 1) {
-      setSelectedCategories(Object.values(MigrationCategory));
-    }
-  }, [currentStep]);
-
-  const handleCopyExport = () => {
-    const prompt = generateExportPrompt();
-    navigator.clipboard.writeText(prompt);
-    setExportCopied(true);
-    setTimeout(() => setExportCopied(false), 2000);
-  };
-
-  const handleCopyImport = () => {
-    navigator.clipboard.writeText(importPrompt);
-    setImportCopied(true);
-    setTimeout(() => setImportCopied(false), 2000);
-  };
-
-  const generateExportPrompt = (): string => {
-    if (!sourcePlatform || !targetPlatform) return '';
-
-    return `帮我把配置迁移到 ${targetPlatform.name}。
-
-请用 JSON 返回以下内容：
-- skills: 技能/插件列表（名称、描述、配置）
-- memories: 记忆/知识库
-- mcp_connections: MCP 服务器配置（名称、URL）
-- settings: 系统设置（模型、温度、系统提示词）
-- projects: 项目/工作流
-
-要求：
-- API Key、密码用 *** 替换
-- 只返回纯 JSON，不要其他文字
-
-示例格式：
-{
-  "version": "1.0.0",
-  "agent_name": "助手名称",
-  "settings": {...},
-  "skills": [...],
-  "memories": [...],
-  "mcp_connections": [...],
-  "projects": [...]
-}`;
-  };
-
   const handleConvert = async () => {
-    if (!jsonData.trim()) {
-      setError('请粘贴 JSON 数据');
-      return;
-    }
+    if (!jsonData.trim()) { setError('请粘贴配置数据'); return; }
 
     setIsConverting(true);
     setError(null);
 
     try {
-      const apiResult = await fetch('/api/migrate/convert', {
+      const res = await fetch('/api/migrate/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourcePlatform: sourcePlatform!.id,
           targetPlatform: targetPlatform!.id,
           rawData: jsonData,
-          categories: selectedCategories,
         }),
       });
 
-      const apiData = await apiResult.json();
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || '转换失败');
 
-      if (!apiData.ok) {
-        throw new Error(apiData.error || '转换失败');
-      }
-
-      setImportPrompt(apiData.data.importPrompt || '');
-      setParsedSchema(apiData.data.schema || null);
+      setConverted(data.data.converted);
+      setStats(data.data.stats);
       setCurrentStep(3);
     } catch (err: any) {
       setError(err.message || '转换失败');
@@ -381,10 +287,14 @@ const MigrationPage: React.FC = () => {
     }
   };
 
-  const handleLoadSample = () => {
-    if (sourcePlatform) {
-      setJsonData(getSampleExportJson(sourcePlatform.id));
-    }
+  const handleCopy = (section: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedSection(section);
+    setTimeout(() => setCopiedSection(null), 2000);
+  };
+
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const getStepStatus = (step: number) => {
@@ -393,275 +303,155 @@ const MigrationPage: React.FC = () => {
     return 'pending';
   };
 
-  const renderStep1 = () => {
-    return (
-      <>
-        <div style={styles.stepContent}>
-          <div style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>从哪里迁出</div>
-            <div style={styles.platformGrid}>
-              {allAdapters.map((adapter) => (
-                <div
-                  key={adapter.id}
-                  style={{
-                    ...styles.platformCard,
-                    ...(sourcePlatform?.id === adapter.id ? styles.platformCardSelected : {}),
-                  }}
-                  onClick={() => setSourcePlatform(adapter)}
-                >
-                  <div style={styles.platformIcon}>{adapter.icon}</div>
-                  <div style={styles.platformName}>{adapter.name}</div>
-                  <div style={styles.platformDesc}>{adapter.description}</div>
-                </div>
-              ))}
+  const renderStep1 = () => (
+    <div style={styles.stepContent}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
+        <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>从哪里迁出</div>
+        <div style={styles.platformGrid}>
+          {allAdapters.map(a => (
+            <div key={a.id} style={{ ...styles.platformCard, ...(sourcePlatform?.id === a.id ? styles.platformCardSelected : {}) }} onClick={() => setSourcePlatform(a)}>
+              <div style={styles.platformIcon}>{a.icon}</div>
+              <div style={styles.platformName}>{a.name}</div>
+              <div style={styles.platformDesc}>{a.description}</div>
             </div>
-          </div>
-
-          <div style={styles.arrowContainer}>
-            <ArrowRight size={24} />
-          </div>
-
-          <div>
-            <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>迁到哪里</div>
-            <div style={styles.platformGrid}>
-              {allAdapters.map((adapter) => (
-                <div
-                  key={adapter.id}
-                  style={{
-                    ...styles.platformCard,
-                    ...(targetPlatform?.id === adapter.id ? styles.platformCardSelected : {}),
-                    ...(sourcePlatform?.id === adapter.id ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
-                  }}
-                  onClick={() => sourcePlatform?.id !== adapter.id && setTargetPlatform(adapter)}
-                >
-                  <div style={styles.platformIcon}>{adapter.icon}</div>
-                  <div style={styles.platformName}>{adapter.name}</div>
-                  <div style={styles.platformDesc}>{adapter.description}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
+      </div>
+      <div style={styles.arrowContainer}><ArrowRight size={24} /></div>
+      <div>
+        <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>迁到哪里</div>
+        <div style={styles.platformGrid}>
+          {allAdapters.map(a => (
+            <div key={a.id} style={{ ...styles.platformCard, ...(targetPlatform?.id === a.id ? styles.platformCardSelected : {}), ...(sourcePlatform?.id === a.id ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }} onClick={() => sourcePlatform?.id !== a.id && setTargetPlatform(a)}>
+              <div style={styles.platformIcon}>{a.icon}</div>
+              <div style={styles.platformName}>{a.name}</div>
+              <div style={styles.platformDesc}>{a.description}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <button style={{ ...styles.actionBtn, ...(!sourcePlatform || !targetPlatform ? styles.actionBtnDisabled : {}), marginTop: 'var(--space-5)' }} onClick={() => setCurrentStep(2)} disabled={!sourcePlatform || !targetPlatform}>
+        <Zap size={20} /> 下一步
+      </button>
+    </div>
+  );
 
-        <button
-          style={{
-            ...styles.actionBtn,
-            ...(!sourcePlatform || !targetPlatform ? styles.actionBtnDisabled : {}),
-            margin: 'var(--space-5)',
-          }}
-          onClick={() => setCurrentStep(2)}
-          disabled={!sourcePlatform || !targetPlatform}
-        >
-          <Zap size={20} />
-          下一步
+  const renderStep2 = () => (
+    <div style={styles.stepContent}>
+      <div style={styles.infoBox}>
+        <div style={styles.infoContent}>
+          在 <strong>{sourcePlatform?.name}</strong> 中复制你的配置数据（JSON 格式），粘贴到下方。你可以从设置页面、导出功能或直接问 AI 获取配置。
+        </div>
+      </div>
+
+      <div style={styles.warningBox}>
+        <AlertTriangle size={16} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
+        <div style={styles.warningContent}>API Key、密码等敏感信息请用 <code>***</code> 替换</div>
+      </div>
+
+      <div style={{ marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>粘贴配置数据</div>
+        <button onClick={() => sourcePlatform && setJsonData(getSampleExportJson(sourcePlatform.id))} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-bg-tertiary)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', cursor: 'pointer' }}>
+          加载示例
         </button>
-      </>
-    );
-  };
+      </div>
+      <textarea style={styles.textarea} placeholder='在此粘贴配置数据（JSON 格式）...' value={jsonData} onChange={e => setJsonData(e.target.value)} />
 
-  const renderStep2 = () => {
+      {error && (
+        <div style={styles.warningBox}>
+          <AlertTriangle size={16} style={{ color: 'var(--color-danger)', flexShrink: 0 }} />
+          <div style={{ fontSize: '0.8125rem', color: 'var(--color-danger)', lineHeight: 1.6 }}>{error}</div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+        <button style={{ ...styles.actionBtn, flex: 1, background: 'var(--color-bg-tertiary)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} onClick={() => setCurrentStep(1)}>返回</button>
+        <button style={{ ...styles.actionBtn, flex: 1, ...(!jsonData.trim() || isConverting ? styles.actionBtnDisabled : {}) }} onClick={handleConvert} disabled={!jsonData.trim() || isConverting}>
+          {isConverting ? <><RefreshCw size={18} className="animate-spin" /> 转换中...</> : <>转换配置 <ArrowRight size={18} /></>}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderCollapsibleSection = (key: string, title: string, content: string, defaultOpen = false) => {
+    const isOpen = expandedSections[key] ?? defaultOpen;
     return (
-      <>
-        <div style={styles.stepContent}>
-          <div style={styles.instructions}>
-            <div style={styles.instructionsTitle}>
-              <Info size={16} />
-              操作指引
-            </div>
-            <div style={styles.instructionsText}>
-              1. 复制下方提示词<br />
-              2. 打开 <strong>{sourcePlatform?.name}</strong>，新建对话粘贴发送<br />
-              3. 等待 AI 返回 JSON 数据，复制全部内容<br />
-              4. 粘贴到下方文本框，点击转换
-            </div>
+      <div style={styles.resultSection} key={key}>
+        <div style={styles.collapsibleHeader} onClick={() => toggleSection(key)}>
+          <span style={styles.resultTitle}>{title}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <button style={{ ...styles.copyBtn, ...(copiedSection === key ? styles.copyBtnCopied : {}) }} onClick={e => { e.stopPropagation(); handleCopy(key, content); }}>
+              {copiedSection === key ? <><Check size={14} /> 已复制</> : <><Copy size={14} /> 复制</>}
+            </button>
+            {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </div>
-
-          <div style={styles.promptBox}>
-            <div style={styles.promptHeader}>
-              <div style={styles.promptTitle}>导出提示词</div>
-              <button
-                style={{ ...styles.copyBtn, ...(exportCopied ? styles.copyBtnCopied : {}) }}
-                onClick={handleCopyExport}
-              >
-                {exportCopied ? <Check size={14} /> : <Copy size={14} />}
-                {exportCopied ? '已复制' : '复制'}
-              </button>
-            </div>
-            <div style={styles.promptContent}>
-              {generateExportPrompt()}
-            </div>
-          </div>
-
-          <div style={styles.warningBox}>
-            <AlertTriangle size={16} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
-            <div style={styles.warningContent}>
-              <strong>隐私保护：</strong>API Key、密码等敏感信息请用 *** 替换
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 'var(--space-4)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-              <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>粘贴 JSON 数据</div>
-              <button
-                onClick={handleLoadSample}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  background: 'var(--color-bg-tertiary)',
-                  color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
-              >
-                <Sparkles size={12} />
-                加载示例
-              </button>
-            </div>
-            <textarea
-              style={styles.textarea}
-              placeholder="在此粘贴从源平台获取的 JSON 数据..."
-              value={jsonData}
-              onChange={(e) => setJsonData(e.target.value)}
-            />
-          </div>
-
-          {error && (
-            <div style={styles.warningBox}>
-              <AlertTriangle size={16} style={{ color: 'var(--color-danger)', flexShrink: 0 }} />
-              <div style={{ fontSize: '0.8125rem', color: 'var(--color-danger)', lineHeight: 1.6 }}>
-                {error}
-              </div>
-            </div>
-          )}
         </div>
-
-        <div style={{ display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-5)' }}>
-          <button
-            style={{
-              ...styles.actionBtn,
-              flex: 1,
-              background: 'var(--color-bg-tertiary)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-            }}
-            onClick={() => setCurrentStep(1)}
-          >
-            返回
-          </button>
-          <button
-            style={{
-              ...styles.actionBtn,
-              flex: 1,
-              ...(!jsonData.trim() || isConverting ? styles.actionBtnDisabled : {}),
-            }}
-            onClick={handleConvert}
-            disabled={!jsonData.trim() || isConverting}
-          >
-            {isConverting ? (
-              <>
-                <RefreshCw size={18} className="animate-spin" />
-                转换中...
-              </>
-            ) : (
-              <>
-                转换并生成导入提示词
-                <ChevronRight size={18} />
-              </>
-            )}
-          </button>
-        </div>
-      </>
+        {isOpen && <div style={styles.resultBody}>{content}</div>}
+      </div>
     );
   };
 
   const renderStep3 = () => {
+    if (!converted || !stats) return null;
+
     return (
-      <>
-        <div style={styles.stepContent}>
-          <div style={styles.instructions}>
-            <div style={styles.instructionsTitle}>
-              <Info size={16} />
-              最后一步
-            </div>
-            <div style={styles.instructionsText}>
-              1. 复制下方导入提示词<br />
-              2. 打开 <strong>{targetPlatform?.name}</strong>，新建对话粘贴发送<br />
-              3. AI 会自动帮你创建所有配置
-            </div>
+      <div style={styles.stepContent}>
+        <div style={styles.infoBox}>
+          <div style={styles.infoContent}>
+            <strong>{converted.label}</strong> — {converted.description}
           </div>
+        </div>
 
-          {parsedSchema && (
-            <div style={styles.previewCard}>
-              <div style={styles.previewTitle}>迁移预览</div>
-              <div style={styles.previewItems}>
-                <p><strong>总配置项：</strong>{parsedSchema.metadata.totalItems} 个</p>
-                {parsedSchema.metadata.sensitiveItems.length > 0 && (
-                  <p><strong>已脱敏项：</strong>{parsedSchema.metadata.sensitiveItems.length} 个</p>
-                )}
-                {parsedSchema.metadata.unsupportedItems.length > 0 && (
-                  <p><strong>不支持项：</strong>{parsedSchema.metadata.unsupportedItems.length} 个</p>
-                )}
-              </div>
-            </div>
-          )}
+        {/* 统计 */}
+        <div style={styles.statsGrid}>
+          <div style={styles.statCard}><div style={styles.statValue}>{stats.totalItems}</div><div style={styles.statLabel}>总配置项</div></div>
+          <div style={styles.statCard}><div style={styles.statValue}>{stats.skills}</div><div style={styles.statLabel}>技能</div></div>
+          <div style={styles.statCard}><div style={styles.statValue}>{stats.memories}</div><div style={styles.statLabel}>记忆</div></div>
+          <div style={styles.statCard}><div style={styles.statValue}>{stats.mcpConnections}</div><div style={styles.statLabel}>MCP</div></div>
+          <div style={styles.statCard}><div style={styles.statValue}>{stats.projects}</div><div style={styles.statLabel}>项目</div></div>
+        </div>
 
+        {/* 核心配置 */}
+        {renderCollapsibleSection('config', '核心配置（名称/提示词/设置）', JSON.stringify(converted.config, null, 2), true)}
+
+        {/* MCP 服务器 */}
+        {converted.mcpServers && converted.mcpServers.length > 0 && renderCollapsibleSection('mcp', `MCP 服务器（${converted.mcpServers.length} 个）`, JSON.stringify(converted.mcpServers, null, 2))}
+
+        {/* 记忆 */}
+        {converted.memories && converted.memories.length > 0 && renderCollapsibleSection('memories', `记忆/知识库（${converted.memories.length} 条）`, JSON.stringify(converted.memories, null, 2))}
+
+        {/* 技能 */}
+        {converted.skills && converted.skills.length > 0 && renderCollapsibleSection('skills', `技能/插件（${converted.skills.length} 个）`, JSON.stringify(converted.skills, null, 2))}
+
+        {/* 项目 */}
+        {converted.projects && converted.projects.length > 0 && renderCollapsibleSection('projects', `项目/工作流（${converted.projects.length} 个）`, JSON.stringify(converted.projects, null, 2))}
+
+        {/* 手动操作步骤 */}
+        <div style={styles.resultSection}>
+          <div style={{ ...styles.resultHeader, borderBottom: 'none' }}>
+            <span style={styles.resultTitle}>需要在 {targetPlatform?.name} 中手动完成的步骤</span>
+          </div>
+          <div style={{ padding: 'var(--space-4)' }}>
+            <ol style={styles.manualStepList}>
+              {converted.manualSteps.map((step, i) => <li key={i}>{step}</li>)}
+            </ol>
+          </div>
+        </div>
+
+        {stats.sensitiveItems > 0 && (
           <div style={styles.warningBox}>
             <AlertTriangle size={16} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
-            <div style={styles.warningContent}>
-              <strong>注意：</strong>MCP 连接、API Key 等敏感配置需要手动输入
-            </div>
+            <div style={styles.warningContent}>检测到 {stats.sensitiveItems} 个敏感信息已被脱敏，需要在目标平台手动补充</div>
           </div>
+        )}
 
-          <div style={styles.promptBox}>
-            <div style={styles.promptHeader}>
-              <div style={styles.promptTitle}>导入提示词</div>
-              <button
-                style={{ ...styles.copyBtn, ...(importCopied ? styles.copyBtnCopied : {}) }}
-                onClick={handleCopyImport}
-              >
-                {importCopied ? <Check size={14} /> : <Copy size={14} />}
-                {importCopied ? '已复制' : '复制'}
-              </button>
-            </div>
-            <div style={styles.promptContent}>
-              {importPrompt}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-5)' }}>
-          <button
-            style={{
-              ...styles.actionBtn,
-              flex: 1,
-              background: 'var(--color-bg-tertiary)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-            }}
-            onClick={() => setCurrentStep(2)}
-          >
-            返回
-          </button>
-          <button
-            style={{ ...styles.actionBtn, flex: 1 }}
-            onClick={() => {
-              setSourcePlatform(null);
-              setTargetPlatform(null);
-              setJsonData('');
-              setImportPrompt('');
-              setParsedSchema(null);
-              setCurrentStep(1);
-            }}
-          >
-            <Check size={18} />
-            完成
+        <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+          <button style={{ ...styles.actionBtn, flex: 1, background: 'var(--color-bg-tertiary)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} onClick={() => setCurrentStep(2)}>返回修改</button>
+          <button style={{ ...styles.actionBtn, flex: 1 }} onClick={() => { setSourcePlatform(null); setTargetPlatform(null); setJsonData(''); setConverted(null); setStats(null); setCurrentStep(1); }}>
+            <Check size={18} /> 完成，开始新迁移
           </button>
         </div>
-      </>
+      </div>
     );
   };
 
@@ -674,21 +464,22 @@ const MigrationPage: React.FC = () => {
     );
   }
 
+  const stepNumStyle = (step: number) => ({
+    ...styles.stepNumber,
+    ...(getStepStatus(step) === 'done' ? styles.stepNumberDone : {}),
+    ...(getStepStatus(step) === 'pending' ? styles.stepNumberPending : {}),
+  });
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <h1 style={styles.title}>AI 配置迁移</h1>
-        <p style={styles.subtitle}>复制粘贴两次，完成跨平台迁移</p>
+        <p style={styles.subtitle}>粘贴配置，一键转换格式</p>
       </div>
 
       <div style={styles.stepCard}>
         <div style={styles.stepHeader}>
-          <div style={{
-            ...styles.stepNumber,
-            ...(getStepStatus(1) === 'done' ? styles.stepNumberDone : {}),
-            ...(getStepStatus(1) === 'active' ? styles.stepNumberActive : {}),
-            ...(getStepStatus(1) === 'pending' ? styles.stepNumberPending : {}),
-          }}>1</div>
+          <div style={stepNumStyle(1)}>1</div>
           <div style={styles.stepTitle}>选择平台</div>
         </div>
         {currentStep === 1 && renderStep1()}
@@ -696,26 +487,16 @@ const MigrationPage: React.FC = () => {
 
       <div style={styles.stepCard}>
         <div style={styles.stepHeader}>
-          <div style={{
-            ...styles.stepNumber,
-            ...(getStepStatus(2) === 'done' ? styles.stepNumberDone : {}),
-            ...(getStepStatus(2) === 'active' ? styles.stepNumberActive : {}),
-            ...(getStepStatus(2) === 'pending' ? styles.stepNumberPending : {}),
-          }}>2</div>
-          <div style={styles.stepTitle}>导出配置</div>
+          <div style={stepNumStyle(2)}>2</div>
+          <div style={styles.stepTitle}>粘贴并转换</div>
         </div>
         {currentStep === 2 && renderStep2()}
       </div>
 
       <div style={styles.stepCard}>
         <div style={styles.stepHeader}>
-          <div style={{
-            ...styles.stepNumber,
-            ...(getStepStatus(3) === 'done' ? styles.stepNumberDone : {}),
-            ...(getStepStatus(3) === 'active' ? styles.stepNumberActive : {}),
-            ...(getStepStatus(3) === 'pending' ? styles.stepNumberPending : {}),
-          }}>3</div>
-          <div style={styles.stepTitle}>导入配置</div>
+          <div style={stepNumStyle(3)}>3</div>
+          <div style={styles.stepTitle}>转换结果</div>
         </div>
         {currentStep === 3 && renderStep3()}
       </div>
