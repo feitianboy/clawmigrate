@@ -3,34 +3,13 @@ import { requireAuth } from '../../lib/auth';
 import { findOrderByOrderId, updateOrderStatus, updateMembership, createOrder, PLAN_PRICES, PlanType, getOrdersByUserId } from '../../lib/membership';
 import { logActivity, getTierFromPlan, getExpireAt, getPlanName, getStatusName } from '../../lib/utils';
 import { setCorsHeaders, handlePreflight } from '../../lib/cors';
-import crypto from 'crypto';
+import { generateSign, verifySign, queryZpayOrder } from '../../lib/payment';
 
-const ZPAY_PID = process.env.ZPAY_PID || '';
-const ZPAY_KEY = process.env.ZPAY_KEY || '';
 const ZPAY_BASE_URL = 'https://zpayz.cn/submit.php';
 const NOTIFY_URL = `${process.env.APP_URL || 'https://clawmigrate.xyz'}/api/orders/callback`;
 const RETURN_URL_BASE = process.env.APP_URL || 'https://clawmigrate.xyz';
-
-// ZPAY MD5签名: 参数按ASCII排序拼接 + KEY, 再MD5
-function generateSign(params: Record<string, string>, key: string): string {
-  const sortedKeys = Object.keys(params)
-    .filter(k => k !== 'sign' && k !== 'sign_type' && params[k] !== '')
-    .sort();
-  const queryString = sortedKeys.map(k => k + '=' + params[k]).join('&');
-  const signStr = queryString + key;
-  return crypto.createHash('md5').update(signStr, 'utf8').digest('hex');
-}
-
-// ZPAY MD5验签
-function verifySign(params: Record<string, string>, key: string, receivedSign: string): boolean {
-  const sortedKeys = Object.keys(params)
-    .filter(k => k !== 'sign' && k !== 'sign_type' && params[k] !== '')
-    .sort();
-  const queryString = sortedKeys.map(k => k + '=' + params[k]).join('&');
-  const signStr = queryString + key;
-  const calculatedSign = crypto.createHash('md5').update(signStr, 'utf8').digest('hex');
-  return calculatedSign === receivedSign;
-}
+const ZPAY_PID = process.env.ZPAY_PID || '';
+const ZPAY_KEY = process.env.ZPAY_KEY || '';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);

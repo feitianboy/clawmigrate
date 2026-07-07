@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { requireAdmin, requireAuth, checkRateLimit, recordFailedAttempt, clearRateLimit, getClientIp } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
 import { logActivity, getPlanName, getStatusName, getTierFromPlan, getExpireAt, getActivityLogs, getActivityStats } from '../../lib/utils';
+import { zpayRefund } from '../../lib/payment';
 import { updateMembership, MembershipTier, getOrdersByUserId, findOrderByOrderId, updateOrderStatus, getOrderStats } from '../../lib/membership';
 import { setCorsHeaders, handlePreflight } from '../../lib/cors';
 
@@ -221,6 +222,24 @@ async function handleUpdateOrder(req: VercelRequest, res: VercelResponse, subPat
 
     const order = await findOrderByOrderId(orderId);
     if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
+
+    if (status === 'refunded') {
+      if (order.status !== 'paid') {
+        return res.status(400).json({ ok: false, error: '只有已支付的订单才能退款' });
+      }
+
+      const refundResult = await zpayRefund(orderId, order.amount);
+      if (!refundResult.success) {
+        return res.status(500).json({ ok: false, error: `退款失败: ${refundResult.message}` });
+      }
+
+      await updateOrderStatus(orderId, 'refunded');
+
+      await updateMembership(order.user_id, 'free', null);
+
+      await logActivity(null, 'admin_refund_order', { adminUsername: result.user!.username, orderId, amount: order.amount, plan: order.plan, userId: order.user_id }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+      return res.json({ ok: true, data: { message: `退款成功: ${refundResult.message}` } });
+    }
 
     const paidAt = status === 'paid' ? new Date() : undefined;
     const updated = await updateOrderStatus(orderId, status as 'pending' | 'paid' | 'cancelled' | 'refunded', paidAt);
