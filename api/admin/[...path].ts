@@ -95,6 +95,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (adminId) return handleUpdateAdmin(req, res, adminId);
   }
 
+  if (subPath === 'templates' && req.method === 'GET') return handleGetTemplates(req, res);
+  if (subPath === 'templates' && req.method === 'POST') return handleCreateTemplate(req, res);
+  if (subPath === 'templates' && req.method === 'PUT') {
+    const templateId = req.query.templateId as string || req.query.id as string;
+    if (templateId) return handleUpdateTemplate(req, res, templateId);
+  }
+  if (subPath === 'templates' && req.method === 'DELETE') {
+    const templateId = req.query.templateId as string || req.query.id as string;
+    if (templateId) return handleDeleteTemplate(req, res, templateId);
+  }
+
   return res.status(404).json({ ok: false, error: 'Admin route not found' });
 }
 
@@ -944,6 +955,119 @@ async function handleUpdateAdmin(req: VercelRequest, res: VercelResponse, adminI
     return res.json({ ok: true, data: { message: 'Admin updated successfully' } });
   } catch (error) {
     console.error('Update admin error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+// ---- Config Templates (模板市场) ----
+async function handleGetTemplates(req: VercelRequest, res: VercelResponse) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const sourcePlatform = req.query.source as string | undefined;
+    const targetPlatform = req.query.target as string | undefined;
+    const tag = req.query.tag as string | undefined;
+    const offset = (page - 1) * limit;
+
+    let query = supabase.from('config_templates').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (sourcePlatform) query = query.eq('source_platform', sourcePlatform);
+    if (targetPlatform) query = query.eq('target_platform', targetPlatform);
+    if (tag) query = query.overlaps('tags', tag);
+
+    const { data: templates, count } = await query;
+    return res.json({ ok: true, data: { templates: templates || [], pagination: { page, limit, total: count || 0, totalPages: Math.ceil((count || 0) / limit) } } });
+  } catch (error) {
+    console.error('Get templates error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+async function handleCreateTemplate(req: VercelRequest, res: VercelResponse) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const { title, description, sourcePlatform, targetPlatform, configData, categories, tags, isPublic } = req.body || {};
+    if (!title || !sourcePlatform || !targetPlatform || !configData) {
+      return res.status(400).json({ ok: false, error: '标题、源平台、目标平台和配置数据为必填' });
+    }
+
+    const { data: template, error } = await supabase.from('config_templates').insert({
+      title,
+      description,
+      source_platform: sourcePlatform,
+      target_platform: targetPlatform,
+      config_data: configData,
+      categories: categories || [],
+      tags: tags || [],
+      is_public: isPublic !== undefined ? isPublic : true,
+    }).select('id, title').single();
+
+    if (error) {
+      console.error('Create template error:', error);
+      return res.status(500).json({ ok: false, error: 'Failed to create template' });
+    }
+
+    await logActivity(null, 'admin_create_template', { adminUsername: result.user!.username, templateId: template!.id, title, sourcePlatform, targetPlatform }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    return res.json({ ok: true, data: { message: 'Template created successfully', template } });
+  } catch (error) {
+    console.error('Create template error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+async function handleUpdateTemplate(req: VercelRequest, res: VercelResponse, templateId: string) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const id = parseInt(templateId);
+    if (isNaN(id)) return res.status(400).json({ ok: false, error: 'Invalid template ID' });
+
+    const { title, description, categories, tags, isPublic } = req.body || {};
+    const updates: Record<string, any> = {};
+    if (title) updates.title = title;
+    if (description) updates.description = description;
+    if (categories) updates.categories = categories;
+    if (tags) updates.tags = tags;
+    if (isPublic !== undefined) updates.is_public = isPublic;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ ok: false, error: '没有提供任何更新字段' });
+    }
+
+    const { error } = await supabase.from('config_templates').update(updates).eq('id', id);
+    if (error) {
+      console.error('Update template error:', error);
+      return res.status(500).json({ ok: false, error: 'Failed to update template' });
+    }
+
+    await logActivity(null, 'admin_update_template', { adminUsername: result.user!.username, templateId: id, changes: Object.keys(updates) }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    return res.json({ ok: true, data: { message: 'Template updated successfully' } });
+  } catch (error) {
+    console.error('Update template error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+}
+
+async function handleDeleteTemplate(req: VercelRequest, res: VercelResponse, templateId: string) {
+  try {
+    const result = await requireAdmin(req);
+    if (result.error) return res.status(result.error.status).json({ ok: false, error: result.error.message });
+
+    const id = parseInt(templateId);
+    if (isNaN(id)) return res.status(400).json({ ok: false, error: 'Invalid template ID' });
+
+    const { error } = await supabase.from('config_templates').delete().eq('id', id);
+    if (error) return res.status(404).json({ ok: false, error: 'Template not found' });
+
+    await logActivity(null, 'admin_delete_template', { adminUsername: result.user!.username, templateId: id }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+    return res.json({ ok: true, data: { message: 'Template deleted successfully' } });
+  } catch (error) {
+    console.error('Delete template error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 }

@@ -72,6 +72,24 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Config templates table (配置模板市场)
+CREATE TABLE IF NOT EXISTS config_templates (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  source_platform TEXT NOT NULL,
+  target_platform TEXT NOT NULL,
+  config_data JSONB NOT NULL,
+  categories TEXT[],
+  tags TEXT[],
+  is_public BOOLEAN DEFAULT true,
+  downloads INTEGER DEFAULT 0,
+  likes INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_migrations_user_id ON migrations(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
@@ -80,6 +98,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_migration_drafts_user_id ON migration_drafts(user_id);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_templates_source_target ON config_templates(source_platform, target_platform);
+CREATE INDEX IF NOT EXISTS idx_templates_is_public ON config_templates(is_public);
+CREATE INDEX IF NOT EXISTS idx_templates_tags ON config_templates USING GIN(tags);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -124,6 +145,7 @@ ALTER TABLE migrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE migration_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE config_templates ENABLE ROW LEVEL SECURITY;
 
 -- admins 表：允许 service_role 访问，禁止其他用户访问
 GRANT ALL ON public.admins TO service_role;
@@ -151,4 +173,10 @@ CREATE POLICY "drafts_delete_own" ON migration_drafts FOR DELETE USING (true);
 
 -- activity_logs 表：只允许插入，不允许通过 anon key 查询
 CREATE POLICY "logs_insert" ON activity_logs FOR INSERT WITH CHECK (true);
+
+-- config_templates 表：公开模板所有人可读，用户可以插入自己的模板
+CREATE POLICY "templates_select_public" ON config_templates FOR SELECT USING (is_public = true);
+CREATE POLICY "templates_insert_own" ON config_templates FOR INSERT WITH CHECK (true);
+CREATE POLICY "templates_update_own" ON config_templates FOR UPDATE USING (true);
+CREATE POLICY "templates_delete_own" ON config_templates FOR DELETE USING (true);
 

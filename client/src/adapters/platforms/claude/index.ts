@@ -27,6 +27,7 @@ import {
   mapTransportType,
   mapMemoryType,
 } from '@/adapters/core/utils';
+import { transformSchema } from '@/adapters/core/mapper';
 
 export const claudeAdapter: PlatformAdapter = {
   id: 'claude',
@@ -69,53 +70,67 @@ export const claudeAdapter: PlatformAdapter = {
       return labels[c] || c;
     });
 
-    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
+    const prompt = `你好！我是 Claude 的长期用户，正在整理我的配置以便迁移到其他 AI 平台。
 
-请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
+Claude 以 Projects 为核心组织工作空间，每个 Project 都有独特的人设、系统提示词和自定义指令。请帮我完整梳理一下当前的配置：
 
 \`\`\`json
 {
   "projects": [
     {
       "name": "项目名称",
-      "description": "项目描述",
-      "persona_description": "你的人设/角色描述（用你自己的话概括，不是系统提示词原文）",
-      "custom_instructions": "自定义指令"
+      "description": "项目的用途和目标描述",
+      "persona_description": "你在这个项目中的角色定位和人设描述（用自然语言概括）",
+      "system_prompt": "项目的系统提示词原文（如果能获取到）",
+      "custom_instructions": "项目的自定义指令（你的行为准则、回复风格等）",
+      "tools": ["该项目中启用的工具/MCP 列表"]
     }
   ],
   "mcp_servers": [
     {
       "name": "MCP服务器名称",
       "transport_type": "stdio 或 sse 或 streamable-http",
-      "tools": ["可用工具列表"]
+      "tools": ["该 MCP 提供的可用工具列表"],
+      "description": "该 MCP 的功能描述"
     }
   ],
   "settings": {
-    "model": "默认模型名称",
+    "model": "当前使用的默认模型（如 claude-3-5-sonnet）",
     "temperature": 0.7,
-    "language": "语言偏好",
-    "effort_level": "思考量 low/normal/high/max",
-    "persona_description": "你的人设/角色描述（用你自己的话概括）"
+    "language": "你的语言偏好设置",
+    "effort_level": "思考量级别（low/normal/high/max）",
+    "persona_description": "你的全局人设描述（用自然语言概括）",
+    "custom_settings": {}
   },
   "memories": [
     {
-      "content": "记忆/偏好内容",
+      "content": "记忆内容（关于我的偏好、习惯、重要信息等）",
       "type": "fact 或 preference 或 instruction",
-      "tags": []
+      "tags": ["相关标签"]
+    }
+  ],
+  "knowledge_bases": [
+    {
+      "name": "知识库名称",
+      "description": "知识库描述",
+      "file_count": 0,
+      "topics": ["覆盖的主题"]
     }
   ]
 }
 \`\`\`
 
-说明：
-- 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
-- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息
-- Projects 中的提示词用你的人设描述来概括即可，不需要完整原文`;
+Claude 特有说明：
+- Projects 是 Claude 的核心概念，请务必详细列出每个项目的配置
+- MCP 服务器配置很重要，请列出所有已连接的 MCP
+- 记忆功能是 Claude 的特色，请列出你存储的所有用户记忆
+- 敏感信息（API Key、密码、认证Token等）不需要输出
+- 系统提示词如果太长，可以概括性描述，但尽量完整`;
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\\n2. 打开 Claude 对话界面（claude.ai）\\n3. 在任意项目或对话中粘贴提示词并发送\\n4. 复制 AI 返回的 JSON 结果\\n\\n💡 提示：MCP 配置也可以手动从 ~/.claude/settings.json 或 claude_desktop_config.json 中获取',
-      note: 'Claude 的 MCP 配置通常存储在本地文件系统中。如果 AI 无法完整导出，建议用户手动检查配置文件。',
+      instructions: '1. 复制上方提示词\\n2. 打开 Claude 对话界面（claude.ai）\\n3. 在任意 Project 中粘贴提示词并发送\\n4. 复制 AI 返回的 JSON 结果\\n\\n💡 提示：如果某些信息 AI 无法直接获取，可以手动从 ~/.claude/settings.json 或 claude_desktop_config.json 中补充',
+      note: 'Claude 的配置分散在多个位置：Projects 在云端，MCP 在本地配置文件中，记忆在云端。建议分别从不同来源获取完整配置。',
     };
   },
 
@@ -334,12 +349,14 @@ export const claudeAdapter: PlatformAdapter = {
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 Claude 中：\\n');
+    const sourcePlatformName = schema.sourcePlatform ? schema.sourcePlatform.toUpperCase() : '源平台';
 
-    // 处理其他平台导入的技能 → 转为 Claude Projects
+    parts.push(`你好！我刚刚从 ${sourcePlatformName} 导出了我的智能体配置，现在想迁移到 Claude 中。`);
+    parts.push('Claude 以 Projects 为核心组织工作空间，请按照以下映射规则帮我配置：\\n');
+
     if (configs.skills && configs.skills.length > 0 && options.categories.includes(MigrationCategory.SKILLS)) {
-      parts.push('## Projects（来自其他平台的技能）');
-      parts.push('请在 Claude 中创建对应的 Project，将以下技能配置为项目指令：\\n');
+      parts.push('## 📦 技能 → Projects（映射转换）');
+      parts.push(`${sourcePlatformName} 的"技能/插件"将转换为 Claude 的"Projects"，因为 Claude 没有技能系统，而是用 Projects 来组织不同的工作场景。\\n`);
       configs.skills.forEach((s) => {
         if (s.sensitivityLevel === SensitivityLevel.MUST_REMOVE) {
           importWarnings.push({
@@ -351,27 +368,32 @@ export const claudeAdapter: PlatformAdapter = {
           });
           return;
         }
-        parts.push(`### ${s.name}`);
-        parts.push(`描述：${s.description || '无描述'}`);
+        parts.push(`### 🆕 创建 Project：${s.name}`);
+        parts.push(`**描述**：${s.description || '无描述'}`);
         const content = typeof s.config === 'object' && s.config.content ? String(s.config.content) : '';
-        if (content) parts.push(`项目指令：${content}`);
+        if (content) parts.push(`**项目指令（系统提示词）**：${content}`);
+        if (s.config && s.config.tools && Array.isArray(s.config.tools)) {
+          parts.push(`**关联工具**：${s.config.tools.join(', ')}`);
+        }
         parts.push('');
       });
     }
 
     if (configs.prompts && configs.prompts.length > 0 && options.categories.includes(MigrationCategory.PROMPTS)) {
-      parts.push('## Projects / 提示词');
-      parts.push('请在 Claude 中创建对应的 Project，并设置以下内容：\\n');
+      parts.push('## 📝 提示词 → Projects / 系统指令（映射转换）');
+      parts.push(`${sourcePlatformName} 的"提示词/角色设定"将转换为 Claude 的"Projects"或"自定义指令"。\\n`);
       configs.prompts.forEach((p) => {
         if (p.sensitivityLevel === SensitivityLevel.MUST_REMOVE) return;
-        parts.push(`### ${p.name}`);
+        const typeLabel = p.type === 'system' ? '系统提示词' : (p.type === 'character' ? '人设设定' : '模板');
+        parts.push(`### ${typeLabel}：${p.name}`);
         parts.push(p.content);
         parts.push('');
       });
     }
 
     if (configs.mcpConnections && configs.mcpConnections.length > 0 && options.categories.includes(MigrationCategory.MCP_CONNECTIONS)) {
-      parts.push('## MCP 服务器配置');
+      parts.push('## 🔗 MCP 服务器配置（直接兼容）');
+      parts.push(`Claude 原生支持 MCP 协议，${sourcePlatformName} 的 MCP 配置可以直接迁移。\\n`);
       parts.push('请将以下配置添加到 claude_desktop_config.json 中：\\n');
       parts.push('```json');
       parts.push('{');
@@ -401,29 +423,32 @@ export const claudeAdapter: PlatformAdapter = {
     }
 
     if (configs.memories && configs.memories.length > 0 && options.categories.includes(MigrationCategory.MEMORIES)) {
-      parts.push('## 记忆/偏好');
+      parts.push('## 🧠 记忆/偏好（映射转换）');
+      parts.push(`${sourcePlatformName} 的"记忆"将转换为 Claude 的"Memories"功能。\\n`);
       parts.push('请在 Claude 设置中添加以下记忆：\\n');
       configs.memories.forEach((m) => {
         if (m.sensitivityLevel !== SensitivityLevel.MUST_REMOVE) {
-          parts.push(`- [${m.type}] ${m.content}`);
+          const typeLabel = m.type === 'fact' ? '事实' : (m.type === 'preference' ? '偏好' : (m.type === 'instruction' ? '指令' : '上下文'));
+          parts.push(`- [${typeLabel}] ${m.content}`);
         }
       });
       parts.push('');
     }
 
     if (configs.settings && options.categories.includes(MigrationCategory.SETTINGS)) {
-      parts.push('## 设置');
+      parts.push('## ⚙️ 设置（映射转换）');
+      parts.push('以下设置将映射到 Claude 的对应配置：\\n');
       const s = configs.settings;
-      if (s.model) parts.push(`- 默认模型：${s.model}`);
-      if (s.temperature !== undefined) parts.push(`- 温度：${s.temperature}`);
-      if (s.language) parts.push(`- 语言：${s.language}`);
+      if (s.model) parts.push(`- 默认模型：${s.model}（对应 Claude 的 Model Settings）`);
+      if (s.temperature !== undefined) parts.push(`- 温度：${s.temperature}（对应 Claude 的 Temperature）`);
+      if (s.language) parts.push(`- 语言：${s.language}（对应 Claude 的 Language Preference）`);
       if (s.personaDescription) {
-        parts.push('## 人设/角色设定');
-        parts.push('请按照以下人设描述设置你的角色：');
+        parts.push('\\n## 🎭 人设/角色设定');
+        parts.push('请按照以下人设描述设置你的角色（对应 Claude 的 Persona）：');
         parts.push(s.personaDescription);
       }
-      if (s.customSettings.effortLevel) parts.push(`- 思考量：${s.customSettings.effortLevel}`);
-      parts.push('这些设置可在 ~/.claude/settings.json 中配置\\n');
+      if (s.customSettings.effortLevel) parts.push(`- 思考量：${s.customSettings.effortLevel}（对应 Claude 的 Effort Level）`);
+      parts.push('\\n这些设置可在 ~/.claude/settings.json 中配置');
     }
 
     if (importWarnings.length > 0) {

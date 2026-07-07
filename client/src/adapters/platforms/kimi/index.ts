@@ -27,8 +27,8 @@ import {
   detectMemorySensitivity,
   mapTransportType,
   mapMemoryType,
-  mapPromptType,
 } from '@/adapters/core/utils';
+import { transformSchema } from '@/adapters/core/mapper';
 
 export const kimiAdapter: PlatformAdapter = {
   id: 'kimi',
@@ -66,51 +66,83 @@ export const kimiAdapter: PlatformAdapter = {
       return labels[c] || c;
     });
 
-    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
+    const prompt = `你好！我是 Kimi 的长期用户，正在整理我的配置以便迁移到其他 AI 平台。
 
-请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
+Kimi 的核心特色包括：Kimi+ 记忆系统、自定义技能/插件、自动化工作流和知识库。请帮我完整梳理一下当前的配置：
 
 \`\`\`json
 {
+  "skills": [
+    {
+      "name": "技能名称",
+      "description": "技能的功能描述",
+      "type": "plugin 或 tool",
+      "config": {
+        "content": "技能的配置内容或提示词",
+        "tools": ["该技能使用的工具列表"]
+      }
+    }
+  ],
   "prompts": [
     {
-      "name": "提示词名称",
-      "content": "你的人设描述和回复规则",
-      "type": "system"
+      "name": "提示词/人设名称",
+      "content": "你的人设描述和回复规则（用自然语言概括）",
+      "type": "system",
+      "tags": ["相关标签"]
     }
   ],
   "mcp_servers": [
     {
       "name": "MCP服务器名称",
       "transport_type": "stdio 或 sse 或 streamable-http",
-      "tools": ["可用工具列表"]
+      "tools": ["该 MCP 提供的可用工具列表"],
+      "description": "该 MCP 的功能描述"
     }
   ],
   "settings": {
-    "model": "默认模型名称（如 moonshot-v1-8k）",
+    "model": "当前使用的默认模型（如 moonshot-v1-8k、moonshot-v1-32k 等）",
     "temperature": 0.7,
-    "language": "语言偏好",
-    "persona_description": "你的人设/角色描述（用你自己的话概括）"
+    "language": "你的语言偏好设置",
+    "persona_description": "你的全局人设描述（用自然语言概括）",
+    "custom_settings": {}
   },
   "memories": [
     {
-      "content": "记忆/知识内容",
+      "content": "Kimi+ 记忆内容（关于我的偏好、习惯、重要信息等）",
       "type": "fact 或 preference 或 instruction",
-      "tags": []
+      "tags": ["相关标签"]
+    }
+  ],
+  "automations": [
+    {
+      "name": "自动化工作流名称",
+      "description": "工作流描述",
+      "trigger": "触发条件",
+      "actions": ["执行的动作列表"]
+    }
+  ],
+  "knowledge_bases": [
+    {
+      "name": "知识库名称",
+      "description": "知识库描述",
+      "file_count": 0,
+      "topics": ["覆盖的主题"]
     }
   ]
 }
 \`\`\`
 
-说明：
-- 敏感信息（API Key、密码、认证Token等）不需要输出，迁移时我会单独配置
-- MCP 连接只需要名称、传输方式和工具列表，不需要服务器地址和认证信息
-- 提示词用你的人设描述来概括即可，不需要完整原文`;
+Kimi 特有说明：
+- Kimi+ 记忆是你的特色功能，请详细列出所有存储的记忆
+- 自定义技能/插件是 Kimi 的核心能力，请列出所有已安装的技能
+- 自动化工作流很实用，请列出所有配置的自动化
+- 知识库功能支持上传文件，请列出所有知识库
+- 敏感信息（API Key、密码、认证Token等）不需要输出`;
 
     return {
       prompt,
-      instructions: '1. 复制上方提示词\\n2. 打开 Kimi 对话界面（kimi.moonshot.cn）\\n3. 在任意对话中粘贴提示词并发送\\n4. 复制 AI 返回的 JSON 结果\\n\\n💡 提示：MCP 配置也可以从 Kimi 的设置页面或配置文件中获取',
-      note: 'Kimi 的 MCP 配置通常存储在用户目录下。如果 AI 无法完整导出，建议用户手动检查配置文件。',
+      instructions: '1. 复制上方提示词\\n2. 打开 Kimi 对话界面（kimi.moonshot.cn）\\n3. 在任意对话中粘贴提示词并发送\\n4. 复制 AI 返回的 JSON 结果\\n\\n💡 提示：如果某些信息 AI 无法直接获取，可以手动从 Kimi 的设置页面补充',
+      note: 'Kimi 的配置分散在多个位置：技能在技能市场页面，记忆在 Kimi+ 页面，知识库在文件上传页面。建议分别从不同来源获取完整配置。',
     };
   },
 
@@ -294,22 +326,50 @@ export const kimiAdapter: PlatformAdapter = {
     const configs = schema.configs;
     const parts: string[] = [];
 
-    parts.push('请帮我配置以下内容到 Kimi 中：\\n');
+    const sourcePlatformName = schema.sourcePlatform ? schema.sourcePlatform.toUpperCase() : '源平台';
+
+    parts.push(`你好！我刚刚从 ${sourcePlatformName} 导出了我的智能体配置，现在想迁移到 Kimi 中。`);
+    parts.push('Kimi 以技能/插件和 Kimi+ 记忆为核心特色，请按照以下映射规则帮我配置：\\n');
+
+    // 技能（来自其他平台）
+    if (configs.skills && configs.skills.length > 0 && options.categories.includes(MigrationCategory.SKILLS)) {
+      parts.push('## 📦 技能/插件（映射转换）');
+      parts.push(`${sourcePlatformName} 的"技能/插件"将直接映射到 Kimi 的"自定义技能"。\\n`);
+      configs.skills.forEach((s) => {
+        if (s.sensitivityLevel === SensitivityLevel.MUST_REMOVE) {
+          importWarnings.push({
+            category: MigrationCategory.SKILLS,
+            field: s.name,
+            originalValue: '[已脱敏]',
+            reason: '该技能包含敏感信息，已自动脱敏',
+            alternative: '请手动重新配置认证信息',
+          });
+          return;
+        }
+        parts.push(`### 🆕 创建技能：${s.name}`);
+        parts.push(`**描述**：${s.description || '无描述'}`);
+        const content = typeof s.config === 'object' && s.config.content ? String(s.config.content) : '';
+        if (content) parts.push(`**技能配置/提示词**：${content}`);
+        parts.push('');
+      });
+    }
 
     // 人设描述（来自新版导出）
     if (configs.settings?.personaDescription && options.categories.includes(MigrationCategory.SETTINGS)) {
-      parts.push('## 人设/角色设定');
-      parts.push('请按照以下人设描述设置你的角色：');
+      parts.push('## 🎭 人设/角色设定');
+      parts.push('请按照以下人设描述设置你的角色（对应 Kimi 的角色设定）：');
       parts.push(configs.settings.personaDescription);
       parts.push('');
     }
 
     // 提示词
     if (configs.prompts && configs.prompts.length > 0 && options.categories.includes(MigrationCategory.PROMPTS)) {
-      parts.push('## 提示词/系统指令');
+      parts.push('## 📝 提示词/系统指令（映射转换）');
+      parts.push(`${sourcePlatformName} 的"提示词"将转换为 Kimi 的"角色设定"或"自定义指令"。\\n`);
       configs.prompts.forEach((p) => {
         if (p.sensitivityLevel === SensitivityLevel.MUST_REMOVE) return;
-        parts.push(`### ${p.name}`);
+        const typeLabel = p.type === 'system' ? '系统提示词' : (p.type === 'character' ? '人设设定' : '模板');
+        parts.push(`### ${typeLabel}：${p.name}`);
         parts.push(p.content);
         parts.push('');
       });

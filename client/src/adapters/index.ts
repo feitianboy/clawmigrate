@@ -1,6 +1,7 @@
 import { registry } from './core/registry';
 export { registry } from './core/registry';
 export * from './core/types';
+export * from './core/mapper';
 
 import { claudeAdapter } from './platforms/claude';
 import { kimiAdapter } from './platforms/kimi';

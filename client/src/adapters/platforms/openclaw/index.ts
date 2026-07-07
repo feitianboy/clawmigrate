@@ -77,37 +77,42 @@ export const openclawAdapter: PlatformAdapter = {
       return labels[c] || c;
     });
 
-    const prompt = `你好！我正在整理我的智能体配置清单，方便迁移到其他平台。能帮我梳理一下你当前的能力和配置吗？
+    const prompt = `你好！我是 OpenClaw 的用户，正在整理我的智能体配置以便迁移到其他 AI 平台。
 
-请按以下 JSON 格式整理（不需要包含任何密钥、密码等敏感信息，只整理能力清单）：
+OpenClaw 是一个高度可定制的开源智能助手平台，支持自定义技能、自动化工作流和 MCP 连接。请帮我完整梳理一下当前的配置：
 
 \`\`\`json
 {
-  "agent_name": "助手名称",
-  "agent_description": "简短描述你的功能",
+  "agent_name": "你的助手名称",
+  "agent_description": "你的功能定位和特色描述",
   "prompts": [
     {
       "name": "人设/角色名称",
-      "content": "你的人设描述和回复规则",
-      "type": "system 或 character 或 template"
+      "content": "你的人设描述和回复规则（系统提示词内容）",
+      "type": "system 或 character 或 template",
+      "priority": 1
     }
   ],
   "skills": [
     {
       "name": "技能名称",
-      "description": "功能描述",
+      "description": "技能的功能描述",
       "type": "plugin 或 skill 或 tool",
+      "config": {
+        "content": "技能的核心配置或提示词",
+        "tools": ["该技能使用的工具"]
+      },
       "enabled": true
     }
   ],
   "automations": [
     {
       "name": "工作流名称",
-      "description": "工作流描述",
+      "description": "工作流的用途描述",
       "type": "workflow 或 schedule 或 trigger",
-      "trigger": "触发条件",
-      "actions": ["动作列表"],
-      "schedule": "定时规则（如有）",
+      "trigger": "触发条件（如特定关键词、时间等）",
+      "actions": ["按顺序执行的动作列表"],
+      "schedule": "定时规则（如有，cron 格式）",
       "enabled": true
     }
   ],

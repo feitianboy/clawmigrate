@@ -6,7 +6,7 @@ import {
   Trash2, RefreshCw, CheckCircle, XCircle, Clock, Shield, Lock,
   ChevronLeft, ChevronRight, DollarSign, UserCheck, Eye, Activity,
   PieChart as PieChartIcon, Search, ArrowLeft, Crown, CreditCard, UserPlus,
-  Menu, FileText, RotateCcw,
+  Menu, FileText, RotateCcw, Plus, ArrowRight,
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, LineChart, Line, BarChart, Bar,
@@ -41,7 +41,7 @@ const tierNames: Record<string, string> = { free: '免费版', pro: '专业版' 
 const planNames: Record<string, string> = { pro_monthly: 'Pro月费', pro_yearly: 'Pro年费' };
 const statusNames: Record<string, string> = { pending: '待支付', paid: '已支付', cancelled: '已取消', refunded: '已退款' };
 
-type Page = 'dashboard' | 'users' | 'migrations' | 'orders' | 'revenue' | 'admins' | 'logs';
+type Page = 'dashboard' | 'users' | 'migrations' | 'orders' | 'revenue' | 'logs' | 'admins' | 'templates';
 
 const formatDate = (s: string) => new Date(s).toLocaleDateString('zh-CN', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -674,6 +674,157 @@ const LogsPage: React.FC = () => {
   );
 };
 
+// ---- 模板市场 ----
+const TemplatesPage: React.FC = () => {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({ title: '', description: '', sourcePlatform: '', targetPlatform: '', tags: '' });
+
+  const fetchTemplates = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/templates', { headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` } });
+      if (!response.ok) throw new Error('请求失败');
+      const result = await response.json();
+      setTemplates(result.data?.templates || []);
+    } catch (error) {
+      console.error('获取模板失败:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  const handleCreate = async () => {
+    if (!newTemplate.title || !newTemplate.sourcePlatform || !newTemplate.targetPlatform) return;
+    try {
+      const response = await fetch('/api/admin/templates', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newTemplate,
+          configData: {},
+          tags: newTemplate.tags.split(',').map(t => t.trim()).filter(Boolean),
+        }),
+      });
+      if (!response.ok) throw new Error('创建失败');
+      setShowCreateModal(false);
+      setNewTemplate({ title: '', description: '', sourcePlatform: '', targetPlatform: '', tags: '' });
+      fetchTemplates();
+    } catch (error) {
+      console.error('创建模板失败:', error);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('确定删除该模板？')) return;
+    try {
+      const response = await fetch(`/api/admin/templates?templateId=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` },
+      });
+      if (!response.ok) throw new Error('删除失败');
+      fetchTemplates();
+    } catch (error) {
+      console.error('删除模板失败:', error);
+    }
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>配置模板市场</h2>
+        <button onClick={() => setShowCreateModal(true)} style={{ ...S.btn, background: 'var(--color-primary)', color: 'white', border: 'none' }}>
+          <Plus size={16} />新建模板
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>加载中...</div>
+      ) : templates.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--color-text-muted)' }}>暂无模板</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--space-4)' }}>
+          {templates.map(t => (
+            <div key={t.id} style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-2)' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>{t.title}</h3>
+                <button onClick={() => handleDelete(t.id)} style={{ ...S.btn, padding: '2px 8px', fontSize: '0.75rem' }}><Trash2 size={12} /></button>
+              </div>
+              {t.description && <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>{t.description}</p>}
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                <span style={{ ...S.badge, background: 'rgba(59,130,246,0.1)', color: '#60a5fa' }}>
+                  {platformIcons[t.source_platform] || '🔄'} {platformNames[t.source_platform] || t.source_platform}
+                </span>
+                <ArrowRight size={12} style={{ marginTop: '4px', color: 'var(--color-text-muted)' }} />
+                <span style={{ ...S.badge, background: 'rgba(34,197,94,0.1)', color: '#4ade80' }}>
+                  {platformIcons[t.target_platform] || '🎯'} {platformNames[t.target_platform] || t.target_platform}
+                </span>
+              </div>
+              {t.tags && t.tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {t.tags.map((tag: string, i: number) => (
+                    <span key={i} style={{ ...S.badge, background: 'var(--color-bg)', color: 'var(--color-text-muted)' }}>#{tag}</span>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: 'var(--space-3)', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                下载: {t.downloads || 0} | 点赞: {t.likes || 0}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)', width: '400px', border: '1px solid var(--color-border)' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>新建配置模板</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '4px' }}>模板名称 *</label>
+                <input value={newTemplate.title} onChange={(e) => setNewTemplate({ ...newTemplate, title: e.target.value })} style={S.searchInput} placeholder="请输入模板名称" />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '4px' }}>描述</label>
+                <textarea value={newTemplate.description} onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })} style={{ ...S.searchInput, height: '80px', resize: 'vertical' }} placeholder="请输入模板描述" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '4px' }}>源平台 *</label>
+                  <select value={newTemplate.sourcePlatform} onChange={(e) => setNewTemplate({ ...newTemplate, sourcePlatform: e.target.value })} style={S.searchInput}>
+                    <option value="">请选择</option>
+                    {Object.entries(platformNames).map(([key, name]) => <option key={key} value={key}>{platformIcons[key]} {name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '4px' }}>目标平台 *</label>
+                  <select value={newTemplate.targetPlatform} onChange={(e) => setNewTemplate({ ...newTemplate, targetPlatform: e.target.value })} style={S.searchInput}>
+                    <option value="">请选择</option>
+                    {Object.entries(platformNames).map(([key, name]) => <option key={key} value={key}>{platformIcons[key]} {name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '4px' }}>标签（逗号分隔）</label>
+                <input value={newTemplate.tags} onChange={(e) => setNewTemplate({ ...newTemplate, tags: e.target.value })} style={S.searchInput} placeholder="如: 工作助手, 写作" />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+              <button onClick={() => setShowCreateModal(false)} style={S.btn}>取消</button>
+              <button onClick={handleCreate} style={{ ...S.btn, background: 'var(--color-primary)', color: 'white', border: 'none' }}>创建</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 // ---- 管理员管理 ----
 const AdminsPage: React.FC = () => {
   const { adminRecords, adminRecordsTotal, isLoading, fetchAdmins, createAdmin, deleteAdmin, updateAdmin, adminUser } = useAdminStore();
@@ -867,6 +1018,7 @@ export const AdminPage: React.FC = () => {
     { key: 'orders', label: '订单管理', icon: <ShoppingCart size={18} /> },
     { key: 'revenue', label: '营收分析', icon: <TrendingUp size={18} /> },
     { key: 'logs', label: '访问日志', icon: <FileText size={18} /> },
+    { key: 'templates', label: '模板市场', icon: <PieChartIcon size={18} /> },
     { key: 'admins', label: '后台管理', icon: <Shield size={18} /> },
   ];
 
@@ -948,6 +1100,7 @@ export const AdminPage: React.FC = () => {
           {currentPage === 'orders' && <OrdersPage />}
           {currentPage === 'revenue' && <RevenuePage />}
           {currentPage === 'logs' && <LogsPage />}
+          {currentPage === 'templates' && <TemplatesPage />}
           {currentPage === 'admins' && <AdminsPage />}
         </div>
       </div>
