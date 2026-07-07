@@ -260,6 +260,10 @@ async function handleDeleteOrder(req: VercelRequest, res: VercelResponse, subPat
     }
     if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
 
+    if (order.status === 'paid') {
+      return res.status(400).json({ ok: false, error: '已支付订单不能直接删除，请先执行退款操作' });
+    }
+
     const { error } = await supabase.from('orders').delete().eq('order_id', orderId);
     if (error) {
       console.error('Delete order error:', error);

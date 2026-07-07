@@ -499,7 +499,9 @@ const OrdersPage: React.FC = () => {
                         {o.status === 'pending' && (
                           <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: '#fbbf24' }} onClick={() => handleCancel(o.order_id)} title="取消订单"><XCircle size={16} /></button>
                         )}
-                        <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除订单 "${o.order_id}"？`) && deleteOrder(o.order_id)} title="删除"><Trash2 size={16} /></button>
+                        {o.status !== 'paid' && (
+  <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除订单 "${o.order_id}"？`) && deleteOrder(o.order_id)} title="删除"><Trash2 size={16} /></button>
+)}
                       </div>
                     </td>
                   </tr>
