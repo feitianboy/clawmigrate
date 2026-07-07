@@ -458,8 +458,11 @@ const OrdersPage: React.FC = () => {
   useEffect(() => { fetchOrders(1, 10, statusFilter || undefined); }, [fetchOrders, statusFilter]);
   const totalPages = Math.ceil(ordersTotal / 10);
 
-  const handleRefund = async (orderId: string, amount: number) => {
-    if (window.confirm(`确定对订单 "${orderId}" 进行退款操作？金额: ¥${amount}`)) {
+  const handleRefund = async (orderId: string, amount: number, isRetry = false) => {
+    const confirmMsg = isRetry
+      ? `确定对订单 "${orderId}" 重新发起退款？金额: ¥${amount}\n（订单状态已是已退款，此操作仅调用支付平台退款API）`
+      : `确定对订单 "${orderId}" 进行退款操作？金额: ¥${amount}`;
+    if (window.confirm(confirmMsg)) {
       await updateOrder(orderId, 'refunded');
     }
   };
@@ -496,12 +499,15 @@ const OrdersPage: React.FC = () => {
                         {o.status === 'paid' && (
                           <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-info)' }} onClick={() => handleRefund(o.order_id, o.amount)} title="退款"><CreditCard size={16} /></button>
                         )}
+                        {o.status === 'refunded' && (
+                          <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: '#f97316' }} onClick={() => handleRefund(o.order_id, o.amount, true)} title="重新退款"><RotateCcw size={16} /></button>
+                        )}
                         {o.status === 'pending' && (
                           <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: '#fbbf24' }} onClick={() => handleCancel(o.order_id)} title="取消订单"><XCircle size={16} /></button>
                         )}
                         {o.status !== 'paid' && (
-  <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除订单 "${o.order_id}"？`) && deleteOrder(o.order_id)} title="删除"><Trash2 size={16} /></button>
-)}
+                          <button style={{ ...S.btn, padding: 'var(--space-2)', border: 'none', background: 'transparent', color: 'var(--color-danger)' }} onClick={() => window.confirm(`确定删除订单 "${o.order_id}"？`) && deleteOrder(o.order_id)} title="删除"><Trash2 size={16} /></button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -224,8 +224,8 @@ async function handleUpdateOrder(req: VercelRequest, res: VercelResponse, subPat
     if (!order) return res.status(404).json({ ok: false, error: 'Order not found' });
 
     if (status === 'refunded') {
-      if (order.status !== 'paid') {
-        return res.status(400).json({ ok: false, error: '只有已支付的订单才能退款' });
+      if (order.status !== 'paid' && order.status !== 'refunded') {
+        return res.status(400).json({ ok: false, error: '只有已支付或已退款的订单才能执行退款操作' });
       }
 
       const refundResult = await zpayRefund(orderId, order.amount);
@@ -233,11 +233,12 @@ async function handleUpdateOrder(req: VercelRequest, res: VercelResponse, subPat
         return res.status(500).json({ ok: false, error: `退款失败: ${refundResult.message}` });
       }
 
-      await updateOrderStatus(orderId, 'refunded');
+      if (order.status === 'paid') {
+        await updateOrderStatus(orderId, 'refunded');
+        await updateMembership(order.user_id, 'free', null);
+      }
 
-      await updateMembership(order.user_id, 'free', null);
-
-      await logActivity(null, 'admin_refund_order', { adminUsername: result.user!.username, orderId, amount: order.amount, plan: order.plan, userId: order.user_id }, req.headers['x-forwarded-for'] as string || (req as any).ip);
+      await logActivity(null, 'admin_refund_order', { adminUsername: result.user!.username, orderId, amount: order.amount, plan: order.plan, userId: order.user_id, retry: order.status === 'refunded' }, req.headers['x-forwarded-for'] as string || (req as any).ip);
       return res.json({ ok: true, data: { message: `退款成功: ${refundResult.message}` } });
     }
 
