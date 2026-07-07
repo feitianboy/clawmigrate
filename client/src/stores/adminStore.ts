@@ -132,6 +132,7 @@ interface AdminState {
   fetchUserDetail: (userId: number) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
+  updateOrder: (orderId: string, status: string) => Promise<{ success: boolean; error?: string }>;
   fetchAdmins: () => Promise<void>;
   createAdmin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   deleteAdmin: (adminId: number) => Promise<void>;
@@ -395,6 +396,27 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       }));
     } catch (error) {
       set({ error: error instanceof Error ? error.message : '删除订单失败', isLoading: false });
+    }
+  },
+
+  updateOrder: async (orderId: string, status: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`/api/admin/orders?orderId=${orderId}`, {
+        method: 'PUT',
+        headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `请求失败: ${response.status}`);
+      }
+      get().fetchOrders();
+      set({ isLoading: false });
+      return { success: true };
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '更新订单失败', isLoading: false });
+      return { success: false, error: error instanceof Error ? error.message : '更新订单失败' };
     }
   },
 

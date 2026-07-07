@@ -39,11 +39,17 @@ export async function getActivityStats() {
 
   const { data: todayUVData } = await supabase
     .from('activity_logs')
-    .select('user_id')
-    .gte('created_at', today)
-    .not('user_id', 'is', null);
+    .select('user_id, ip')
+    .gte('created_at', today);
 
-  const uniqueUsers = new Set(todayUVData?.map(l => l.user_id) || []);
+  const uniqueUsers = new Set<string>();
+  todayUVData?.forEach(log => {
+    if (log.user_id) {
+      uniqueUsers.add(`user_${log.user_id}`);
+    } else if (log.ip) {
+      uniqueUsers.add(`ip_${log.ip}`);
+    }
+  });
   
   const { count: totalLogs } = await supabase
     .from('activity_logs')
