@@ -192,22 +192,6 @@ async function handleCallback(req, res) {
         catch { /* already sent */ }
     }
 }
-// Query ZPAY order status (active polling backup for callback)
-async function queryZpayOrder(orderId) {
-    try {
-        const url = `https://zpayz.cn/api.php?act=order&pid=${ZPAY_PID}&key=${ZPAY_KEY}&out_trade_no=${orderId}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        if (data.code === 1) {
-            return { paid: data.status === 1, tradeNo: data.trade_no || null };
-        }
-        return { paid: false, tradeNo: null };
-    }
-    catch (error) {
-        console.error('ZPAY query error:', error);
-        return { paid: false, tradeNo: null };
-    }
-}
 // ---- Get Single Order ----
 async function handleGetOrder(req, res, orderId) {
     try {
@@ -221,7 +205,7 @@ async function handleGetOrder(req, res, orderId) {
             return res.status(403).json({ ok: false, error: 'Access denied' });
         // Active ZPAY polling: if order is pending, query ZPAY API
         if (order.status === 'pending') {
-            const zpayResult = await queryZpayOrder(orderId);
+            const zpayResult = await (0, payment_1.queryZpayOrder)(orderId);
             if (zpayResult.paid) {
                 const paidAt = new Date();
                 await (0, membership_1.updateOrderStatus)(orderId, 'paid', paidAt);

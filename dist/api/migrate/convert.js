@@ -32,7 +32,7 @@ async function handler(req, res) {
         }
         const transformedSchema = (0, mapper_1.transformSchema)(parseResult.data, targetAdapter);
         const importOptions = {
-            categories: categories || Object.values(sourceAdapter.supportedCategories),
+            categories: categories || Object.values(sourceAdapter.supportedExportCategories),
             includeSensitive: false,
         };
         const importPrompt = targetAdapter.generateImportPrompt(transformedSchema, importOptions);

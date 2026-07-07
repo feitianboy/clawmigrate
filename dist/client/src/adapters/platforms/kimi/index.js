@@ -147,7 +147,7 @@ Kimi 特有说明：
                     id: `prompt_${i}`,
                     name: String(p.name || `提示词 ${i + 1}`),
                     content,
-                    type: mapPromptType(String(p.type || 'system')),
+                    type: (0, utils_1.mapPromptType)(String(p.type || 'system')),
                     sensitivityLevel: sensitivity,
                     originalFieldNames: { name: '提示词名称', content: '提示词内容', type: '提示词类型' },
                 });

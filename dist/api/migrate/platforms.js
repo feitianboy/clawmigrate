@@ -11,14 +11,16 @@ async function handler(req, res) {
         return res.status(405).json({ ok: false, error: 'Method not allowed' });
     }
     try {
-        const platforms = Array.from(adapters_1.registry.keys()).map(id => {
-            const adapter = adapters_1.registry.get(id);
-            const features = (0, adapters_1.getPlatformFeatureMatrix)()[id] || {};
+        const allAdapters = adapters_1.registry.getAll();
+        const featureMatrix = (0, adapters_1.getPlatformFeatureMatrix)();
+        const platforms = allAdapters.map(adapter => {
+            const id = adapter.id;
+            const features = featureMatrix[id] || {};
             return {
                 id,
-                name: adapter?.name || id,
+                name: adapter.name || id,
                 description: features.description || '',
-                supportedCategories: adapter?.supportedCategories || [],
+                supportedCategories: adapter.supportedExportCategories || [],
                 features: {
                     hasProjects: features.hasProjects || false,
                     hasSkills: features.hasSkills || false,

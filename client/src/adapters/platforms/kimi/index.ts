@@ -27,6 +27,7 @@ import {
   detectMemorySensitivity,
   mapTransportType,
   mapMemoryType,
+  mapPromptType,
 } from '@/adapters/core/utils';
 import { transformSchema } from '@/adapters/core/mapper';
 

@@ -11,21 +11,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const platforms = Array.from(registry.keys()).map(id => {
-      const adapter = registry.get(id);
-      const features = getPlatformFeatureMatrix()[id] || {};
+    const allAdapters = registry.getAll();
+    const featureMatrix = getPlatformFeatureMatrix();
+    const platforms = allAdapters.map(adapter => {
+      const id = adapter.id;
+      const features = featureMatrix[id as keyof typeof featureMatrix] || {};
       return {
         id,
-        name: adapter?.name || id,
-        description: features.description || '',
-        supportedCategories: adapter?.supportedCategories || [],
+        name: adapter.name || id,
+        description: (features as any).description || '',
+        supportedCategories: adapter.supportedExportCategories || [],
         features: {
-          hasProjects: features.hasProjects || false,
-          hasSkills: features.hasSkills || false,
-          hasMCP: features.hasMCP || false,
-          hasMemories: features.hasMemories || false,
-          hasAutomations: features.hasAutomations || false,
-          hasKnowledgeBase: features.hasKnowledgeBase || false,
+          hasProjects: (features as any).hasProjects || false,
+          hasSkills: (features as any).hasSkills || false,
+          hasMCP: (features as any).hasMCP || false,
+          hasMemories: (features as any).hasMemories || false,
+          hasAutomations: (features as any).hasAutomations || false,
+          hasKnowledgeBase: (features as any).hasKnowledgeBase || false,
         },
       };
     });

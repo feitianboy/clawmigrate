@@ -40,7 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const transformedSchema = transformSchema(parseResult.data, targetAdapter);
 
     const importOptions = {
-      categories: categories || Object.values(sourceAdapter.supportedCategories),
+      categories: categories || Object.values(sourceAdapter.supportedExportCategories),
       includeSensitive: false,
     };
 

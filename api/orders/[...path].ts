@@ -210,22 +210,6 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
 }
 
 
-// Query ZPAY order status (active polling backup for callback)
-async function queryZpayOrder(orderId: string): Promise<{ paid: boolean; tradeNo: string | null }> {
-  try {
-    const url = `https://zpayz.cn/api.php?act=order&pid=${ZPAY_PID}&key=${ZPAY_KEY}&out_trade_no=${orderId}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    if (data.code === 1) {
-      return { paid: data.status === 1, tradeNo: data.trade_no || null };
-    }
-    return { paid: false, tradeNo: null };
-  } catch (error) {
-    console.error('ZPAY query error:', error);
-    return { paid: false, tradeNo: null };
-  }
-}
-
 // ---- Get Single Order ----
 async function handleGetOrder(req: VercelRequest, res: VercelResponse, orderId: string) {
   try {
