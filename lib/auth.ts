@@ -74,7 +74,16 @@ export function clearRateLimit(key: string): void {
 
 // 获取客户端 IP
 export function getClientIp(req: VercelRequest): string {
-  return (req.headers['x-forwarded-for'] as string) || (req as any).ip || 'unknown';
+  const cfConnectingIp = req.headers['cf-connecting-ip'] as string;
+  if (cfConnectingIp) return cfConnectingIp;
+
+  const xForwardedFor = req.headers['x-forwarded-for'] as string;
+  if (xForwardedFor) {
+    const ips = xForwardedFor.split(',').map(ip => ip.trim());
+    return ips[0] || 'unknown';
+  }
+
+  return (req as any).ip || 'unknown';
 }
 
 // Helper function to extract token from cookies
